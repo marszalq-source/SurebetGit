@@ -150,38 +150,38 @@ class GoalTriggersEngine:
         if (lowest_over_ht and lowest_over_ht_line == 0.5 and total_goals == 0 and half == '1H' and
                 min_m_05ht <= minute <= max_m_05ht and not is_anti_goal_league and not is_sterile_possession):
 
-            min_sot = cfg_05_ht.get('min_sot', 2)
-            if sot >= min_sot and (shots_total >= cfg_05_ht.get('min_shots_total', 4) or apm >= cfg_05_ht.get('min_apm', 0.80) or xg_total >= cfg_05_ht.get('min_xg', 0.40)):
+            min_sot = max(2, cfg_05_ht.get('min_sot', 2))
+            if sot >= min_sot and shots_total >= 5 and (apm >= 0.82 or xg_total >= 0.45 or danger_index >= 60):
                 odds_val = float(lowest_over_ht['odds'])
                 reasons = []
                 confidence = 1
 
                 # Weryfikacja statystyczna
-                if apm >= 0.85:
+                if apm >= 0.88:
                     confidence += 1
                     reasons.append(f"Wysokie tempo APM ({apm:.2f} ataku/min)")
-                if sot >= 3:
-                    confidence += 1
+                if sot >= 4:
+                    confidence += 2
                     reasons.append(f"{sot} celne strzały w światło")
-                elif sot >= 2:
+                elif sot >= 3:
+                    confidence += 1
                     reasons.append(f"{sot} celne strzały")
-                if shots_total >= 5:
+                if shots_total >= 7:
                     confidence += 1
                     reasons.append(f"{shots_total} oddanych strzałów")
-                if xg_total >= 0.50:
+                if xg_total >= 0.60:
                     confidence += 1
                     reasons.append(f"Wysokie xG: {xg_total:.2f}")
-                if danger_index >= 65:
+                if danger_index >= 70:
                     confidence += 1
                     reasons.append(f"Danger Index: {danger_index}%")
 
-                # Estymacja EV i Sweet Spot kursowy
                 rem_mins_1h = max(1, 45 - minute)
                 ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_1h, odds_val)
 
-                # Sweet spot dla Over 0.5 HT: 1.50 - 2.25 (powyżej 2.25 wymagana podwyższona jakość)
-                odds_ok = (1.45 <= odds_val <= 2.25 and confidence >= 2) or (2.25 < odds_val <= 2.65 and confidence >= 3 and sot >= 3)
-                if odds_ok and ev >= -0.05:
+                # Sweet spot dla Over 0.5 HT: 1.45 - 2.15
+                odds_ok = (1.40 <= odds_val <= 2.15 and confidence >= 2) or (2.15 < odds_val <= 2.50 and confidence >= 4 and sot >= 3)
+                if odds_ok and ev >= -0.04:
                     stars_count = min(5, max(2, confidence))
                     signals.append({
                         'type': 'OVER_05_HT',
@@ -199,37 +199,40 @@ class GoalTriggersEngine:
         # =========================================================================
         cfg_15_ht = self.config.get('OVER_15_HT', {})
         min_m_15ht = cfg_15_ht.get('min_minute', 14)
-        max_m_15ht = cfg_15_ht.get('max_minute', 32)  # Odcięcie nieco wcześniej dla 2. bramki
+        max_m_15ht = cfg_15_ht.get('max_minute', 32)
 
         if (lowest_over_ht and lowest_over_ht_line == 1.5 and total_goals == 1 and half == '1H' and
                 min_m_15ht <= minute <= max_m_15ht and not is_anti_goal_league and not is_sterile_possession):
 
-            min_sot_15 = cfg_15_ht.get('min_sot', 2)
-            if sot >= min_sot_15 and (shots_total >= cfg_15_ht.get('min_shots_total', 5) or apm >= cfg_15_ht.get('min_apm', 0.90) or xg_total >= 0.60):
+            min_sot_15 = max(3, cfg_15_ht.get('min_sot', 3))
+            if sot >= min_sot_15 and shots_total >= 6 and (apm >= 0.88 or xg_total >= 0.65):
                 odds_val = float(lowest_over_ht['odds'])
                 reasons = []
                 confidence = 1
 
                 reasons.append(f"Mecz otwarty (wynik {home_score}:{away_score})")
-                if apm >= 0.90:
+                if apm >= 0.92:
                     confidence += 1
                     reasons.append(f"Intensywność APM ({apm:.2f})")
-                if sot >= 3:
-                    confidence += 1
+                if sot >= 4:
+                    confidence += 2
                     reasons.append(f"{sot} strzałów celnych")
-                if shots_total >= 6:
+                elif sot >= 3:
+                    confidence += 1
+                    reasons.append(f"{sot} strzały celne")
+                if shots_total >= 7:
                     confidence += 1
                     reasons.append(f"{shots_total} strzałów")
-                if xg_total >= 0.70:
+                if xg_total >= 0.80:
                     confidence += 1
                     reasons.append(f"xG: {xg_total:.2f}")
 
                 rem_mins_1h = max(1, 45 - minute)
                 ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_1h, odds_val)
 
-                # Sweet spot dla Over 1.5 HT: 1.65 - 2.50
-                odds_ok = (1.60 <= odds_val <= 2.50 and confidence >= 2) or (2.50 < odds_val <= 2.90 and confidence >= 4 and sot >= 4)
-                if odds_ok and ev >= -0.05:
+                # Sweet spot dla Over 1.5 HT: 1.55 - 2.45
+                odds_ok = (1.55 <= odds_val <= 2.45 and confidence >= 2) or (2.45 < odds_val <= 2.80 and confidence >= 4 and sot >= 4)
+                if odds_ok and ev >= -0.04:
                     stars_count = min(5, max(2, confidence))
                     signals.append({
                         'type': 'OVER_15_HT',
@@ -248,61 +251,72 @@ class GoalTriggersEngine:
         if (total_goals >= 1 and (minute >= 20 or half in ('HT', '2H')) and minute <= 78 and
                 lowest_over_ft and not is_blowout_game and not is_sterile_possession):
 
-            # Zabezpieczenie: wysokie linie Over 4.5+ wymagają wybitnego tempa
-            is_high_line = (lowest_over_ft_line is not None and lowest_over_ft_line >= 4.5)
-            allow_trigger = True
-            if is_high_line and (sot < 4 or xg_total < 1.20 or apm < 0.95):
-                allow_trigger = False
-
-            if allow_trigger and sot >= 2 and (apm >= 0.75 or xg_total >= 0.45 or shots_total >= 5):
+            # Wymóg: minimum 3 strzały celne, 6 strzałów łącznych i tempo gry
+            if sot >= 3 and shots_total >= 6 and (apm >= 0.80 or xg_total >= 0.60 or danger_index >= 60):
                 reasons = []
                 confidence = 1
                 reasons.append(f"Mecz otwarty po bramce ({home_score}:{away_score})")
 
-                if sot >= 3:
+                if sot >= 5:
+                    confidence += 2
+                    reasons.append(f"{sot} strzałów celnych")
+                elif sot >= 3:
                     confidence += 1
                     reasons.append(f"{sot} strzały celne")
-                if apm >= 0.85:
+                if apm >= 0.90:
                     confidence += 1
                     reasons.append(f"Napór APM: {apm:.2f}")
-                if shots_total >= 6:
+                if shots_total >= 8:
                     confidence += 1
                     reasons.append(f"{shots_total} łącznych strzałów")
-                if xg_total >= 0.80:
+                if xg_total >= 1.00:
                     confidence += 1
-                    reasons.append(f"xG: {xg_total:.2f}")
-                if score_diff <= 1:
+                    reasons.append(f"Wysokie xG: {xg_total:.2f}")
+                if danger_index >= 70:
                     confidence += 1
-                    reasons.append("Wynik na styku")
+                    reasons.append(f"Danger: {danger_index}%")
 
-                # Wybór optymalnej linii o najwyższym Value (preferowany kurs 1.45 - 2.35)
-                target_over_ft = lowest_over_ft
-                target_line = lowest_over_ft_line
+                # Inteligentny dobór linii:
+                # Linia +1 gol (najbezpieczniejsza) jest domyślna.
+                # Linia +2 gole (np. Over 2.5 przy 1:0) TYLKO gdy sot >= 4 i xG >= 1.10!
+                immediate_next_line = total_goals + 0.5
+                target_over_ft = None
+                target_line = None
+
                 for l_val, m_obj in available_over_ft:
-                    o_v = float(m_obj.get('odds', 0.0))
-                    if 1.45 <= o_v <= 2.35:
+                    if abs(l_val - immediate_next_line) < 0.1:
                         target_over_ft = m_obj
                         target_line = l_val
                         break
 
-                odds_val = float(target_over_ft['odds'])
-                rem_mins_ft = max(1, 90 - minute)
-                ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_ft, odds_val)
+                # Jeśli statystyki są wybitne (sot >= 4 i xG >= 1.10), możemy zagrać +2 gole
+                if (not target_over_ft or float(target_over_ft.get('odds', 0)) < 1.30) and sot >= 4 and xg_total >= 1.10:
+                    higher_line = total_goals + 1.5
+                    for l_val, m_obj in available_over_ft:
+                        if abs(l_val - higher_line) < 0.1:
+                            target_over_ft = m_obj
+                            target_line = l_val
+                            break
 
-                # Sweet spot kursowy: 1.45 - 2.35
-                if confidence >= 2 and 1.40 <= odds_val <= 2.40 and ev >= -0.08:
-                    time_desc = "Przerwa (HT)" if half == 'HT' else f"{minute}' min"
-                    stars_count = min(5, max(2, confidence))
-                    signals.append({
-                        'type': 'POST_GOAL_FT',
-                        'title': f"⚡ NATYCHMIASTOWY ALARM: OVER {target_line} FT",
-                        'badge': f"OVER {target_line} FT",
-                        'color': '#00B0FF',
-                        'odds': odds_val,
-                        'stars': stars_count,
-                        'ev': round(ev, 3),
-                        'desc': f"Błyskawiczna reakcja po bramce ({time_desc}). " + ", ".join(reasons)
-                    })
+                if target_over_ft and target_line:
+                    odds_val = float(target_over_ft['odds'])
+                    rem_mins_ft = max(1, 90 - minute)
+                    ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_ft, odds_val)
+
+                    # Sweet spot: 1.35 - 2.25
+                    if confidence >= 2 and 1.35 <= odds_val <= 2.25 and ev >= -0.04:
+                        time_desc = "Przerwa (HT)" if half == 'HT' else f"{minute}' min"
+                        stars_count = min(5, max(2, confidence))
+                        signals.append({
+                            'type': 'POST_GOAL_FT',
+                            'title': f"⚡ NATYCHMIASTOWY ALARM: OVER {target_line} FT",
+                            'badge': f"OVER {target_line} FT",
+                            'color': '#00B0FF',
+                            'odds': odds_val,
+                            'stars': stars_count,
+                            'ev': round(ev, 3),
+                            'desc': f"Błyskawiczna reakcja po bramce ({time_desc}). " + ", ".join(reasons)
+                        })
 
         # =========================================================================
         # --- D. STRATEGIA 4: OVER 1.5 FT W 2. POŁOWIE (WCZESNA 2H: 46'-68' MIN) ---

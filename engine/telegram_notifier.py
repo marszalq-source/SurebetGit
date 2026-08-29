@@ -946,13 +946,13 @@ class TelegramNotifier:
             return False
 
         # Mapowanie jednostek i sugerowanych stawek:
-        # 2 gwiazdki -> 1J (2.00 zł)
-        # 3 gwiazdki -> 2J (4.00 zł)
-        # 4+ gwiazdki -> 3J (6.00 zł - MAX)
-        if stars >= 4:
+        # 5 gwiazdek (Super-Lock / Top EV) -> 3J (6.00 zł)
+        # 4 gwiazdki (Wysoka pewność) -> 2J (4.00 zł)
+        # 2-3 gwiazdki (Standard Value) -> 1J (2.00 zł)
+        if stars >= 5:
             unit_tag = "3J"
             stake_desc = "6.00 zł (MAX)"
-        elif stars == 3:
+        elif stars == 4:
             unit_tag = "2J"
             stake_desc = "4.00 zł"
         else:
