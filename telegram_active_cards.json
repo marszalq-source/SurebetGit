@@ -7,16 +7,16 @@
     "home_team": "Playford Patriots",
     "away_team": "Adelaide City",
     "league": "24: AUSTRALIA: NPL South Australia - Play Offy",
-    "last_text": "<b>ALARM LIVE</b> <i>(Przerwa)</i>\n\n⚽️ <b>Playford Patriots vs Adelaide City</b>  <code>[1:2]</code>\n🏆 <b>Liga:</b> 24: AUSTRALIA: NPL South Australia - Play Offy\n⏱️ <b>Czas:</b> Przerwa\n\n🎯 <b>Rekomendacja:</b> <code>OVER 3.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>2.04</b>\n🔥 <b>80%</b> (APM: 0.9)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3345417\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
-    "last_odds": 2.04,
+    "last_text": "<b>ALARM LIVE</b> <i>(90')</i>\n\n⚽️ <b>Playford Patriots vs Adelaide City</b>  <code>[1:2]</code>\n🏆 <b>Liga:</b> 24: AUSTRALIA: NPL South Australia - Play Offy\n⏱️ <b>Czas:</b> 90'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 3.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>3.97</b>\n🔥 <b>18%</b> (APM: 0.19)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3345417\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
+    "last_odds": 3.97,
     "initial_score": "0:1",
     "initial_goals": 1,
     "target_goals": 4,
     "target_period": "FT",
     "created_at": 1787983054.3074362,
-    "last_edit_time": 1787987934.7759795,
-    "last_seen_time": 1787987934.7759795,
-    "last_seen_minute": 45,
+    "last_edit_time": 1787988813.1925678,
+    "last_seen_time": 1787988813.1925678,
+    "last_seen_minute": 90,
     "last_seen_score": "1:2",
     "last_seen_half": "1H",
     "sts_url": "https://www.sts.pl/live/pilka-nozna/f3345417",
@@ -27,34 +27,6 @@
     "danger": 80,
     "apm": 0.9
   },
-  "tigers_vs_canberra juventus": {
-    "device_messages": {
-      "8773792302": 516,
-      "5445412227": 517
-    },
-    "home_team": "Tigers FC",
-    "away_team": "Canberra Juventus",
-    "league": "24: AUSTRALIA: NPL ACT - Play Offy",
-    "last_text": "<b>ALARM LIVE</b> <i>(45')</i>\n\n⚽️ <b>Tigers FC vs Canberra Juventus</b>  <code>[0:2]</code>\n🏆 <b>Liga:</b> 24: AUSTRALIA: NPL ACT - Play Offy\n⏱️ <b>Czas:</b> 45'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 3.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>1.75</b>\n🔥 <b>72%</b> (APM: 0.84)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3349876\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
-    "last_odds": 1.75,
-    "initial_score": "0:1",
-    "initial_goals": 1,
-    "target_goals": 4,
-    "target_period": "FT",
-    "created_at": 1787985361.409501,
-    "last_edit_time": 1787987935.2062008,
-    "last_seen_time": 1787987935.2062008,
-    "last_seen_minute": 45,
-    "last_seen_score": "0:2",
-    "last_seen_half": "1H",
-    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3349876",
-    "badge": "OVER 3.5 FT",
-    "unit_tag": "3J",
-    "stars": 4,
-    "desc": "Błyskawiczna reakcja po bramce (25' min). Mecz otwarty po bramce (0:1), 6 łącznych strzałów, xG: 0.92, Wynik na styku",
-    "danger": 72,
-    "apm": 0.84
-  },
   "__settled_matches__": {
     "oakleigh_vs_dandenong city": 1787981753.545762,
     "preston lions_vs_altona magic": 1787982360.1964707,
@@ -63,6 +35,7 @@
     "george cross_vs_south melbourne": 1787986473.0458531,
     "avondale_vs_hume city": 1787986473.5826266,
     "heidelberg_vs_bentleigh": 1787986676.6087196,
-    "broadmeadow_vs_weston bears": 1787987061.755698
+    "broadmeadow_vs_weston bears": 1787987061.755698,
+    "tigers_vs_canberra juventus": 1787988729.5309525
   }
 }
