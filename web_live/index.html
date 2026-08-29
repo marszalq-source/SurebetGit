@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STS Live & Prematch Goal Scanner ⚽ – Niemcy, Holandia & Puchary</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="logo-area">
+            <div class="logo-icon">⚽</div>
+            <div>
+                <div class="logo-title">
+                    STS & FLASHSCORE <span class="sts-tag">GOAL SCANNER</span>
+                </div>
+                <div class="logo-subtitle">
+                    Skaner Live + Przedmeczowy (🇩🇪 Niemcy | 🇳🇱 Holandia | 🇪🇺 Puchary Europejskie)
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="nav-tab-btn active" data-tab="live">
+                🔴 LIVE SCANNER <span class="tab-count-badge" id="tab-live-count">0</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="prematch">
+                📅 SKANER PRZEDMECZOWY <span class="tab-count-badge" id="tab-prematch-count">0</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="watchlist">
+                ⭐ WATCHLISTA <span class="tab-count-badge" id="tab-watchlist-count">0</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="tracker" style="border-color: rgba(255, 214, 0, 0.4); color: #ffd600;">
+                📊 DZIENNIK & CEL +10 ZŁ <span class="tab-count-badge" id="tab-tracker-count">1</span>
+            </button>
+        </nav>
+
+        <div class="header-controls">
+            <button id="btn-browser-settings" class="btn" style="border-color: #ffd600; color: #ffd600; font-weight: 700;" title="Wybierz domyślną przeglądarkę do obstawiania oferty STS">
+                🌐 Przeglądarka
+            </button>
+            <button id="btn-open-telegram" class="btn" style="border-color: #0088cc; color: #29b6f6; font-weight: 700;">
+                📱 Telegram <span id="telegram-status-dot" style="font-size: 9px;">⚪</span>
+            </button>
+            <button id="btn-sound" class="btn btn-success active">
+                🔊 Dźwięk WŁ
+            </button>
+            <button id="btn-scan" class="btn btn-primary">
+                🔄 Skanuj Teraz
+            </button>
+        </div>
+    </header>
+
+
+    <div class="container">
+
+        <!-- ==================== TAB 1: LIVE SCANNER ==================== -->
+        <section id="section-live" class="tab-content active">
+            <!-- Stats Summary Bar -->
+            <div class="stats-summary">
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Mecze na żywo</h4>
+                        <div class="stat-value" id="stat-total-live">0</div>
+                    </div>
+                    <div class="stat-icon">🟢</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Aktywne Sygnały (Gole)</h4>
+                        <div class="stat-value" style="color: var(--accent-green);" id="stat-signals-count">0</div>
+                    </div>
+                    <div class="stat-icon">🎯</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Średni Indeks Groźności</h4>
+                        <div class="stat-value" style="color: var(--accent-yellow);" id="stat-avg-danger">0%</div>
+                    </div>
+                    <div class="stat-icon">🔥</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Następny skan</h4>
+                        <div class="stat-value" style="color: var(--accent-blue);" id="countdown-timer">15s</div>
+                    </div>
+                    <div class="stat-icon">⏱️</div>
+                </div>
+            </div>
+
+            <!-- Filter & Search Toolbar -->
+            <div class="filter-bar">
+                <div class="filter-group" style="flex-wrap: wrap;">
+                    <button id="btn-filter-all-live" class="btn active">
+                        🔘 Wszystkie Mecze (100% STS)
+                    </button>
+                    <button id="btn-filter-worth-watching" class="btn">
+                        🔥 Tylko Warte Uwagi (TOP Value)
+                    </button>
+                    <button id="btn-only-signals" class="btn">
+                        🚨 Tylko z Sygnałami
+                    </button>
+                    <div class="btn-group" style="display: flex; gap: 4px;">
+                        <button class="btn half-filter-btn active" data-half="ALL">Wszystkie</button>
+                        <button class="btn half-filter-btn" data-half="1H">1. Połowa (HT)</button>
+                        <button class="btn half-filter-btn" data-half="2H">2. Połowa (2H)</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <input type="text" id="search-live" class="search-input" placeholder="🔍 Szukaj meczu lub ligi...">
+                    <span style="font-size: 11px; color: var(--text-dim);">
+                        Ostatnia aktualizacja: <b id="last-update-time">--:--:--</b>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Matches Container Live -->
+            <div id="matches-container-live" class="matches-grid">
+                <div class="empty-state">
+                    <div class="empty-icon">⏳</div>
+                    <div class="empty-title">Inicjalizacja skanera Live...</div>
+                    <div class="empty-desc">Łączenie z bazą Flashscore oraz bukmacherem STS...</div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ==================== TAB 2: PRE-MATCH SCANNER ==================== -->
+        <section id="section-prematch" class="tab-content">
+            <!-- Prematch Filters -->
+            <div class="filter-bar" style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%;">
+                    <div class="filter-group" style="flex-wrap: wrap;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">LIGA / KRAJ:</span>
+                        <div class="btn-group" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn country-filter-btn active" data-country="ALL">🌍 Wszystkie Kraje (STS)</button>
+                            <button class="btn country-filter-btn" data-country="CHAMPIONS_LEAGUE">⭐ Liga Mistrzów (UCL)</button>
+                            <button class="btn country-filter-btn" data-country="CONFERENCE_LEAGUE">🏆 Liga Konferencji (UECL)</button>
+                            <button class="btn country-filter-btn" data-country="ULTRA_GOALS">🔥 TOP Maszyny do Goli (>3.2)</button>
+                            <button class="btn country-filter-btn" data-country="AUSTRALIA_ASIA">🇦🇺 Australia & Azja</button>
+                            <button class="btn country-filter-btn" data-country="NETHERLANDS">🇳🇱 Holandia</button>
+                            <button class="btn country-filter-btn" data-country="GERMANY">🇩🇪 Niemcy</button>
+                            <button class="btn country-filter-btn" data-country="SCANDINAVIA">❄️ Norwegia & Islandia</button>
+                            <button class="btn country-filter-btn" data-country="EUROPE">🇪🇺 Wszystkie Puchary</button>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="btn-group" style="display: flex; gap: 4px;">
+                            <button class="btn day-filter-btn active" data-day="0">Dzisiaj</button>
+                            <button class="btn day-filter-btn" data-day="1">Jutro</button>
+                        </div>
+                        <input type="text" id="search-prematch" class="search-input" placeholder="🔍 Szukaj meczu lub kraju...">
+                    </div>
+                </div>
+
+                <!-- Pasek filtrów czasowych i widoku akordeonu -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                    <div class="filter-group" style="flex-wrap: wrap;">
+                        <span style="font-size: 12px; font-weight: 800; color: #ffd600;">⏱️ ZA ILE MECZ:</span>
+                        <div class="btn-group" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn time-filter-btn active" data-time="ALL">Wszystkie godziny</button>
+                            <button class="btn time-filter-btn" data-time="1H">⚡ Za 1h (Najbliższe 60 min)</button>
+                            <button class="btn time-filter-btn" data-time="2H">⏳ Za 2h (Do 120 min)</button>
+                            <button class="btn time-filter-btn" data-time="3H">⏳ Za 3h (Do 180 min)</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 6px;">
+                        <button id="btn-expand-all-countries" class="btn btn-sm">🔽 Rozwiń Wszystkie</button>
+                        <button id="btn-collapse-all-countries" class="btn btn-sm">🔼 Zwiń Wszystkie</button>
+                    </div>
+                </div>
+
+                <!-- Pasek filtrów Oceny Eksperta -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                    <div class="filter-group" style="flex-wrap: wrap;">
+                        <span style="font-size: 12px; font-weight: 800; color: #00E676;">🎯 OCENA EKSPERTA:</span>
+                        <div class="btn-group" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn rating-filter-btn active" data-rating="ALL">👑 Wszystkie Oceny</button>
+                            <button class="btn rating-filter-btn" data-rating="85">🔥 TOP 85%+ (Ultra Bramkowe)</button>
+                            <button class="btn rating-filter-btn" data-rating="75">🟢 Min. 75%+ (Bardzo Dobre)</button>
+                            <button class="btn rating-filter-btn" data-rating="65">🟡 Min. 65%+ (Solidny Potencjał)</button>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 11px; color: var(--text-dim);">
+                        Wybrany filtr: <b id="prematch-rating-badge" style="color: #00E676;">Wszystkie Oceny</b>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prematch Matches Grid -->
+            <div id="matches-container-prematch" class="matches-grid">
+                <div class="empty-state">
+                    <div class="empty-icon">📅</div>
+                    <div class="empty-title">Ładowanie analizy przedmeczowej...</div>
+                    <div class="empty-desc">Przetwarzanie statystyk H2H, potencjału bramek i kalendarza europejskiego...</div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ==================== TAB 3: WATCHLIST ==================== -->
+        <section id="section-watchlist" class="tab-content">
+            <div class="filter-bar" style="margin-top: 14px;">
+                <div class="filter-group">
+                    <span style="font-size: 13px; font-weight: 700; color: var(--accent-yellow);">
+                        ⭐ TWOJA WATCHLISTA (Mecze przygotowane pod grę Live na bramki)
+                    </span>
+                </div>
+                <div class="filter-group">
+                    <button id="btn-clear-watchlist" class="btn">Wyczyść Watchlistę</button>
+                </div>
+            </div>
+
+            <div id="matches-container-watchlist" class="matches-grid">
+                <div class="empty-state">
+                    <div class="empty-icon">⭐</div>
+                    <div class="empty-title">Brak obserwowanych meczów</div>
+                    <div class="empty-desc">Przejdź do zakładki Skaner Przedmeczowy i kliknij ⭐ przy meczach, które chcesz śledzić.</div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ==================== TAB 4: BET TRACKER & STATS ==================== -->
+        <section id="section-tracker" class="tab-content">
+            <!-- Tracker KPI Bar -->
+            <div class="stats-summary" style="margin-top: 14px;">
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Aktualne Saldo</h4>
+                        <div class="stat-value" style="color: var(--accent-green);" id="tracker-bankroll">44.00 zł</div>
+                    </div>
+                    <div class="stat-icon">💰</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Dzisiejszy Zysk</h4>
+                        <div class="stat-value" id="tracker-daily-profit">0.00 zł</div>
+                    </div>
+                    <div class="stat-icon">🎯</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Skuteczność (Win Rate)</h4>
+                        <div class="stat-value" style="color: var(--accent-blue);" id="tracker-winrate">0%</div>
+                    </div>
+                    <div class="stat-icon">⭐</div>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-info">
+                        <h4>Zwrot z inwestycji (Yield)</h4>
+                        <div class="stat-value" style="color: var(--accent-yellow);" id="tracker-yield">0%</div>
+                    </div>
+                    <div class="stat-icon">📈</div>
+                </div>
+            </div>
+
+            <!-- Target Progress Box -->
+            <div class="target-progress-card">
+                <div class="target-progress-header">
+                    <div>
+                        <span style="font-weight: 800; color: #ffd600;">🎯 DZIENNY CEL: +10.00 ZŁ</span>
+                        <span id="target-status-text" style="margin-left: 10px; font-size: 12px; color: var(--text-muted);">(W trakcie realizacji)</span>
+                    </div>
+                    <div style="font-size: 13px; font-weight: 700;" id="target-progress-val">0 / 10.00 zł (0%)</div>
+                </div>
+                <div class="target-bar-bg">
+                    <div id="target-bar-fill" class="target-bar-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Quick Add Bet Toolbar -->
+            <div class="tracker-form-card">
+                <h3 style="font-size: 13px; margin-bottom: 10px; color: #fff;">➕ Szybkie Dodawanie Postawionego Zakładu / Kuponu:</h3>
+                <div class="tracker-form-grid">
+                    <input type="text" id="bet-input-match" class="search-input" placeholder="Mecz / Kupon (np. Bayern vs BVB)" style="flex: 2;">
+                    <input type="text" id="bet-input-market" class="search-input" placeholder="Typ (np. Over 0.5 HT)" style="flex: 1.5;">
+                    <input type="number" id="bet-input-stake" class="search-input" placeholder="Stawka zł (np. 4.00)" step="0.5" style="flex: 1;">
+                    <input type="number" id="bet-input-odds" class="search-input" placeholder="Kurs (np. 1.75)" step="0.01" style="flex: 1;">
+                    <input type="text" id="bet-input-notes" class="search-input" placeholder="Notatka (opcjonalnie)" style="flex: 1.5;">
+                    <button id="btn-add-bet" class="btn btn-primary" style="font-weight: 700;">➕ Dodaj Zakład</button>
+                </div>
+            </div>
+
+            <!-- Bets List -->
+            <div class="filter-bar" style="margin-top: 14px;">
+                <div class="filter-group">
+                    <span style="font-size: 13px; font-weight: 700; color: #fff;">📜 HISTORIA POSTAWIONYCH ZAKŁADÓW:</span>
+                </div>
+                <div class="filter-group">
+                    <button id="btn-edit-bankroll" class="btn btn-sm">⚙️ Zmień Saldo Początkowe</button>
+                </div>
+            </div>
+
+            <div id="tracker-bets-container" class="matches-grid">
+                <!-- Dynamicznie generowane karty zakładów -->
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ==================== FLOATING KUPON AKO (BET SLIP) ==================== -->
+    <div id="ako-slip-widget" class="ako-slip-widget closed">
+        <div class="ako-slip-header" id="ako-slip-header">
+            <div class="ako-slip-title">
+                🎫 KUPON AKO (<span id="ako-count">0</span>)
+                <span class="ako-badge-odds">Kurs: <b id="ako-total-odds">1.00</b></span>
+            </div>
+            <div class="ako-slip-controls">
+                <span id="ako-toggle-icon" style="font-size: 14px; cursor: pointer;">🔼</span>
+            </div>
+        </div>
+
+        <div class="ako-slip-body" id="ako-slip-body">
+            <div id="ako-legs-list" class="ako-legs-list">
+                <!-- Lista wybranych meczów do kuponu AKO -->
+                <div class="empty-ako-msg" style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+                    Kliknij kurs przy dowolnych meczach (Live lub Przedmeczowych), aby złożyć kupon AKO!
+                </div>
+            </div>
+
+            <div class="ako-calculator-box">
+                <div class="ako-calc-row">
+                    <span>Stawka (zł):</span>
+                    <input type="number" id="ako-input-stake" class="search-input" value="4.00" step="0.5" min="1" style="width: 85px; text-align: right; font-weight: 800; color: #ffd600;">
+                </div>
+                <div class="ako-calc-row">
+                    <span>Kurs całkowity:</span>
+                    <b id="ako-calc-odds" style="color: #fff;">1.00</b>
+                </div>
+                <div class="ako-calc-row">
+                    <span>Do wygrania (po 12% pod.):</span>
+                    <b id="ako-calc-win" style="color: var(--accent-green); font-size: 14px;">0.00 zł</b>
+                </div>
+                <div class="ako-calc-row">
+                    <span>Czysty zysk:</span>
+                    <b id="ako-calc-profit" style="color: var(--accent-yellow);">+0.00 zł</b>
+                </div>
+            </div>
+
+            <div class="ako-actions-row">
+                <button id="btn-save-ako" class="btn btn-primary" style="flex: 2; font-weight: 800;">
+                    💾 Zapisz Kupon AKO w Dzienniku
+                </button>
+                <button id="btn-clear-ako" class="btn btn-sm" style="flex: 1; color: var(--accent-red); border-color: rgba(255, 23, 68, 0.3);">
+                    🗑️ Wyczyść
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TELEGRAM CONFIG & MULTI-DEVICE MODAL ==================== -->
+    <div id="modal-telegram" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 580px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 20px;">📱</span>
+                    <h3 style="margin: 0; font-size: 16px; color: #fff;">Powiadomienia Telegram (Multi-Device & QR)</h3>
+                </div>
+                <button id="btn-close-telegram" class="btn-close-modal">✖</button>
+            </div>
+            
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px; padding: 18px 20px;">
+                <!-- QR Pairing Section -->
+                <div style="background: linear-gradient(135deg, rgba(0, 136, 204, 0.15), rgba(15, 23, 42, 0.6)); border: 1px solid rgba(0, 136, 204, 0.4); border-radius: 10px; padding: 14px; display: flex; gap: 16px; align-items: center;">
+                    <div style="background: #fff; padding: 6px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
+                        <img id="tg-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=https://t.me/skaner_skinow_cs2_bot?start=7777" alt="QR Kod Telegram" style="width: 130px; height: 130px; display: block;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <div style="font-weight: 800; font-size: 13px; color: #ffd600; text-transform: uppercase;">📲 Połącz Dowolny Telefon / Tablet</div>
+                        <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">
+                            1. Zeskanuj kod aparatem lub otwórz link:<br>
+                            👉 <a id="tg-direct-link" href="https://t.me/skaner_skinow_cs2_bot?start=7777" target="_blank" style="color: #38bdf8; font-weight: 700; text-decoration: underline;">t.me/skaner_skinow_cs2_bot</a><br>
+                            2. Kliknij <b>Start</b> w Telegramie – urządzenie zostanie natychmiast sparowane!
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                            <span style="font-size: 11px; color: var(--text-muted);">🔑 Hasło PIN:</span>
+                            <input type="text" id="tg-pairing-pin" class="search-input" style="width: 70px; padding: 2px 6px; text-align: center; font-weight: 800; color: #ffd600;" value="7777">
+                            <button id="btn-save-pin" class="btn btn-sm" style="font-size: 11px; padding: 4px 8px;">Zmień PIN</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connected Devices List -->
+                <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">📱 POŁĄCZONE URZĄDZENIA (<span id="tg-devices-count" style="color: var(--accent-green);">2</span>):</span>
+                        <span style="font-size: 10px; color: #94a3b8;">Wszystkie odbierają sygnały naraz</span>
+                    </div>
+                    <div id="tg-subscribers-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto;">
+                        <div style="font-size: 11px; color: var(--text-dim);">Ładowanie listy urządzeń...</div>
+                    </div>
+                </div>
+
+                <!-- Bot Settings -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="tg-enabled" checked style="cursor: pointer; width: 16px; height: 16px;">
+                        <label for="tg-enabled" style="font-size: 13px; font-weight: 700; cursor: pointer; color: #fff;">Włącz powiadomienia Live</label>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-muted);">Min. Stawka (Pewność):</label>
+                        <select id="tg-min-stars" class="search-input" style="padding: 4px 8px;">
+                            <option value="2" selected>1J+ (1J / 2J / 3J - Wszystkie)</option>
+                            <option value="3">2J+ (2J / 3J - Średnie i Wysokie)</option>
+                            <option value="4">3J (Tylko 3J - 6.00 zł MAX)</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <div id="tg-status-feedback" style="font-size: 12px; display: none; padding: 8px 12px; border-radius: 6px;"></div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+                    <button id="btn-tg-test" class="btn btn-primary" style="background: #0088cc; border-color: #0088cc;">
+                        🧪 Wyślij Test do Wszystkich
+                    </button>
+                    <button id="btn-tg-save" class="btn btn-success">
+                        💾 Zapisz Ustawienia
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Browser Chooser Modal -->
+    <div id="modal-browser" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title">🌐 Przeglądarka do oferty STS</div>
+                <button class="modal-close" id="btn-close-browser-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4;">
+                    Wybierz, w której aplikacji chcesz otwierać ofertę zakładów STS po kliknięciu sygnału z Telegrama lub programu:
+                </p>
+                <div id="browser-options-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+                    <!-- Rendered via JS -->
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+                    <button class="btn btn-secondary" id="btn-reset-browser" style="font-size: 12px;">🔄 Resetuj preferencję</button>
+                    <button class="btn btn-primary" id="btn-close-browser-action">Gotowe</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
+

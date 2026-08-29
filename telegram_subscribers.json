@@ -1,0 +1,46 @@
+{
+  "pairing_pin": "7777",
+  "require_pin": false,
+  "bot_username": "skaner_skinow_cs2_bot",
+  "subscribers": [
+    {
+      "chat_id": "8773792302",
+      "first_name": "Łukasz",
+      "username": "lukasz",
+      "device_name": "Właściciel / Twórca (ADMIN)",
+      "role": "ADMIN",
+      "joined_at": "2026-08-26 12:00:00",
+      "expires_at": null,
+      "is_active": true
+    },
+    {
+      "chat_id": "5445412227",
+      "first_name": "Łukasz (Drugie Urządzenie)",
+      "device_name": "Drugie Urządzenie (ADMIN)",
+      "role": "ADMIN",
+      "joined_at": "2026-08-27 06:19:00",
+      "expires_at": null,
+      "is_active": true
+    }
+  ],
+  "vip_price_pln": 99,
+  "trial_hours": 24,
+  "admins": [
+    "8773792302",
+    "5445412227"
+  ],
+  "promo_codes": {
+    "VIP30": {
+      "days": 30,
+      "uses_left": 100
+    },
+    "START7": {
+      "days": 7,
+      "uses_left": 50
+    },
+    "VIP30-1958": {
+      "days": 30,
+      "uses_left": 1
+    }
+  }
+}

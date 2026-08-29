@@ -1,0 +1,7 @@
+{
+  "initial_bankroll": 50.0,
+  "current_bankroll": 57.1,
+  "daily_target_profit": 10.0,
+  "daily_stop_loss": 6.0,
+  "bets": []
+}

@@ -1,0 +1,1388 @@
+import os
+import re
+import json
+import time
+import datetime
+import random
+import threading
+import urllib.request
+import urllib.parse
+from typing import Dict, Any, Optional, List, Tuple
+from engine.stats_engine import StatsEngine
+
+
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_config.json")
+CARDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_active_cards.json")
+SUBSCRIBERS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_subscribers.json")
+
+class TelegramNotifier:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(TelegramNotifier, cls).__new__(cls)
+            cls._instance._init_notifier()
+        return cls._instance
+
+    def _init_notifier(self):
+        self._cards_lock = threading.RLock()
+        self.config = self.load_config()
+        self.active_match_cards, self.settled_matches = self._load_cards()
+        self.subscribers_data = self._load_subscribers()
+        self.stats_engine = StatsEngine()
+        self._last_update_id = 0
+        self.start_polling_thread()
+
+    def start_polling_thread(self):
+        """Uruchamia ciągły wątek nasłuchujący poleceń z Telegrama (reakcja < 1s)."""
+        if getattr(self, '_polling_started', False):
+            return
+        self._polling_started = True
+
+        def _worker():
+            while True:
+                try:
+                    self.poll_pairing_requests()
+                except Exception:
+                    pass
+                time.sleep(1.0)
+
+        t = threading.Thread(target=_worker, daemon=True, name="TelegramLiveWorker")
+        t.start()
+
+
+    def load_config(self) -> Dict[str, Any]:
+        default_cfg = {
+            "enabled": False,
+            "bot_token": "",
+            "chat_id": "",
+            "min_stars": 2,
+            "notify_signals": True,
+            "notify_daily_goal": True,
+            "live_update_mode": True
+        }
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    default_cfg.update(data)
+            except Exception as e:
+                print(f"[Telegram] Błąd odczytu config: {e}")
+        return default_cfg
+
+    def save_config(self, new_cfg: Dict[str, Any]) -> bool:
+        try:
+            self.config.update(new_cfg)
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"[Telegram] Błąd zapisu config: {e}")
+            return False
+
+    def _load_subscribers(self) -> Dict[str, Any]:
+        default_sub = {
+            "pairing_pin": "7777",
+            "require_pin": True,
+            "bot_username": "skaner_skinow_cs2_bot",
+            "subscribers": []
+        }
+        if os.path.exists(SUBSCRIBERS_FILE):
+            try:
+                with open(SUBSCRIBERS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    default_sub.update(data)
+            except Exception as e:
+                print(f"[Telegram] Błąd odczytu subskrybentów: {e}")
+        else:
+            main_id = self.config.get("chat_id")
+            if main_id:
+                default_sub["subscribers"].append({
+                    "chat_id": str(main_id),
+                    "first_name": "Główne Urządzenie",
+                    "joined_at": time.strftime('%Y-%m-%d %H:%M:%S')
+                })
+            self._save_subscribers_data(default_sub)
+        return default_sub
+
+    def _save_subscribers_data(self, data: Dict[str, Any]):
+        try:
+            with open(SUBSCRIBERS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[Telegram] Błąd zapisu subskrybentów: {e}")
+
+    def get_all_chat_ids(self) -> List[str]:
+        """Zwraca listę AKTYWNYCH chat ID (Admini, aktywny VIP, aktywny Trial)."""
+        ids = set()
+        admins = set(str(a) for a in self.subscribers_data.get("admins", []))
+        main_id = self.config.get("chat_id", "").strip()
+        if main_id:
+            ids.add(str(main_id))
+            admins.add(str(main_id))
+
+        now_dt = datetime.datetime.now()
+        subs = self.subscribers_data.get("subscribers", [])
+        changed = False
+
+        for sub in subs:
+            cid = str(sub.get("chat_id", "")).strip()
+            if not cid:
+                continue
+
+            role = sub.get("role", "VIP")
+            # Admin zawsze ma dostęp dożywotni
+            if cid in admins or role == "ADMIN":
+                ids.add(cid)
+                continue
+
+            # Sprawdzenie daty ważności subskrypcji
+            exp_str = sub.get("expires_at")
+            if not exp_str:
+                ids.add(cid)
+                continue
+
+            try:
+                exp_dt = datetime.datetime.strptime(exp_str, '%Y-%m-%d %H:%M:%S')
+                if now_dt <= exp_dt:
+                    ids.add(cid)
+                else:
+                    if sub.get("role") != "EXPIRED":
+                        sub["role"] = "EXPIRED"
+                        changed = True
+                        # Wyślij jednorazowe powiadomienie o wygaśnięciu
+                        self.send_message(
+                            "⚠️ <b>TWÓJ DOSTĘP WYGASŁ</b> ⚠️\n\n"
+                            "Twój okres subskrypcji dobiegł końca.\n"
+                            "Aby odnowić dostęp do sygnałów na kolejne 30 dni, wpisz polecenie <code>/kup</code> lub aktywuj kod <code>/kod TWÓJ_KOD</code>.",
+                            chat_id=cid
+                        )
+            except Exception:
+                ids.add(cid)
+
+        if changed:
+            self._save_subscribers_data(self.subscribers_data)
+
+        return list(ids)
+
+
+    def _load_cards(self) -> Tuple[Dict[str, Any], Dict[str, float]]:
+        """Wczytuje aktywne i rozliczone karty wiadomości z pliku JSON i czyści przedawnione."""
+        cards = {}
+        settled = {}
+        if os.path.exists(CARDS_FILE):
+            try:
+                with open(CARDS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        if "__settled_matches__" in data:
+                            settled = data.pop("__settled_matches__", {})
+                        cards = data
+            except Exception as e:
+                print(f"[Telegram] Błąd odczytu kart: {e}")
+                cards = {}
+
+        now = time.time()
+        # Mecz piłkarski trwa max ~120 minut + 10 minut buforu = 7800 sekund
+        # Karty starsze niż 130 minut bez rozliczenia zostaną automatycznie usunięte
+        cleaned_cards = {
+            k: v for k, v in cards.items()
+            if isinstance(v, dict) and (now - v.get('created_at', now)) < 7800
+        }
+        cleaned_settled = {
+            k: float(v) for k, v in settled.items()
+            if isinstance(v, (int, float)) and (now - v) < 28800
+        }
+        return cleaned_cards, cleaned_settled
+
+    def _save_cards(self):
+        """Utrwala stan aktywnych i rozliczonych kart na dysku w sposób bezpieczny wątkowo."""
+        lock = getattr(self, '_cards_lock', None)
+        if lock:
+            lock.acquire()
+        try:
+            now = time.time()
+            # Oczyszczenie przedawnionych kart przed zapisem
+            self.active_match_cards = {
+                k: v for k, v in self.active_match_cards.items()
+                if isinstance(v, dict) and (now - v.get('created_at', now)) < 7800
+            }
+            self.settled_matches = {
+                k: float(v) for k, v in getattr(self, 'settled_matches', {}).items()
+                if isinstance(v, (int, float)) and (now - v) < 28800
+            }
+            data = dict(self.active_match_cards)
+            data["__settled_matches__"] = self.settled_matches
+            
+            tmp_file = CARDS_FILE + ".tmp"
+            with open(tmp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            if os.path.exists(tmp_file):
+                os.replace(tmp_file, CARDS_FILE)
+        except Exception as e:
+            print(f"[Telegram] Błąd zapisu kart: {e}")
+        finally:
+            if lock:
+                lock.release()
+
+    def send_message(self, text: str, chat_id: Optional[str] = None, parse_mode: str = "HTML", reply_markup: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        token = self.config.get("bot_token", "").strip()
+        target_chat = str(chat_id or self.config.get("chat_id", "")).strip()
+
+        if not token or not target_chat:
+            return {"success": False, "error": "Brak skonfigurowanego Bot Token lub Chat ID"}
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": target_chat,
+            "text": text,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": True
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json", "User-Agent": "SurebetScanner/2.0"}
+            )
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                res_body = json.loads(resp.read().decode('utf-8'))
+                return {"success": res_body.get("ok", False), "result": res_body.get("result", {})}
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode('utf-8', errors='ignore')
+            return {"success": False, "error": f"HTTP {e.code}: {err_msg}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def edit_message(self, message_id: int, text: str, chat_id: Optional[str] = None, parse_mode: str = "HTML", reply_markup: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        token = self.config.get("bot_token", "").strip()
+        target_chat = str(chat_id or self.config.get("chat_id", "")).strip()
+
+        if not token or not target_chat or not message_id:
+            return {"success": False, "error": "Brak parametrów do edycji wiadomości"}
+
+        url = f"https://api.telegram.org/bot{token}/editMessageText"
+        payload = {
+            "chat_id": target_chat,
+            "message_id": message_id,
+            "text": text,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": True
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json", "User-Agent": "SurebetScanner/2.0"}
+            )
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                res_body = json.loads(resp.read().decode('utf-8'))
+                return {"success": res_body.get("ok", False), "result": res_body.get("result", {})}
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode('utf-8', errors='ignore')
+            if "message is not modified" in err_msg:
+                return {"success": True, "not_modified": True}
+            return {"success": False, "error": f"HTTP {e.code}: {err_msg}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def send_message_all(self, text: str, parse_mode: str = "HTML") -> Dict[str, int]:
+        """Wysyła wiadomość do WSZYSTKICH podłączonych urządzeń / subskrybentów."""
+        results = {}
+        all_ids = self.get_all_chat_ids()
+        for cid in all_ids:
+            res = self.send_message(text, chat_id=cid, parse_mode=parse_mode)
+            if res.get("success"):
+                msg_id = res.get("result", {}).get("message_id")
+                if msg_id:
+                    results[str(cid)] = msg_id
+        return results
+
+    def edit_message_all(self, device_messages: Dict[str, int], text: str, parse_mode: str = "HTML") -> bool:
+        """Edytuje wiadomość w miejscu na WSZYSTKICH podłączonych urządzeniach."""
+        if not device_messages:
+            return False
+        success = False
+        for cid, msg_id in device_messages.items():
+            res = self.edit_message(msg_id, text, chat_id=cid, parse_mode=parse_mode)
+            if res.get("success") or res.get("not_modified"):
+                success = True
+        return success
+
+    def poll_pairing_requests(self) -> List[Dict[str, Any]]:
+        """Nasłuchuje nowych poleceń z Telegrama (Komendy Twórcy / Admina oraz Klientów VIP)."""
+        token = self.config.get("bot_token", "").strip()
+        if not token:
+            return []
+
+        if not hasattr(self, '_poll_lock'):
+            self._poll_lock = threading.Lock()
+        if not hasattr(self, '_processed_update_ids'):
+            self._processed_update_ids = set()
+
+        acquired = self._poll_lock.acquire(blocking=False)
+        if not acquired:
+            return []
+
+        url = f"https://api.telegram.org/bot{token}/getUpdates?offset={self._last_update_id + 1}&timeout=1"
+        new_paired = []
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "SurebetScanner/2.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                body = json.loads(resp.read().decode('utf-8'))
+                if not body.get("ok"):
+                    return []
+
+                updates = body.get("result", [])
+                admins = set(str(a) for a in self.subscribers_data.get("admins", []))
+                main_id = self.config.get("chat_id", "").strip()
+                if main_id:
+                    admins.add(str(main_id))
+
+                for u in updates:
+                    uid = u.get("update_id", 0)
+                    if uid in self._processed_update_ids:
+                        continue
+                    self._processed_update_ids.add(uid)
+                    if uid > self._last_update_id:
+                        self._last_update_id = uid
+
+                    # Obsługa kliknięć w przyciski Inline (callback_query)
+                    cb = u.get("callback_query")
+                    if cb:
+                        cb_id = cb.get("id")
+                        cb_data = cb.get("data", "")
+                        cb_msg = cb.get("message", {})
+                        cb_cid = str(cb_msg.get("chat", {}).get("id", ""))
+                        cb_mid = cb_msg.get("message_id")
+
+                        # Potwierdzenie odbioru kliknięcia
+                        try:
+                            ans_url = f"https://api.telegram.org/bot{token}/answerCallbackQuery"
+                            ans_data = json.dumps({"callback_query_id": cb_id}).encode('utf-8')
+                            ans_req = urllib.request.Request(ans_url, data=ans_data, headers={"Content-Type": "application/json"})
+                            urllib.request.urlopen(ans_req, timeout=3)
+                        except Exception:
+                            pass
+
+                        if cb_data.startswith("stats_"):
+                            period = cb_data.replace("stats_", "")
+                            stats_res = self.stats_engine.get_stats(period)
+                            stats_msg = self.stats_engine.format_telegram_message(stats_res)
+                            kb = self.stats_engine.get_inline_keyboard(current_period=period)
+                            if cb_mid and cb_cid:
+                                self.edit_message(cb_mid, stats_msg, chat_id=cb_cid, reply_markup=kb)
+                        continue
+
+                    msg = u.get("message")
+                    if not msg:
+                        continue
+
+                    chat = msg.get("chat", {})
+                    cid = str(chat.get("id", ""))
+                    from_user = msg.get("from", {})
+                    first_name = from_user.get("first_name", "Użytkownik")
+                    username = from_user.get("username", "")
+                    raw_text = msg.get("text", "").strip()
+                    if not cid or not raw_text:
+                        continue
+
+                    # Normalizacja tekstu: np. "/ kod 30" -> "/kod 30", "admin" -> "/admin"
+                    text = re.sub(r'^/\s+', '/', raw_text)
+                    if text.lower() in ("admin", "panel", "status", "konto", "mojekonto", "kup", "cennik", "lista", "kody", "stats", "statystyki", "bilans", "raport"):
+                        text = "/" + text
+                    text_lower = text.lower()
+                    is_admin = (cid in admins)
+
+                    subs = self.subscribers_data.setdefault("subscribers", [])
+                    sub_found = next((s for s in subs if str(s.get("chat_id")) == cid), None)
+                    if is_admin and sub_found and sub_found.get("role") != "ADMIN":
+                        sub_found["role"] = "ADMIN"
+                        self._save_subscribers_data(self.subscribers_data)
+
+                    # ========================================================
+                    # 👑 1. KOMENDY TWÓRCY / ADMINISTRATORA (DLA CIEBIE)
+                    # ========================================================
+                    if is_admin and text_lower.startswith(("/admin", "/panel", "/komendy", "/menu")):
+                        total_subs = len(subs)
+                        active_subs = len(self.get_all_chat_ids())
+                        price = self.subscribers_data.get("vip_price_pln", 99)
+                        codes_count = len(self.subscribers_data.get("promo_codes", {}))
+                        admin_msg = (
+                            "👑 <b>TWOJE CENTRUM DOWODZENIA (ADMIN)</b> 👑\n"
+                            "<i>Dostępne wyłącznie dla Ciebie (Właściciela).</i>\n\n"
+                            f"📊 <b>W bazie:</b> {total_subs} | <b>Aktywni:</b> {active_subs} | <b>Cena VIP:</b> {price:.2f} zł\n\n"
+                            "📈 <b>STATYSTYKI & HISTORIA:</b>\n"
+                            "• <code>/stats</code> – Interaktywny raport ze wszystkimi okresami\n"
+                            "• <code>/stats dzis</code> – Statystyki z dzisiejszego dnia\n"
+                            "• <code>/stats tydzien</code> – Statystyki z 7 dni\n"
+                            "• <code>/stats miesiac</code> – Statystyki z 30 dni\n"
+                            "• <code>/stats 3m</code> – Statystyki z 90 dni\n"
+                            "• <code>/stats rok</code> – Statystyki z 365 dni\n"
+                            "• <code>/stats all</code> – Statystyki całkowite\n"
+                            "• <code>/resetstats</code> – Wyzerowanie statystyk do czystego stanu (0/0)\n\n"
+                            "👥 <b>ZARZĄDZANIE KLIENTAMI & VIP:</b>\n"
+                            "• <code>/lista</code> – Pełna lista subskrybentów i terminy ważności\n"
+                            "• <code>/dodaj &lt;chat_id&gt; &lt;dni&gt;</code> – Nadanie dostępu VIP (np. <code>/dodaj 123456789 30</code>)\n"
+                            "• <code>/usun &lt;chat_id&gt;</code> – Zablokowanie i odebranie dostępu\n"
+                            "• <code>/kod &lt;dni&gt;</code> – Wygenerowanie unikalnego kodu VIP (np. <code>/kod 30</code>)\n"
+                            "• <code>/kody</code> – Lista aktywnych kodów promocyjnych\n"
+                            "• <code>/cena &lt;kwota&gt;</code> – Zmiana ceny subskrypcji (np. <code>/cena 149</code>)\n\n"
+                            "📢 <b>KOMUNIKACJA:</b>\n"
+                            "• <code>/ogloszenie &lt;treść&gt;</code> – Wysłanie wiadomości do wszystkich aktywnych\n\n"
+                            "💡 <i>Wpisz <code>/komendy</code> w dowolnym momencie, aby wyświetlić tę listę.</i>"
+                        )
+                        self.send_message(admin_msg, chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith("/dodaj"):
+                        parts = text.split()
+                        if len(parts) >= 3:
+                            target_cid = parts[1].replace("@", "").strip()
+                            try:
+                                days = int(parts[2])
+                                exp_dt = datetime.datetime.now() + datetime.timedelta(days=days)
+                                exp_str = exp_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+                                target_sub = next((s for s in subs if str(s.get("chat_id")) == target_cid or str(s.get("username", "")).lower() == target_cid.lower()), None)
+                                if not target_sub:
+                                    target_sub = {
+                                        "chat_id": target_cid,
+                                        "first_name": f"Klient {target_cid}",
+                                        "role": "VIP",
+                                        "joined_at": time.strftime('%Y-%m-%d %H:%M:%S')
+                                    }
+                                    subs.append(target_sub)
+
+                                target_sub["role"] = "VIP"
+                                target_sub["expires_at"] = exp_str
+                                target_sub["is_active"] = True
+                                self._save_subscribers_data(self.subscribers_data)
+
+                                self.send_message(
+                                    f"✅ <b>Pomyślnie nadano dostęp VIP!</b>\n"
+                                    f"👤 Użytkownik: <code>{target_cid}</code>\n"
+                                    f"📅 Ważność: <b>{days} dni</b> (do: {exp_str})",
+                                    chat_id=cid
+                                )
+                                self.send_message(
+                                    f"🎉 <b>TWÓJ DOSTĘP VIP ZOSTAŁ AKTYWOWANY!</b> 🎉\n\n"
+                                    f"💎 Twórca nadał Ci dostęp VIP na <b>{days} dni</b>.\n"
+                                    f"📅 Dostęp ważny do: <b>{exp_str}</b>\n"
+                                    f"🚀 Od teraz otrzymujesz wszystkie sygnały Over na żywo!",
+                                    chat_id=target_cid
+                                )
+                            except ValueError:
+                                self.send_message("❌ Błąd. Użyj: <code>/dodaj <chat_id> <liczba_dni></code>", chat_id=cid)
+                        else:
+                            self.send_message("❌ Użyj: <code>/dodaj <chat_id> <liczba_dni></code> (np. <code>/dodaj 123456789 30</code>)", chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith("/usun"):
+                        parts = text.split()
+                        if len(parts) >= 2:
+                            target_cid = parts[1].replace("@", "").strip()
+                            self.subscribers_data["subscribers"] = [s for s in subs if str(s.get("chat_id")) != target_cid]
+                            self._save_subscribers_data(self.subscribers_data)
+                            self.send_message(f"✅ Usunięto użytkownika <code>{target_cid}</code> z bazy.", chat_id=cid)
+                            self.send_message("👋 Twój dostęp do sygnałów został wyłączony przez administratora.", chat_id=target_cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith("/kod") and len(text.split()) >= 2 and text.split()[1].isdigit():
+                        days = int(text.split()[1])
+                        code_id = f"VIP{days}-" + str(random.randint(1000, 9999))
+                        codes = self.subscribers_data.setdefault("promo_codes", {})
+                        codes[code_id] = {"days": days, "uses_left": 1}
+                        self._save_subscribers_data(self.subscribers_data)
+                        self.send_message(
+                            f"🎟️ <b>WYGENEROWANO NOWY KOD VIP</b> 🎟️\n\n"
+                            f"🔑 Kod: <code>{code_id}</code>\n"
+                            f"📅 Ważność: <b>{days} dni</b>\n\n"
+                            f"Przekaż ten kod klientowi po opłaceniu. Klient wpisuje:\n"
+                            f"<code>/kod {code_id}</code>",
+                            chat_id=cid
+                        )
+                        continue
+
+                    elif is_admin and text_lower.startswith(("/kody", "/promokody")):
+                        codes = self.subscribers_data.get("promo_codes", {})
+                        if not codes:
+                            self.send_message("Brak aktywnych kodów. Wpisz <code>/kod 30</code> aby wygenerować.", chat_id=cid)
+                        else:
+                            txt = "🎟️ <b>LISTA KODÓW PROMOCYJNYCH:</b>\n\n"
+                            for c, info in codes.items():
+                                d = info.get("days", 30) if isinstance(info, dict) else info
+                                u = info.get("uses_left", 1) if isinstance(info, dict) else 1
+                                txt += f"• <code>{c}</code> ➔ <b>{d} dni</b> (Pozostało: {u})\n"
+                            self.send_message(txt, chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith(("/lista", "/subskrybenci")):
+                        txt = f"📋 <b>LISTA SUBSKRYBENTÓW ({len(subs)}):</b>\n\n"
+                        for s in subs:
+                            role = s.get("role", "VIP")
+                            name = s.get("first_name", "User")
+                            exp = s.get("expires_at") or "DOŻYWOTNI"
+                            cid_s = s.get("chat_id", "")
+                            badge = "👑 ADMIN" if role == "ADMIN" else ("💎 VIP" if role == "VIP" else ("🎁 TRIAL" if role == "TRIAL" else "❌ EXPIRED"))
+                            txt += f"• {badge} <b>{name}</b> (<code>{cid_s}</code>)\n   📅 Ważność: {exp}\n"
+                        self.send_message(txt, chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith("/ogloszenie"):
+                        announcement = text[len("/ogloszenie"):].strip()
+                        if announcement:
+                            msg_ann = f"📢 <b>KOMUNIKAT OD TWÓRCY</b> 📢\n\n{announcement}"
+                            self.send_message_all(msg_ann)
+                            self.send_message("✅ Ogłoszenie wysłane do wszystkich aktywnych użytkowników!", chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith("/cena"):
+                        parts = text.split()
+                        if len(parts) >= 2:
+                            try:
+                                new_p = float(parts[1])
+                                self.subscribers_data["vip_price_pln"] = new_p
+                                self._save_subscribers_data(self.subscribers_data)
+                                self.send_message(f"✅ Zmieniono cenę subskrypcji na <b>{new_p:.2f} zł / 30 dni</b>.", chat_id=cid)
+                            except ValueError:
+                                self.send_message("❌ Podaj poprawną kwotę, np. <code>/cena 149</code>", chat_id=cid)
+                        continue
+
+                    elif is_admin and text_lower.startswith(("/reset", "/resetstats", "/czysc", "/wyczysc", "/clean", "/zeruj")):
+                        # 1. Reset statystyk i bazy
+                        self.stats_engine.reset_history()
+                        self.active_match_cards.clear()
+                        self.settled_matches.clear()
+                        self._save_cards()
+                        
+                        try:
+                            with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_signals_history.json"), "w", encoding="utf-8") as f:
+                                json.dump([], f)
+                            with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_active_cards.json"), "w", encoding="utf-8") as f:
+                                json.dump({}, f)
+                            from engine.bet_tracker import BetTracker
+                            tracker = BetTracker()
+                            tdata = tracker._load_data()
+                            tdata["bets"] = []
+                            tracker._save_data(tdata)
+                        except Exception as ex:
+                            print(f"[Reset Command] File clean error: {ex}")
+
+                        # 2. Usuwanie ostatnich wiadomości na Telegramie (ostatnie 150 ID)
+                        current_mid = msg.get("message_id", 500)
+                        min_mid = max(1, current_mid - 150)
+                        from concurrent.futures import ThreadPoolExecutor
+                        
+                        def _del_msg(m_id):
+                            try:
+                                d_url = f"https://api.telegram.org/bot{token}/deleteMessage"
+                                p = json.dumps({"chat_id": cid, "message_id": m_id}).encode('utf-8')
+                                req_d = urllib.request.Request(d_url, data=p, headers={"Content-Type": "application/json"})
+                                urllib.request.urlopen(req_d, timeout=1.5)
+                            except Exception:
+                                pass
+
+                        try:
+                            with ThreadPoolExecutor(max_workers=16) as ex:
+                                list(ex.map(_del_msg, range(min_mid, current_mid + 1)))
+                        except Exception:
+                            pass
+
+                        # 3. Potwierdzenie na czacie
+                        self.send_message(
+                            "🧹 <b>STATYSTYKI I CZAT ZOSTAŁY WYCZYSZCZONE!</b>\n\n"
+                            "📊 <b>Bilans:</b> <code>0.00 J (0/0)</code>\n"
+                            "🎯 <b>Skuteczność:</b> <code>0.0%</code>\n"
+                            "💰 <b>Zysk:</b> <code>+0.00 zł</code>\n\n"
+                            "🚀 Nowa historia sygnałów rozpoczęta od zera!",
+                            chat_id=cid
+                        )
+                        continue
+
+                    # ========================================================
+                    # 👥 2. KOMENDY KLIENTÓW / SUBSKRYBENTÓW
+                    # ========================================================
+                    if text_lower.startswith("/start"):
+                        if is_admin:
+                            self.send_message(
+                                f"👑 <b>WITAJ W PANELU TWÓRCY, {first_name}!</b> 👑\n\n"
+                                f"Twój dostęp administratora jest <b>dożywotni i bezpłatny</b>.\n"
+                                f"Wpisz <code>/admin</code> aby otworzyć panel zarządzania klientami i kodami.",
+                                chat_id=cid
+                            )
+                            continue
+
+                        if sub_found:
+                            role = sub_found.get("role", "VIP")
+                            exp = sub_found.get("expires_at", "Dożywotni")
+                            if role in ("VIP", "ADMIN", "TRIAL"):
+                                self.send_message(
+                                    f"💎 <b>Witaj ponownie {first_name}!</b>\n\n"
+                                    f"Status Twojego konta: <b>{role}</b>\n"
+                                    f"📅 Ważny do: <b>{exp}</b> 🚀\n\n"
+                                    f"Odbierasz wszystkie sygnały Over na żywo.",
+                                    chat_id=cid
+                                )
+                                continue
+
+                        # Nowy użytkownik -> Darmowy 24h Trial
+                        trial_hours = self.subscribers_data.get("trial_hours", 24)
+                        exp_dt = datetime.datetime.now() + datetime.timedelta(hours=trial_hours)
+                        exp_str = exp_dt.strftime('%Y-%m-%d %H:%M:%S')
+
+                        if not sub_found:
+                            sub_found = {
+                                "chat_id": cid,
+                                "first_name": first_name,
+                                "username": username,
+                                "role": "TRIAL",
+                                "joined_at": time.strftime('%Y-%m-%d %H:%M:%S'),
+                                "expires_at": exp_str,
+                                "is_active": True
+                            }
+                            subs.append(sub_found)
+                            new_paired.append({"chat_id": cid, "name": first_name})
+                        else:
+                            sub_found["role"] = "TRIAL"
+                            sub_found["expires_at"] = exp_str
+                            sub_found["is_active"] = True
+
+                        self._save_subscribers_data(self.subscribers_data)
+                        welcome_trial_msg = (
+                            f"⚽ <b>WITAJ W STS LIVE GOAL SCANNER!</b> ⚽\n\n"
+                            f"🔥 Prawdziwe kursy STS na żywo i algorytm konsensusu 8 serwisów.\n"
+                            f"📈 <b>Skuteczność rynków Over: 90.9%!</b>\n\n"
+                            f"🎁 <b>Aktywowano DARMOWY DOSTĘP PRÓBNY ({trial_hours}h)!</b>\n"
+                            f"📅 Ważny do: <b>{exp_str}</b>\n\n"
+                            f"Będziesz otrzymywać tutaj wszystkie sygnały meczowe z sugerowanymi stawkami 1J, 2J, 3J.\n\n"
+                            f"💎 Aby wykupić pełny dostęp VIP (30 dni), wpisz: <code>/kup</code>\n"
+                            f"🎟️ Masz kod aktywacyjny? Wpisz: <code>/kod TWÓJ_KOD</code>"
+                        )
+                        self.send_message(welcome_trial_msg, chat_id=cid)
+                        continue
+
+                    elif text_lower.startswith(("/kup", "/cennik", "/oferta", "/vip")):
+                        price = self.subscribers_data.get("vip_price_pln", 99)
+                        buy_msg = (
+                            f"💎 <b>SUBSKRYPCJA VIP – STS LIVE GOAL SCANNER</b> 💎\n\n"
+                            f"🚀 <b>Co zyskujesz w pakiecie VIP:</b>\n"
+                            f"• Wszystkie sygnały Over 1.5 / 2.5 FT na żywo (skuteczność 90.9%)\n"
+                            f"• Błyskawiczne alerty natychmiast po golu i w Złotym Oknie 1H\n"
+                            f"• Zarządzanie kapitałem i sugerowane stawki 1J, 2J, 3J\n"
+                            f"• Bezpośrednie linki do oferty STS Live\n\n"
+                            f"💰 <b>CENA: {price:.2f} zł / 30 dni</b>\n\n"
+                            f"📲 <b>JAK DOKONAĆ ZAKUPU:</b>\n"
+                            f"1. Skontaktuj się z twórcą w celu płatności BLIK / Przelewem.\n"
+                            f"2. Po wpłacie otrzymasz swój unikalny Kod VIP.\n"
+                            f"3. Wpisz w tym czacie polecenie:\n"
+                            f"<code>/kod TWÓJ_KOD</code> aby natychmiast odblokować 30 dni VIP!"
+                        )
+                        self.send_message(buy_msg, chat_id=cid)
+                        continue
+
+                    elif text_lower.startswith("/kod") or text_lower.startswith("/aktywuj"):
+                        code_entered = text.replace("/kod", "").replace("/aktywuj", "").strip().upper()
+                        codes = self.subscribers_data.get("promo_codes", {})
+                        if code_entered and code_entered in codes:
+                            c_info = codes[code_entered]
+                            days_to_add = c_info.get("days", 30) if isinstance(c_info, dict) else c_info
+
+                            if not sub_found:
+                                sub_found = {
+                                    "chat_id": cid,
+                                    "first_name": first_name,
+                                    "username": username,
+                                    "role": "VIP",
+                                    "joined_at": time.strftime('%Y-%m-%d %H:%M:%S')
+                                }
+                                subs.append(sub_found)
+
+                            base_dt = datetime.datetime.now()
+                            cur_exp = sub_found.get("expires_at")
+                            if cur_exp:
+                                try:
+                                    parsed_cur = datetime.datetime.strptime(cur_exp, '%Y-%m-%d %H:%M:%S')
+                                    if parsed_cur > base_dt:
+                                        base_dt = parsed_cur
+                                except Exception:
+                                    pass
+
+                            new_exp = base_dt + datetime.timedelta(days=days_to_add)
+                            new_exp_str = new_exp.strftime('%Y-%m-%d %H:%M:%S')
+                            sub_found["role"] = "VIP"
+                            sub_found["expires_at"] = new_exp_str
+                            sub_found["is_active"] = True
+
+                            if isinstance(c_info, dict):
+                                c_info["uses_left"] = c_info.get("uses_left", 1) - 1
+                                if c_info["uses_left"] <= 0:
+                                    del codes[code_entered]
+
+                            self._save_subscribers_data(self.subscribers_data)
+                            self.send_message(
+                                f"🎉 <b>KOD AKTYWOWANY POMYŚLNIE!</b> 🎉\n\n"
+                                f"💎 Przedłużono dostęp VIP o <b>+{days_to_add} dni</b>!\n"
+                                f"📅 Dostęp ważny do: <b>{new_exp_str}</b>\n"
+                                f"🚀 Powodzenia w obstawianiu z algorytmem!",
+                                chat_id=cid
+                            )
+                        else:
+                            self.send_message("❌ Niepoprawny kod promocyjny. Sprawdź pisownię lub wpisz <code>/kup</code>.", chat_id=cid)
+                        continue
+
+                    elif text_lower in ("/status", "/mojekonto", "/konto"):
+                        if is_admin:
+                            self.send_message("👑 <b>Twój status:</b> WŁAŚCICIEL / TWÓRCA (ADMIN)\n📅 <b>Ważność:</b> Dożywotnia (Bez limitu)", chat_id=cid)
+                        elif sub_found:
+                            r = sub_found.get("role", "VIP")
+                            exp = sub_found.get("expires_at", "Brak danych")
+                            self.send_message(
+                                f"👤 <b>INFORMACJE O TWOIM KONCIE</b>\n\n"
+                                f"💎 <b>Plan:</b> {r}\n"
+                                f"📅 <b>Ważny do:</b> {exp}\n"
+                                f"🚀 <b>Powiadomienia Live:</b> Aktywne",
+                                chat_id=cid
+                            )
+                        else:
+                            self.send_message("Wpisz <code>/start</code> aby aktywować konto.", chat_id=cid)
+                        continue
+
+                    elif text_lower.startswith(("/stats", "/statystyki", "/bilans", "/raport", "/wyniki")):
+                        parts = text_lower.split()
+                        period = "30d"
+                        if len(parts) >= 2:
+                            p_arg = parts[1].strip()
+                            if p_arg in ("1d", "dzis", "dzisiaj", "today", "1"):
+                                period = "1d"
+                            elif p_arg in ("7d", "tydzien", "tydzień", "week", "7"):
+                                period = "7d"
+                            elif p_arg in ("30d", "miesiac", "miesiąc", "month", "30"):
+                                period = "30d"
+                            elif p_arg in ("90d", "3m", "kwartal", "kwartał", "90"):
+                                period = "90d"
+                            elif p_arg in ("365d", "rok", "year", "365"):
+                                period = "365d"
+                            elif p_arg in ("all", "wszystko", "calosc", "całość"):
+                                period = "all"
+
+                        stats_res = self.stats_engine.get_stats(period)
+                        stats_msg = self.stats_engine.format_telegram_message(stats_res)
+                        kb = self.stats_engine.get_inline_keyboard(current_period=period)
+                        self.send_message(stats_msg, chat_id=cid, reply_markup=kb)
+                        continue
+
+                    elif text_lower in ("/pomoc", "/help"):
+                        if is_admin:
+                            admin_msg = (
+                                "👑 <b>TWOJE CENTRUM DOWODZENIA (ADMIN)</b> 👑\n"
+                                "<i>Dostępne wyłącznie dla Ciebie (Właściciela).</i>\n\n"
+                                "📈 <b>STATYSTYKI & HISTORIA:</b>\n"
+                                "• <code>/stats</code> – Interaktywny raport ze wszystkimi okresami\n"
+                                "• <code>/stats dzis</code> – Statystyki z dzisiejszego dnia\n"
+                                "• <code>/stats tydzien</code> – Statystyki z 7 dni\n"
+                                "• <code>/stats miesiac</code> – Statystyki z 30 dni\n"
+                                "• <code>/stats 3m</code> – Statystyki z 90 dni\n"
+                                "• <code>/stats rok</code> – Statystyki z 365 dni\n"
+                                "• <code>/stats all</code> – Statystyki całkowite\n"
+                                "• <code>/resetstats</code> – Wyzerowanie statystyk (0/0)\n\n"
+                                "👥 <b>ZARZĄDZANIE KLIENTAMI & VIP:</b>\n"
+                                "• <code>/lista</code> – Pełna lista subskrybentów i ważności\n"
+                                "• <code>/dodaj &lt;chat_id&gt; &lt;dni&gt;</code> – Nadanie dostępu VIP\n"
+                                "• <code>/usun &lt;chat_id&gt;</code> – Zablokowanie i odebranie dostępu\n"
+                                "• <code>/kod &lt;dni&gt;</code> – Wygenerowanie unikalnego kodu VIP\n"
+                                "• <code>/kody</code> – Lista aktywnych kodów promocyjnych\n"
+                                "• <code>/cena &lt;kwota&gt;</code> – Zmiana ceny subskrypcji\n\n"
+                                "📢 <b>KOMUNIKACJA:</b>\n"
+                                "• <code>/ogloszenie &lt;treść&gt;</code> – Wysłanie wiadomości do wszystkich"
+                            )
+                            self.send_message(admin_msg, chat_id=cid)
+                        else:
+                            self.send_message(
+                                "ℹ️ <b>DOSTĘPNE POLECENIA:</b>\n\n"
+                                "• <code>/stats</code> – Statystyki skuteczności (dzień, tydzień, miesiąc, rok)\n"
+                                "• <code>/start</code> – Aktywacja konta / Powitanie\n"
+                                "• <code>/kup</code> – Cennik i zakup subskrypcji VIP\n"
+                                "• <code>/kod KOD</code> – Aktywacja kodu promocyjnego\n"
+                                "• <code>/mojekonto</code> – Stan Twojej subskrypcji\n"
+                                "• <code>/stop</code> – Wyłączenie powiadomień",
+                                chat_id=cid
+                            )
+                        continue
+
+                    elif text_lower in ("/stop", "/wyloguj", "/odlacz"):
+                        self.subscribers_data["subscribers"] = [s for s in subs if str(s.get("chat_id")) != cid]
+                        self._save_subscribers_data(self.subscribers_data)
+                        self.send_message("👋 <b>POWIADOMIENIA WYŁĄCZONE</b>\nTwoje urządzenie zostało odłączone.", chat_id=cid)
+                        continue
+
+        except urllib.error.HTTPError as he:
+            if he.code != 409:
+                print(f"[Telegram] HTTP Error w poll_pairing_requests: {he}")
+        except Exception as e:
+            print(f"[Telegram] Błąd w poll_pairing_requests: {e}")
+
+        finally:
+            if acquired:
+                try:
+                    self._poll_lock.release()
+                except Exception:
+                    pass
+        return new_paired
+
+
+    def get_pairing_info(self) -> Dict[str, Any]:
+        bot_user = self.subscribers_data.get("bot_username", "skaner_skinow_cs2_bot")
+        pin = self.subscribers_data.get("pairing_pin", "7777")
+        join_url = f"https://t.me/{bot_user}?start={pin}"
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=260x260&data={urllib.parse.quote(join_url)}"
+        
+        return {
+            "bot_username": bot_user,
+            "pairing_pin": pin,
+            "join_url": join_url,
+            "qr_code_url": qr_url,
+            "subscribers": self.subscribers_data.get("subscribers", []),
+            "total_devices": len(self.get_all_chat_ids())
+        }
+
+    def _normalize_name(self, name: str) -> str:
+        from engine.live_matcher import normalize_team_name
+        return normalize_team_name(str(name or ""))
+
+    def _find_existing_card_key(self, home: str, away: str) -> Optional[str]:
+        h_norm = self._normalize_name(home)
+        a_norm = self._normalize_name(away)
+        if not h_norm or not a_norm:
+            return None
+            
+        h_words = set(w for w in h_norm.split() if len(w) > 1)
+        a_words = set(w for w in a_norm.split() if len(w) > 1)
+
+        lock = getattr(self, '_cards_lock', None)
+        if lock: lock.acquire()
+        try:
+            for key, card in self.active_match_cards.items():
+                card_h = card.get('home_team', '')
+                card_a = card.get('away_team', '')
+                ch_norm = self._normalize_name(card_h)
+                ca_norm = self._normalize_name(card_a)
+                if not ch_norm or not ca_norm:
+                    continue
+
+                ch_words = set(w for w in ch_norm.split() if len(w) > 1)
+                ca_words = set(w for w in ca_norm.split() if len(w) > 1)
+
+                # 1. Dokładne lub zawierające się dopasowanie
+                if (h_norm == ch_norm or h_norm in ch_norm or ch_norm in h_norm) and \
+                   (a_norm == ca_norm or a_norm in ca_norm or ca_norm in a_norm):
+                    return key
+
+                # 2. Przecięcie słów kluczowych
+                h_match = bool(h_words and ch_words and (h_words.intersection(ch_words) or any(w in ch_norm for w in h_words) or any(w in h_norm for w in ch_words)))
+                a_match = bool(a_words and ca_words and (a_words.intersection(ca_words) or any(w in ca_norm for w in a_words) or any(w in a_norm for w in ca_words)))
+                if h_match and a_match:
+                    return key
+
+                # 3. Fuzzy similarity
+                import difflib
+                sim_h = difflib.SequenceMatcher(None, h_norm, ch_norm).ratio()
+                sim_a = difflib.SequenceMatcher(None, a_norm, ca_norm).ratio()
+                if (sim_h >= 0.55 and sim_a >= 0.55) or (sim_h >= 0.75 and sim_a >= 0.40) or (sim_a >= 0.75 and sim_h >= 0.40):
+                    return key
+
+            return None
+        finally:
+            if lock: lock.release()
+
+    def _is_match_already_settled(self, home: str, away: str) -> bool:
+        """Sprawdza czy dany mecz został już dzisiaj definitywnie rozliczony (WIN / LOSS / VOID)."""
+        h_norm = self._normalize_name(home)
+        a_norm = self._normalize_name(away)
+        if not h_norm or not a_norm:
+            return False
+
+        h_words = set(w for w in h_norm.split() if len(w) > 1)
+        a_words = set(w for w in a_norm.split() if len(w) > 1)
+
+        lock = getattr(self, '_cards_lock', None)
+        if lock: lock.acquire()
+        try:
+            for key in list(getattr(self, 'settled_matches', {}).keys()):
+                if '_vs_' in key:
+                    s_h, s_a = key.split('_vs_', 1)
+                    sh_norm = self._normalize_name(s_h)
+                    sa_norm = self._normalize_name(s_a)
+                    if not sh_norm or not sa_norm:
+                        continue
+                    sh_words = set(w for w in sh_norm.split() if len(w) > 1)
+                    sa_words = set(w for w in sa_norm.split() if len(w) > 1)
+                    if (h_words and sh_words and (h_words.intersection(sh_words) or h_norm in sh_norm or sh_norm in h_norm)) and \
+                       (a_words and sa_words and (a_words.intersection(sa_words) or a_norm in sa_norm or sa_norm in a_norm)):
+                        return True
+            return False
+        finally:
+            if lock: lock.release()
+
+    def notify_goal_signal(self, match: Dict[str, Any], signal: Dict[str, Any]) -> bool:
+        if not self.config.get("enabled", False) or not self.config.get("notify_signals", True):
+            return False
+
+        home, away = match.get("home_team", ""), match.get("away_team", "")
+        # Kategoryczna blokada powtórnych sygnałów dla meczów już rozliczonych dzisiaj (WIN / LOSS / VOID)
+        if self._is_match_already_settled(home, away):
+            return False
+
+        stars = signal.get("stars", 2)
+        if stars < self.config.get("min_stars", 2):
+            return False
+
+        # Mapowanie jednostek i sugerowanych stawek:
+        # 2 gwiazdki -> 1J (2.00 zł)
+        # 3 gwiazdki -> 2J (4.00 zł)
+        # 4+ gwiazdki -> 3J (6.00 zł - MAX)
+        if stars >= 4:
+            unit_tag = "3J"
+            stake_desc = "6.00 zł (MAX)"
+        elif stars == 3:
+            unit_tag = "2J"
+            stake_desc = "4.00 zł"
+        else:
+            unit_tag = "1J"
+            stake_desc = "2.00 zł"
+
+        home, away = match.get("home_team", ""), match.get("away_team", "")
+        score = match.get("score_str", "0:0")
+        minute = match.get("minute", 0)
+        half = match.get("half", "1H")
+        league = match.get("league", "Piłka Nożna")
+        odds_val = signal.get("odds", 1.80)
+        badge = signal.get("badge", "OVER")
+        desc = signal.get("desc", "")
+        sts_url = match.get('sts_url', 'https://www.sts.pl/live/pilka-nozna')
+        open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
+        danger = match.get('danger_index', 50)
+        apm = match.get('apm', 0.8)
+
+        # Precyzyjne formatowanie minuty (zawsze minuta np. 23' lub Przerwa, NIGDY sam tekst 'Live')
+        stage_raw = str(match.get('stage_text', '')).lower()
+        if half == 'HT' or 'przerw' in stage_raw:
+            time_display = "Przerwa"
+            header_time = "HT"
+        elif isinstance(minute, int) and minute > 0:
+            time_display = f"{minute}'"
+            header_time = f"{minute}'"
+        else:
+            m_dig = re.search(r'(\d+)', f"{minute} {stage_raw}")
+            if m_dig:
+                val = int(m_dig.group(1))
+                time_display = f"{val}'"
+                header_time = f"{val}'"
+            else:
+                time_display = "23'" if half == '1H' else "68'"
+                header_time = time_display
+
+        msg = (
+            f"<b>ALARM LIVE</b> <i>({header_time})</i>\n\n"
+            f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
+            f"🏆 <b>Liga:</b> {league}\n"
+            f"⏱️ <b>Czas:</b> {time_display}\n\n"
+            f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+            f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+            f"📈 <b>Aktualny Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+            f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+            f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
+        )
+
+        now = time.time()
+        existing_key = self._find_existing_card_key(home, away)
+        if self.config.get("live_update_mode", True) and existing_key and existing_key in self.active_match_cards:
+            card = self.active_match_cards[existing_key]
+            dev_msgs = card.get("device_messages", {})
+            # Aktualizacja danych w pamięci
+            card["last_seen_minute"] = minute
+            card["last_seen_score"] = score
+            card["last_seen_time"] = now
+            card["last_odds"] = odds_val
+            card["danger"] = danger
+            card["apm"] = apm
+            
+            # Throttle: edytuj wiadomość na Telegramie tylko jeśli minęło >= 45s lub zmienił się wynik
+            score_changed = (score != card.get("initial_score"))
+            time_since_edit = now - card.get("last_edit_time", 0)
+            if card.get("last_text") != msg and (score_changed or time_since_edit >= 45):
+                self.edit_message_all(dev_msgs, msg)
+                card["last_text"] = msg
+                card["last_edit_time"] = now
+                self._save_cards()
+            return True
+
+        dev_msgs = self.send_message_all(msg)
+        if dev_msgs:
+            new_key = f"{self._normalize_name(home)}_vs_{self._normalize_name(away)}"
+            badge_u = badge.upper()
+            sig_type = str(signal.get("type", "")).upper()
+            try:
+                init_tot = sum(map(int, score.split(":")))
+            except Exception:
+                init_tot = 0
+
+            # Precyzyjne wyznaczenie okresu docelowego: TYLKO wyraźnie oznaczone HT są rynkami 1. połowy
+            is_ht_market = any(kw in badge_u for kw in ['HT', '1. POŁ', '1.POŁ', '1H', 'POŁOWA', 'FIRST HALF']) or \
+                           any(kw in sig_type for kw in ['HT', '05_HT', '15_HT'])
+            target_period = '1H' if is_ht_market else 'FT'
+
+            match_over = re.search(r'OVER\s+(\d+(?:\.\d+)?)', badge_u)
+            if match_over:
+                line_val = float(match_over.group(1))
+                target_goals = int(line_val + 0.5)
+            else:
+                target_goals = init_tot + 1
+
+            self.active_match_cards[new_key] = {
+                "device_messages": dev_msgs,
+                "home_team": home,
+                "away_team": away,
+                "league": league,
+                "last_text": msg,
+                "last_odds": odds_val,
+                "initial_score": score,
+                "initial_goals": init_tot,
+                "target_goals": target_goals,
+                "target_period": target_period,
+                "created_at": now,
+                "last_edit_time": now,
+                "last_seen_time": now,
+                "last_seen_minute": minute,
+                "last_seen_score": score,
+                "last_seen_half": half,
+                "sts_url": sts_url,
+                "badge": badge,
+                "unit_tag": unit_tag,
+                "stars": stars,
+                "desc": desc,
+                "danger": danger,
+                "apm": apm
+            }
+            self.stats_engine.record_signal(match, signal, unit_tag)
+            self._save_cards()
+            return True
+        return False
+
+
+    def check_and_update_match_status(self, match: Dict[str, Any]) -> bool:
+        if not self.config.get("enabled", False):
+            return False
+
+        home = match.get('home_team', '')
+        away = match.get('away_team', '')
+        existing_key = self._find_existing_card_key(home, away)
+        if not existing_key or existing_key not in self.active_match_cards:
+            return False
+
+        card = self.active_match_cards[existing_key]
+        dev_msgs = card.get("device_messages", {})
+        if not dev_msgs and card.get("message_id"):
+            dev_msgs = {str(self.config.get("chat_id")): card.get("message_id")}
+
+        current_score = match.get("score_str", "0:0")
+        minute = match.get('minute', 0)
+        half = match.get('half', '1H')
+        stage_text = match.get('stage_text', f"{minute}'")
+        is_live = match.get('is_live', True)
+        status_code = str(match.get('status_code', ''))
+
+        try:
+            curr_tot = sum(map(int, current_score.split(":")))
+        except Exception:
+            curr_tot = 0
+
+        target_goals = card.get('target_goals', 1)
+        target_period = card.get('target_period', 'FT')
+        badge = card.get('badge', 'OVER')
+        odds_val = card.get('last_odds', 1.70)
+        league = card.get('league', match.get('league', 'Piłka Nożna'))
+        unit_tag = card.get('unit_tag', '1J')
+        units = 1
+        if '3' in unit_tag: units = 3
+        elif '2' in unit_tag: units = 2
+        now = time.time()
+
+        if half == 'HT' or 'przerw' in str(stage_text).lower() or str(stage_text).strip() == '13':
+            time_display = "Przerwa"
+        elif half == 'FT' or 'koniec' in str(stage_text).lower() or str(stage_text).strip() == '3':
+            time_display = f"{minute}'" if minute > 0 else "Koniec meczu"
+        elif isinstance(minute, int) and minute > 0:
+            time_display = f"{minute}'"
+        else:
+            m_dig = re.search(r'(\d+)', f"{minute} {stage_text}")
+            if m_dig:
+                time_display = f"{m_dig.group(1)}'"
+            else:
+                time_display = "23'" if half == '1H' else "68'"
+
+        # 1. SCENARIUSZ: TYP WYGRANY (ZIELONY ZNACZEK OK ✅ 🟢)
+        is_won = False
+        if target_period == '1H':
+            if curr_tot >= target_goals:
+                is_won = True
+            elif match.get('ht_score'):
+                try:
+                    ht_tot = sum(map(int, match['ht_score'].split(':')))
+                    if ht_tot >= target_goals:
+                        is_won = True
+                except Exception:
+                    pass
+        else:
+            if curr_tot >= target_goals:
+                is_won = True
+
+        danger = match.get('danger_index', card.get('danger', 50))
+        apm = match.get('apm', card.get('apm', 0.8))
+
+        if is_won:
+            win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
+            profit_units = round(units * (odds_val - 1.0), 2)
+            win_msg = (
+                f"✅ <b>ALARM LIVE</b> <i>({win_time})</i>\n\n"
+                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                f"🏆 <b>Liga:</b> {league}\n"
+                f"⏱️ <b>Czas:</b> {win_time}\n\n"
+                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Trafiony Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J</b>"
+            )
+            self.edit_message_all(dev_msgs, win_msg)
+            self.active_match_cards.pop(existing_key, None)
+            self.settled_matches[existing_key] = time.time()
+            self.stats_engine.settle_signal(home, away, "WON", current_score)
+            self._save_cards()
+            return True
+
+        # 2. SCENARIUSZ: MECZ ODWOŁANY / PRZERWANY (ZWROT STAWKI 🟡 🔄)
+        st_lower = str(stage_text).lower()
+        if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
+            void_msg = (
+                f"🟡 <b>ALARM LIVE</b> <i>({stage_text})</i>\n\n"
+                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                f"🏆 <b>Liga:</b> {league}\n"
+                f"⏱️ <b>Czas:</b> {stage_text}\n\n"
+                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Aktualny Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+            )
+            self.edit_message_all(dev_msgs, void_msg)
+            self.active_match_cards.pop(existing_key, None)
+            self.settled_matches[existing_key] = time.time()
+            self.stats_engine.settle_signal(home, away, "VOID", current_score)
+            self._save_cards()
+            return True
+
+        # 3. SCENARIUSZ: TYP PRZEGRANY (CZERWONY ZNACZEK X ❌ 🔴)
+        is_period_finished = False
+        st_low = str(stage_text).lower()
+
+        if target_period == '1H':
+            # 1H kończy się tylko w przerwie HT, w 2H lub po zakończeniu meczu
+            is_1h_over = (half in ('HT', '2H', 'FT') or 'koniec' in st_low or (not is_live and minute >= 45))
+            if is_1h_over:
+                if match.get('ht_score'):
+                    try:
+                        ht_tot = sum(map(int, match['ht_score'].split(':')))
+                        if ht_tot < target_goals:
+                            is_period_finished = True
+                    except Exception:
+                        if curr_tot < target_goals:
+                            is_period_finished = True
+                else:
+                    if curr_tot < target_goals:
+                        is_period_finished = True
+        elif target_period == 'FT':
+            # FT kończy się TYLKO I WYŁĄCZNIE po upływie 90+ minut i końcowym gwizdku sędziego
+            is_ft_over = (half == 'FT' or 'koniec' in st_low or 'ended' in st_low or
+                          status_code in ('3', '10', '11') or (not is_live and minute >= 90))
+            if is_ft_over and curr_tot < target_goals:
+                is_period_finished = True
+
+        if is_period_finished:
+            loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
+            loss_units = float(units)
+            loss_msg = (
+                f"❌ <b>ALARM LIVE</b> <i>({loss_time})</i>\n\n"
+                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                f"🏆 <b>Liga:</b> {league}\n"
+                f"⏱️ <b>Czas:</b> {loss_time}\n\n"
+                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J</b>"
+            )
+            self.edit_message_all(dev_msgs, loss_msg)
+            self.active_match_cards.pop(existing_key, None)
+            self.settled_matches[existing_key] = time.time()
+            self.stats_engine.settle_signal(home, away, "LOST", current_score)
+            self._save_cards()
+            return True
+
+        # 4. SCENARIUSZ: LIVE UPDATE IN-PLACE (Płynna aktualizacja minuty, wyniku i kursu w tej samej wiadomości)
+        if self.config.get("live_update_mode", True) and is_live and not is_won and not is_period_finished:
+            latest_odds = odds_val
+            for mkt in match.get('live_markets', []):
+                if badge.upper().replace(' ', '') in str(mkt.get('name', '')).upper().replace(' ', ''):
+                    latest_odds = mkt.get('odds', odds_val)
+                    break
+
+            danger = match.get('danger_index', card.get('danger', 50))
+            apm = match.get('apm', card.get('apm', 0.8))
+            desc = card.get('desc', '')
+            sts_url = match.get('sts_url', card.get('sts_url', 'https://www.sts.pl/live/pilka-nozna'))
+            open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
+
+            updated_msg = (
+                f"<b>ALARM LIVE</b> <i>({time_display})</i>\n\n"
+                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                f"🏆 <b>Liga:</b> {league}\n"
+                f"⏱️ <b>Czas:</b> {time_display}\n\n"
+                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Aktualny Kurs STS:</b> <b>{latest_odds:.2f}</b>\n"
+                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
+            )
+
+            score_changed = (current_score != card.get("last_seen_score"))
+            time_since_edit = now - card.get("last_edit_time", 0)
+            
+            card["last_seen_score"] = current_score
+            card["last_seen_minute"] = minute
+            card["last_seen_time"] = now
+            card["last_odds"] = latest_odds
+
+            if card.get("last_text") != updated_msg and (score_changed or time_since_edit >= 45):
+                self.edit_message_all(dev_msgs, updated_msg)
+                card["last_text"] = updated_msg
+                card["last_edit_time"] = now
+                self._save_cards()
+                return True
+
+    def auto_settle_active_cards(self, live_matches: List[Dict[str, Any]], finished_matches: Optional[List[Dict[str, Any]]] = None) -> int:
+        """
+        Natychmiastowe i inteligentne rozliczanie wszystkich aktywnych sygnałów:
+        1. Mecze trwające na żywo w STS -> sprawdza natychmiast czy padł gol (WON ✅) lub aktualizuje minutę/wynik.
+        2. Mecze zakończone w bazie (Flashscore/STS) -> natychmiast rozlicza status końcowy (WON ✅ / LOST ❌).
+        3. Mecze, które zniknęły z oferty STS Live po upływie czasu gry -> sprawdza i rozlicza definitywny wynik końcowy.
+        """
+        if not self.active_match_cards:
+            return 0
+
+        settled_count = 0
+        now = time.time()
+        finished_list = finished_matches or []
+        
+        lock = getattr(self, '_cards_lock', None)
+        if lock: lock.acquire()
+        try:
+            active_keys = list(self.active_match_cards.keys())
+
+            for key in active_keys:
+                if key not in self.active_match_cards:
+                    continue
+                card = self.active_match_cards[key]
+                card_home = card.get('home_team', '')
+                card_away = card.get('away_team', '')
+                if not card_home or not card_away:
+                    continue
+
+                # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore)
+                live_m = next((m for m in live_matches if self._find_existing_card_key(m.get('home_team', ''), m.get('away_team', '')) == key), None)
+                if live_m:
+                    card['last_seen_time'] = now
+                    card['last_seen_minute'] = live_m.get('minute', card.get('last_seen_minute', 0))
+                    card['last_seen_score'] = live_m.get('score_str', card.get('last_seen_score', '0:0'))
+                    card['last_seen_half'] = live_m.get('half', card.get('last_seen_half', '1H'))
+                    if live_m.get('sts_url'):
+                        card['sts_url'] = live_m['sts_url']
+
+                    if self.check_and_update_match_status(live_m):
+                        settled_count += 1
+                    continue
+
+                # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS)
+                fin_m = next((m for m in finished_list if self._find_existing_card_key(m.get('home_team', ''), m.get('away_team', '')) == key), None)
+                if fin_m:
+                    if self.check_and_update_match_status(fin_m):
+                        settled_count += 1
+                    continue
+
+                # 3. Mecz zniknął z oferty STS Live (zakończył się)
+                card_age = now - card.get('created_at', now)
+                last_minute = card.get('last_seen_minute', 0)
+                if not last_minute:
+                    m_min = re.search(r'\((\d+)\'\)', card.get('last_text', ''))
+                    if m_min:
+                        last_minute = int(m_min.group(1))
+                target_period = card.get('target_period', 'FT')
+                last_score = card.get('last_seen_score', card.get('initial_score', '0:0'))
+
+                is_finished_event = False
+                time_since_seen = now - card.get('last_seen_time', card.get('created_at', now))
+                if target_period == '1H':
+                    # 1H kończy się tylko gdy minęła 45. minuta i mecz zniknął z 1H na min. 4 minuty
+                    if last_minute >= 45 and time_since_seen > 240:
+                        is_finished_event = True
+                    elif card_age > 3600: # Ponad 60 minut od sygnału z 1. połowy
+                        is_finished_event = True
+                elif target_period == 'FT':
+                    # Mecz kończy się TYLKO gdy osiągnął min. 90. minutę i zniknął z STS Live na co najmniej 3 minuty
+                    if last_minute >= 90 and time_since_seen > 180:
+                        is_finished_event = True
+                    elif card_age > 7200: # Ponad 120 minut od utworzenia sygnału
+                        is_finished_event = True
+
+                if is_finished_event:
+                    synthetic_finished = {
+                        'home_team': card_home,
+                        'away_team': card_away,
+                        'league': card.get('league', 'Piłka Nożna'),
+                        'score_str': last_score,
+                        'home_score': int(last_score.split(':')[0]) if ':' in last_score else 0,
+                        'away_score': int(last_score.split(':')[1]) if ':' in last_score else 0,
+                        'minute': 90 if target_period == 'FT' else 45,
+                        'half': 'FT' if target_period == 'FT' else 'HT',
+                        'stage_text': 'Koniec meczu',
+                        'is_live': False
+                    }
+                    if self.check_and_update_match_status(synthetic_finished):
+                        settled_count += 1
+
+            return settled_count
+        finally:
+            if lock: lock.release()
+
+    def check_and_notify_goal_event(self, match: Dict[str, Any]) -> bool:
+        return self.check_and_update_match_status(match)
+
+    def notify_daily_goal_achieved(self, profit: float, target: float) -> bool:
+        if not self.config.get("enabled", False) or not self.config.get("notify_daily_goal", True):
+            return False
+        msg = (
+            f"🎉 <b>CEL DZIENNY OSIĄGNIĘTY!</b> 🏆\n\n"
+            f"💰 <b>Dzisiejszy Zysk:</b> <code>+{profit:.2f} zł</code>\n"
+            f"🎯 <b>Cel Dnia:</b> +{target:.2f} zł\n\n"
+            f"🛡️ <b>ZASADA MISTRZA:</b> Zamknij aplikację na dziś i ciesz się wygraną!"
+        )
+        res = self.send_message_all(msg)
+        return bool(res)
