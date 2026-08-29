@@ -569,18 +569,10 @@ class STSLiveEngine:
                 if len(text_lines) >= 2:
                     home_team = text_lines[0]
                     away_team = text_lines[1]
-                    if len(score_lines) >= 6:
-                        # Format z sumą końcową: [1H_h, 1H_a, 2H_h, 2H_a, TOT_h, TOT_a]
+                    if len(score_lines) >= 2:
+                        # Na STS ostatnie 2 cyfry to ZAWSZE aktualny wynik łączny meczu (Total Home : Total Away)
                         score_h = score_lines[-2]
                         score_a = score_lines[-1]
-                    elif len(score_lines) == 4:
-                        # Format połówkowy: [1H_h, 1H_a, 2H_h, 2H_a]
-                        score_h = score_lines[0] + score_lines[2]
-                        score_a = score_lines[1] + score_lines[3]
-                    elif len(score_lines) >= 2:
-                        # Format standardowy: [h, a]
-                        score_h = score_lines[0]
-                        score_a = score_lines[1]
 
                     is_started = True
                     stage_lower = stage.lower()
