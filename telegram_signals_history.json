@@ -438,5 +438,27 @@
     "profit_units": 0.0,
     "profit_pln": 0.0,
     "resolved_at": ""
+  },
+  {
+    "id": "sig_1787993607_arikra",
+    "created_at": "2026-08-29 10:53:27",
+    "timestamp": 1787993607.8294528,
+    "date": "2026-08-29",
+    "home_team": "Aritma Prague",
+    "away_team": "Kraluv Dvur",
+    "match_title": "Aritma Prague vs Kraluv Dvur",
+    "league": "62: CZECHY: 3. CFL - Group A",
+    "minute": 38,
+    "score_initial": "0:1",
+    "score_final": "0:1",
+    "market": "OVER 2.5 FT",
+    "odds": 1.8,
+    "unit_tag": "1J",
+    "units": 1,
+    "stake_pln": 2.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]

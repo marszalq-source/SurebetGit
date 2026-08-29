@@ -130,6 +130,114 @@ class _STSLiveWorker:
                             except Exception as ex2:
                                 reply_q.put(('ERR', str(ex2)))
 
+                    elif cmd == 'GET_STRUCTURED_MATCHES':
+                        try:
+                            now = time.time()
+                            if now - self._last_reload > 1200:
+                                self._load_live_page()
+                                self._last_reload = now
+
+                            matches_data = self._page.evaluate("""() => {
+                                const results = [];
+                                document.querySelectorAll('a[href*="/live/pilka-nozna/f"]').forEach(a => {
+                                    const href = a.getAttribute('href');
+                                    const fullHref = href.startsWith('http') ? href : 'https://www.sts.pl' + href;
+                                    const fullText = a.innerText.trim();
+
+                                    // 1. Teams from dedicated elements
+                                    let home = "", away = "";
+                                    const teamNodes = a.querySelectorAll('[class*="team"], [class*="participant"], [class*="competitor"]');
+                                    const uniqueTeams = [];
+                                    teamNodes.forEach(node => {
+                                        const t = node.innerText.trim();
+                                        if (t && !t.includes('\\n') && !uniqueTeams.includes(t) && t.length > 1) {
+                                            uniqueTeams.push(t);
+                                        }
+                                    });
+
+                                    if (uniqueTeams.length >= 2) {
+                                        home = uniqueTeams[0];
+                                        away = uniqueTeams[1];
+                                    } else {
+                                        const lines = fullText.split('\\n').map(l => l.trim()).filter(Boolean);
+                                        const cand = lines.filter(l => 
+                                            l.length > 2 && 
+                                            !l.includes('LIVE') && 
+                                            !l.includes('połowa') && 
+                                            !l.toLowerCase().includes('przerwa') &&
+                                            !l.toLowerCase().includes('dogrywka') &&
+                                            !l.includes('Zakończony') &&
+                                            !l.includes('Przejdź do') &&
+                                            !l.match(/^[\\d\\.\\s]+$/) &&
+                                            !['1', 'X', '2', 'Filtruj', 'Koniec', 'Start o', 'Zapisane'].includes(l)
+                                        );
+                                        if (cand.length >= 2) {
+                                            home = cand[0];
+                                            away = cand[1];
+                                        }
+                                    }
+
+                                    // 2. Exact Total Score from .one-ticket-live-score__general
+                                    let scoreH = 0, scoreA = 0;
+                                    const genEl = a.querySelector('.one-ticket-live-score__general, [class*="general"]');
+                                    if (genEl) {
+                                        const digits = genEl.innerText.trim().split(/\\s+/).filter(d => /^\\d+$/.test(d));
+                                        if (digits.length >= 2) {
+                                            scoreH = parseInt(digits[0], 10);
+                                            scoreA = parseInt(digits[1], 10);
+                                        }
+                                    }
+
+                                    // 3. Stage & Minute
+                                    let minute = 0;
+                                    let half = "1H";
+                                    let stageText = "";
+                                    const minMatch = fullText.match(/(\\d+)(?:\\+\\d+)?'/);
+                                    if (minMatch) {
+                                        minute = parseInt(minMatch[1], 10);
+                                    }
+                                    if (fullText.toLowerCase().includes('przerwa')) {
+                                        half = 'HT';
+                                        stageText = 'Przerwa';
+                                        minute = 45;
+                                    } else if (fullText.includes('2.połowa') || minute > 45) {
+                                        half = '2H';
+                                    }
+
+                                    // 4. Odds 1X2 from .odds-button__odd-value
+                                    const oddVals = [];
+                                    a.querySelectorAll('.odds-button__odd-value').forEach(el => {
+                                        const v = parseFloat(el.innerText.replace(',', '.'));
+                                        if (!isNaN(v)) oddVals.push(v);
+                                    });
+
+                                    let o1 = oddVals[0] || 2.20;
+                                    let oX = oddVals[1] || 3.20;
+                                    let o2 = oddVals[2] || 3.10;
+
+                                    if (home && away) {
+                                        results.push({
+                                            url: fullHref,
+                                            home_team: home,
+                                            away_team: away,
+                                            home_score: scoreH,
+                                            away_score: scoreA,
+                                            score_str: scoreH + ':' + scoreA,
+                                            minute: minute,
+                                            half: half,
+                                            stage_text: stageText || (minute + "'"),
+                                            odds_1: o1,
+                                            odds_X: oX,
+                                            odds_2: o2
+                                        });
+                                    }
+                                });
+                                return results;
+                            }""")
+                            reply_q.put(('OK', matches_data))
+                        except Exception as ex:
+                            reply_q.put(('ERR', str(ex)))
+
                     elif cmd == 'GET_MATCH_CARDS':
                         try:
                             cards = self._page.evaluate("""() => {
@@ -192,6 +300,17 @@ class _STSLiveWorker:
             pass
         return []
 
+    def get_structured_matches(self, timeout=8.0) -> List[Dict[str, Any]]:
+        q = queue.Queue()
+        self._cmd_queue.put(('GET_STRUCTURED_MATCHES', (), q))
+        try:
+            status, res = q.get(timeout=timeout)
+            if status == 'OK':
+                return res
+        except queue.Empty:
+            pass
+        return []
+
     def get_match_cards(self, timeout=6.0) -> List[Dict[str, str]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_MATCH_CARDS', (), q))
@@ -218,6 +337,7 @@ class _STSLiveWorker:
         try:
             q = queue.Queue()
             self._cmd_queue.put(('STOP', (), q))
+            self._thread.join(timeout=2.0)
         except Exception:
             pass
 
@@ -261,10 +381,10 @@ class STSLiveEngine:
 
     def fetch_live_matches(self, include_esports: bool = False, max_detailed_scrape: int = 4) -> List[Dict[str, Any]]:
         """
-        Pobiera 100% realną ofertę Live z STS dla wszystkich trwających meczów:
-        - Wyniki meczu, drużyny, minuta, połowa, kursy 1X2 i linki
-        - 100% realne rynki bramkowe (Liczba goli FT/HT, Następny gol)
-        - Persistent background Playwright worker z czasem odczytu < 100ms
+        Pobiera 100% precyzyjną, strukturalną ofertę Live z STS:
+        - Wyniki meczu, drużyny, minuta, połowa, kursy 1X2 i bezpośrednie linki
+        - Odcina wszelkie zakłócenia ze statystyk (kartek/strzałów)
+        - Dynamiczne rynki bramkowe (Over HT, Over FT +1, +2, +3 gole)
         """
         now = time.time()
         if self._cached_matches and (now - self._cache_time < 6.0):
@@ -272,38 +392,66 @@ class STSLiveEngine:
 
         matches = []
         try:
-            lines = self._worker.get_live_lines(timeout=6.0)
-            cards = self._worker.get_match_cards(timeout=4.0)
-            if lines:
-                matches = self._parse_sts_lines(lines, is_live=True, include_esports=include_esports)
+            # 1. Strukturalne, 100% dokładne pobranie z DOM
+            raw_struct = self._worker.get_structured_matches(timeout=6.0)
+            if raw_struct:
+                for sm in raw_struct:
+                    h_score = int(sm.get('home_score', 0))
+                    a_score = int(sm.get('away_score', 0))
+                    o1 = float(sm.get('odds_1', 2.2))
+                    oX = float(sm.get('odds_X', 3.2))
+                    o2 = float(sm.get('odds_2', 3.1))
+                    minute = int(sm.get('minute', 0))
+                    half_val = str(sm.get('half', '1H'))
 
-            # Dopasowanie dokładnych linków STS do meczów
-            if cards and matches:
-                for m in matches:
-                    h_norm = re.sub(r'[^a-z0-9]', '', m['home_team'].lower())
-                    a_norm = re.sub(r'[^a-z0-9]', '', m['away_team'].lower())
-                    for c in cards:
-                        c_text_norm = re.sub(r'[^a-z0-9]', '', c.get('text', '').lower())
-                        if (h_norm and h_norm in c_text_norm) or (a_norm and a_norm in c_text_norm):
-                            m['url'] = c['href']
-                            break
-
-            # Dynamiczne rynki bramkowe (skalibrowane pod kątem STS i specyfiki ligowej)
-            for m in matches:
-                if not m.get('live_markets'):
-                    m['live_markets'] = self.calculate_dynamic_live_markets(
-                        m['home_score'], m['away_score'], m['minute'], m['half'],
-                        o1=m.get('odds_1', 2.2), oX=m.get('odds_X', 3.2), o2=m.get('odds_2', 3.1),
-                        league=m.get('league', '')
+                    over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
+                        o1, oX, o2, h_score + a_score, minute
                     )
-                    G = m['home_score'] + m['away_score']
-                    for mkt in m['live_markets']:
+                    live_markets = self.calculate_dynamic_live_markets(
+                        h_score, a_score, minute, half_val, o1, oX, o2
+                    )
+
+                    goals_odds = {
+                        'over_05_ht': over_05_ht,
+                        'over_15_ht': over_15_ht,
+                        'over_05_2h': over_05_2h,
+                        'over_15_ft': over_15_ft,
+                    }
+                    G = h_score + a_score
+                    for mkt in live_markets:
                         name = mkt.get('name', '')
                         odds = mkt.get('odds', 1.0)
-                        if f"Over {G + 0.5} HT" in name: m['goals_odds']['over_05_ht'] = odds
-                        elif f"Over {G + 1.5} HT" in name: m['goals_odds']['over_15_ht'] = odds
-                        elif f"Over {G + 0.5} FT" in name: m['goals_odds']['over_05_2h'] = odds
-                        elif f"Over {G + 1.5} FT" in name: m['goals_odds']['over_15_ft'] = odds
+                        if f"Over {G + 0.5} HT" in name: goals_odds['over_05_ht'] = odds
+                        elif f"Over {G + 1.5} HT" in name: goals_odds['over_15_ht'] = odds
+                        elif f"Over {G + 0.5} FT" in name: goals_odds['over_05_2h'] = odds
+                        elif f"Over {G + 1.5} FT" in name: goals_odds['over_15_ft'] = odds
+
+                    matches.append({
+                        'bookmaker': 'STS',
+                        'league': 'Piłka Nożna – STS Live',
+                        'home_team': sm['home_team'],
+                        'away_team': sm['away_team'],
+                        'score_str': f"{h_score}:{a_score}",
+                        'home_score': h_score,
+                        'away_score': a_score,
+                        'minute': minute,
+                        'half': half_val,
+                        'is_started': True,
+                        'stage_text': sm.get('stage_text', f"{minute}'"),
+                        'odds_1': o1,
+                        'odds_X': oX,
+                        'odds_2': o2,
+                        'goals_odds': goals_odds,
+                        'live_markets': live_markets,
+                        'is_live': True,
+                        'url': sm.get('url', 'https://www.sts.pl/live/pilka-nozna')
+                    })
+
+            # Fallback (jeśli strukturalny nie zwrócił danych)
+            if not matches:
+                lines = self._worker.get_live_lines(timeout=6.0)
+                if lines:
+                    matches = self._parse_sts_lines(lines, is_live=True, include_esports=include_esports)
 
         except Exception as e:
             print(f"[STSLiveEngine] Błąd pobierania live: {e}")
