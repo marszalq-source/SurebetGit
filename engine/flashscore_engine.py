@@ -76,10 +76,14 @@ class FlashscoreEngine:
                     is_live = status_code in LIVE_STATUSES
 
                     # Dodatkowa detekcja z tekstu fazy
+                    st_low = stage_text.lower()
                     if not is_live:
-                        st_low = stage_text.lower()
                         if any(w in st_low for w in ['1. połowa', '2. połowa', 'przerwa', 'w grze', '1st half', '2nd half', 'live', 'ht', '1h', '2h', 'dogrywka', 'et']):
                             is_live = True
+
+                    # Bezwzględne wykluczenie meczów zakończonych z trybu live
+                    if status_code in ('3', '10', '11') or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.']):
+                        is_live = False
 
                     if not is_live and not include_all_today:
                         continue
