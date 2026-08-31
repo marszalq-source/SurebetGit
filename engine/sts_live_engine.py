@@ -366,22 +366,27 @@ class _STSLiveWorker:
                             sub_markets = ev_page.evaluate("""() => {
                                 const mkts = [];
                                 const seen = new Set();
-                                document.querySelectorAll('button, .odds-button, [class*="odds-button"]').forEach(b => {
-                                    const txt = b.innerText.replace(/\\s+/g, ' ').trim();
-                                    const mOver = txt.match(/^\\+(\\d+\\.\\d+)\\s+(\\d+[,.]\\d+)$/);
-                                    if (mOver) {
-                                        const line = parseFloat(mOver[1]);
-                                        const odds = parseFloat(mOver[2].replace(',', '.'));
-                                        const key = 'over_' + line;
-                                        if (!isNaN(line) && !isNaN(odds) && odds > 1.0 && !seen.has(key)) {
-                                            seen.add(key);
-                                            mkts.push({
-                                                market: 'OVER ' + line + ' FT',
-                                                name: 'Over ' + line + ' FT',
-                                                line: line,
-                                                odds: odds,
-                                                label: 'Over ' + line
-                                            });
+                                document.querySelectorAll('button, .odds-button, [class*="odds-button"], sds-odds-button').forEach(b => {
+                                    let label = (b.getAttribute('aria-label') || b.innerText || '').replace(/\\s+/g, ' ').trim();
+                                    // Dopasowanie linii typu "+4.5 1.30", "+2.5 1.65", "+0.5 1.45"
+                                    const m = label.match(/^([+-]?\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
+                                    if (m) {
+                                        const lineStr = m[1];
+                                        const odds = parseFloat(m[2].replace(',', '.'));
+                                        if (lineStr.startsWith('+') && !isNaN(odds) && odds > 1.0) {
+                                            const line = parseFloat(lineStr.replace('+', ''));
+                                            const key = 'over_' + line;
+                                            if (!seen.has(key)) {
+                                                seen.add(key);
+                                                mkts.push({
+                                                    market: 'OVER ' + line + ' FT',
+                                                    name: 'Over ' + line + ' FT',
+                                                    line: line,
+                                                    odds: odds,
+                                                    label: '+ Over ' + line + ' FT',
+                                                    source: 'STS_REAL'
+                                                });
+                                            }
                                         }
                                     }
                                 });
