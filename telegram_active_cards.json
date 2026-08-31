@@ -1,4 +1,32 @@
 {
+  "mladost lucani u19_vs_crvena zvezda u19": {
+    "device_messages": {
+      "5445412227": 608,
+      "8773792302": 609
+    },
+    "home_team": "Mladost Lucani U19",
+    "away_team": "Crvena Zvezda U19",
+    "league": "Serbia, League U19",
+    "last_text": "<b>ALARM LIVE</b> <i>(28')</i>\n\n⚽️ <b>Western Region Ghana U19 vs Upper West Region U19</b>  <code>[0:0]</code>\n🏆 <b>Liga:</b> Serbia, League U19\n⏱️ <b>Czas:</b> 28'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 4.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>2J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>1.68</b>\n🔥 <b>29%</b> (APM: 0.56)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3403360\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
+    "last_odds": 1.68,
+    "initial_score": "1:2",
+    "initial_goals": 3,
+    "target_goals": 5,
+    "target_period": "FT",
+    "created_at": 1788164975.978273,
+    "last_edit_time": 1788165317.9022722,
+    "last_seen_time": 1788165317.9022722,
+    "last_seen_minute": 28,
+    "last_seen_score": "0:0",
+    "last_seen_half": "1H",
+    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3179240",
+    "badge": "OVER 4.5 FT",
+    "unit_tag": "2J",
+    "stars": 4,
+    "desc": "Błyskawiczna reakcja po bramce (29' min). Mecz otwarty po bramce (1:2), 3 strzały celne, Wysokie xG: 1.55, Danger: 70%",
+    "danger": 80,
+    "apm": 0.87
+  },
   "__settled_matches__": {
     "mariany polnocne u20_vs_mongolia u20": 1788156442.876064
   }

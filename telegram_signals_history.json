@@ -20,5 +20,27 @@
     "profit_units": 0.84,
     "profit_pln": 1.68,
     "resolved_at": "2026-08-31 08:07:22"
+  },
+  {
+    "id": "sig_1788164976_mlacrv",
+    "created_at": "2026-08-31 10:29:36",
+    "timestamp": 1788164976.5871036,
+    "date": "2026-08-31",
+    "home_team": "Mladost Lucani U19",
+    "away_team": "Crvena Zvezda U19",
+    "match_title": "Mladost Lucani U19 vs Crvena Zvezda U19",
+    "league": "Serbia, League U19",
+    "minute": 29,
+    "score_initial": "1:2",
+    "score_final": "1:2",
+    "market": "OVER 4.5 FT",
+    "odds": 1.55,
+    "unit_tag": "2J",
+    "units": 2,
+    "stake_pln": 4.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]

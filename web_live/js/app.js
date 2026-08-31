@@ -257,6 +257,7 @@ function renderLiveMatches() {
                     <span>⚡ INDEKS GROŹNOŚCI / NAPÓR NA BRAMKĘ ${(() => {
                         if (stats.source === 'BEESPORTS') return '<small style="color: #ffd600; font-size: 10px; font-weight: 800;">(BeeSports Live 🐝)</small>';
                         if (stats.source === 'BETSAPI') return '<small style="color: #00e676; font-size: 10px; font-weight: 800;">(BetsAPI In-Play 🎯)</small>';
+                        if (stats.source === 'GOALOO') return '<small style="color: #ff9100; font-size: 10px; font-weight: 800;">(Goaloo Live ⚽)</small>';
                         if (stats.source === 'FLASHSCORE') return '<small style="color: #29b6f6; font-size: 10px; font-weight: 800;">(Flashscore Live ⚡)</small>';
                         if (stats.is_estimated) return '<small style="color: var(--accent-yellow); font-size: 10px;">(Model STS Radar)</small>';
                         return '<small style="color: var(--accent-green); font-size: 10px;">(Live Telemetria)</small>';

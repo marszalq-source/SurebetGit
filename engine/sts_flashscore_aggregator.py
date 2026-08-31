@@ -5,6 +5,7 @@ from .flashscore_engine import FlashscoreEngine
 from .sts_live_engine import STSLiveEngine
 from .beesports_engine import BeeSportsEngine
 from .betsapi_engine import BetsAPIEngine
+from .goaloo_engine import GoalooEngine
 from .live_matcher import LiveMatcher
 from .goal_triggers import GoalTriggersEngine
 from .prematch_analyzer import PrematchAnalyzer
@@ -17,6 +18,7 @@ class STSFlashscoreAggregator:
         self.sts_engine = STSLiveEngine()
         self.beesports = BeeSportsEngine()
         self.betsapi = BetsAPIEngine()
+        self.goaloo = GoalooEngine()
         self.matcher = LiveMatcher()
         self.triggers = GoalTriggersEngine()
         self.prematch_analyzer = PrematchAnalyzer()
@@ -170,6 +172,12 @@ class STSFlashscoreAggregator:
             except Exception:
                 pass
 
+            # Zaktualizuj listę meczów na żywo z Goaloo (szybki request HTTP)
+            try:
+                self.goaloo.update_live_matches_list()
+            except Exception:
+                pass
+
             processed_matches = []
             signals_count = 0
             used_sts_urls = set()
@@ -190,7 +198,15 @@ class STSFlashscoreAggregator:
                         minute=fs_m.get('minute', 1)
                     )
 
-                # 3. PRIORYTET 3: Flashscore (gdy brak na BeeSports i BetsAPI)
+                # 3. PRIORYTET 3: Goaloo (gdy brak na BeeSports i BetsAPI)
+                if not stats or not stats.get('has_stats'):
+                    stats = self.goaloo.get_live_stats(
+                        fs_m.get('home_team', ''),
+                        fs_m.get('away_team', ''),
+                        minute=fs_m.get('minute', 1)
+                    )
+
+                # 4. PRIORYTET 4: Flashscore (gdy brak na BeeSports, BetsAPI i Goaloo)
                 if not stats or not stats.get('has_stats'):
                     stats = stats_map.get(fs_m['flashscore_id'], {})
 
@@ -349,7 +365,15 @@ class STSFlashscoreAggregator:
                         minute=sts_m['minute']
                     )
 
-                # PRIORYTET 3 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
+                # PRIORYTET 3: Sprawdź Goaloo
+                if not stats or not stats.get('has_stats'):
+                    stats = self.goaloo.get_live_stats(
+                        sts_m['home_team'],
+                        sts_m['away_team'],
+                        minute=sts_m['minute']
+                    )
+
+                # PRIORYTET 4 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
                 if not stats or not stats.get('has_stats'):
                     stats = self._estimate_live_stats(
                         score_h=sts_m['home_score'],
