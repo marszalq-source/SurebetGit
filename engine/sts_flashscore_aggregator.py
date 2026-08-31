@@ -103,10 +103,10 @@ class STSFlashscoreAggregator:
             fs_all_matches = self.fs_engine.get_live_soccer_matches(include_all_today=True)
             fs_matches = [m for m in fs_all_matches if m.get('is_live')] if not demo_mode else fs_all_matches
             
-            # Pobierz pełną bazę zakończonych spotkań (dzisiaj + wczoraj)
+            # Pobierz pełną bazę zakończonych spotkań (do 3-4 dni wstecz dla pełnej ciągłości)
             fs_finished_all = []
             try:
-                fs_finished_all = self.fs_engine.get_finished_results(include_yesterday=True)
+                fs_finished_all = self.fs_engine.get_finished_results(days_back=3)
             except Exception as e:
                 print(f"[Aggregator] Finished results fetch error: {e}")
 

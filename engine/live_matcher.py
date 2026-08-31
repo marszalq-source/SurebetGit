@@ -154,3 +154,24 @@ class LiveMatcher:
         if best_score >= 0.70:
             return best_sts
         return None
+
+    @staticmethod
+    def is_same_fixture(h1: str, a1: str, h2: str, a2: str, threshold: float = 0.65) -> bool:
+        """
+        Sprawdza czy dwie pary drużyn reprezentują ten sam mecz.
+        Obsługuje skróty, różnice w pisowni i prefiksy klubowe.
+        """
+        nh1 = normalize_team_name(h1)
+        na1 = normalize_team_name(a1)
+        nh2 = normalize_team_name(h2)
+        na2 = normalize_team_name(a2)
+        if not nh1 or not na1 or not nh2 or not na2:
+            return False
+
+        s_h = match_teams_similarity(nh1, nh2)
+        if s_h < threshold:
+            return False
+        s_a = match_teams_similarity(na1, na2)
+        if s_a < threshold:
+            return False
+        return ((s_h + s_a) / 2.0) >= threshold

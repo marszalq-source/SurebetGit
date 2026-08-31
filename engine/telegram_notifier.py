@@ -1307,7 +1307,8 @@ class TelegramNotifier:
                     continue
 
                 # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore)
-                live_m = next((m for m in live_matches if self._find_existing_card_key(m.get('home_team', ''), m.get('away_team', '')) == key), None)
+                from engine.live_matcher import LiveMatcher
+                live_m = next((m for m in live_matches if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
                 if live_m:
                     card['last_seen_time'] = now
                     card['last_seen_minute'] = live_m.get('minute', card.get('last_seen_minute', 0))
@@ -1321,7 +1322,7 @@ class TelegramNotifier:
                     continue
 
                 # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS)
-                fin_m = next((m for m in finished_list if self._find_existing_card_key(m.get('home_team', ''), m.get('away_team', '')) == key), None)
+                fin_m = next((m for m in finished_list if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
                 if fin_m:
                     if self.check_and_update_match_status(fin_m):
                         settled_count += 1

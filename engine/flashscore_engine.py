@@ -168,14 +168,12 @@ class FlashscoreEngine:
 
         return matches
 
-    def get_finished_results(self, include_yesterday: bool = True) -> List[Dict[str, Any]]:
+    def get_finished_results(self, days_back: int = 3) -> List[Dict[str, Any]]:
         """
-        Pobiera wszystkie oficjalnie zakończone mecze z dzisiejszego i wczorajszego dnia z Flashscore.
-        Gwarantuje 100% pewności wyniku końcowego (FT) oraz wyniku do przerwy (HT).
+        Pobiera wszystkie oficjalnie zakończone mecze z ostatnich dni (domyślnie 0, -1, -2, -3 dni wstecz).
+        Gwarantuje 100% pewności wyniku końcowego (FT) oraz wyniku do przerwy (HT) nawet po przerwie weekendowej.
         """
-        feed_urls = ['https://global.flashscore.ninja/3/x/feed/f_1_0_3_pl_1']
-        if include_yesterday:
-            feed_urls.append('https://global.flashscore.ninja/3/x/feed/f_1_-1_3_pl_1')
+        feed_urls = [f'https://global.flashscore.ninja/3/x/feed/f_1_{-d}_3_pl_1' if d > 0 else 'https://global.flashscore.ninja/3/x/feed/f_1_0_3_pl_1' for d in range(days_back + 1)]
 
         finished_matches = []
         seen_ids = set()
