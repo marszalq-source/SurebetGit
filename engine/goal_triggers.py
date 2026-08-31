@@ -276,24 +276,35 @@ class GoalTriggersEngine:
                     confidence += 1
                     reasons.append(f"Danger: {danger_index}%")
 
-                # Inteligentny dobór linii:
-                # Linia +1 gol (najbezpieczniejsza) jest domyślna.
-                # Linia +2 gole (np. Over 2.5 przy 1:0) TYLKO gdy sot >= 4 i xG >= 1.10!
-                immediate_next_line = total_goals + 0.5
+                # Inteligentny dobór linii z realnych rynków STS:
+                # Wybierz linię powyżej aktualnej sumy bramek o optymalnym kursie (1.35 - 2.35)
+                valid_lines = [item for item in available_over_ft if item[0] > total_goals]
+                valid_lines.sort(key=lambda x: x[0])
+
                 target_over_ft = None
                 target_line = None
 
-                for l_val, m_obj in available_over_ft:
-                    if abs(l_val - immediate_next_line) < 0.1:
+                for l_val, m_obj in valid_lines:
+                    o_val = float(m_obj.get('odds', 0))
+                    if 1.35 <= o_val <= 2.35:
                         target_over_ft = m_obj
                         target_line = l_val
                         break
 
-                # Jeśli statystyki są wybitne (sot >= 4 i xG >= 1.10), możemy zagrać +2 gole
-                if (not target_over_ft or float(target_over_ft.get('odds', 0)) < 1.30) and sot >= 4 and xg_total >= 1.10:
-                    higher_line = total_goals + 1.5
+                # Jeśli pierwsza linia miała kurs < 1.35, weź kolejną z kursem >= 1.35
+                if not target_over_ft and valid_lines:
+                    for l_val, m_obj in valid_lines:
+                        o_val = float(m_obj.get('odds', 0))
+                        if o_val >= 1.35:
+                            target_over_ft = m_obj
+                            target_line = l_val
+                            break
+
+                # Fallback jeśli brak rynków z podstrony: domyślna linia +1 gol
+                if not target_over_ft:
+                    immediate_next_line = total_goals + 1.5 if total_goals >= 2 else (total_goals + 0.5)
                     for l_val, m_obj in available_over_ft:
-                        if abs(l_val - higher_line) < 0.1:
+                        if abs(l_val - immediate_next_line) < 0.1:
                             target_over_ft = m_obj
                             target_line = l_val
                             break

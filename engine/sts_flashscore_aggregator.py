@@ -221,6 +221,15 @@ class STSFlashscoreAggregator:
 
                 # Wyznacz wskaźniki i triggery bramkowe
                 eval_res = self.triggers.evaluate_match(fs_m, stats, odds_dict)
+
+                # Jeśli mecz generuje sygnał lub ma wysoki indeks, pobierz 100% realne kursy z podstrony STS
+                if matched_with_sts and sts_url and '/live/' in sts_url and (eval_res.get('has_signals') or stats.get('danger_index', 0) >= 65):
+                    real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_url)
+                    if real_sub_mkts:
+                        fs_m['live_markets'] = real_sub_mkts
+                        odds_dict['live_markets'] = real_sub_mkts
+                        eval_res = self.triggers.evaluate_match(fs_m, stats, odds_dict)
+
                 if eval_res.get('has_signals'):
                     signals_count += len(eval_res.get('signals', []))
 

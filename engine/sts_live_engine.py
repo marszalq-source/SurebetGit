@@ -337,6 +337,54 @@ class _STSLiveWorker:
                         except Exception as ex:
                             reply_q.put(('ERR', str(ex)))
 
+                    elif cmd == 'GET_SUBPAGE_MARKETS':
+                        match_url = args[0]
+                        try:
+                            ev_page = self._context.new_page()
+                            ev_page.goto(match_url, timeout=10000, wait_until='domcontentloaded')
+                            try:
+                                btn = ev_page.query_selector('button:has-text("Akceptuj wszystkie"), button:has-text("Zaakceptuj")')
+                                if btn:
+                                    btn.click()
+                                    ev_page.wait_for_timeout(400)
+                                ev_page.evaluate("() => { const el = document.getElementById('CybotCookiebotDialog'); if (el) el.remove(); }")
+                            except Exception:
+                                pass
+
+                            try:
+                                ev_page.wait_for_selector('button.odds-button, .odds-button', timeout=3000)
+                            except Exception:
+                                pass
+                            
+                            sub_markets = ev_page.evaluate("""() => {
+                                const mkts = [];
+                                const seen = new Set();
+                                document.querySelectorAll('button, .odds-button, [class*="odds-button"]').forEach(b => {
+                                    const txt = b.innerText.replace(/\\s+/g, ' ').trim();
+                                    const mOver = txt.match(/^\\+(\\d+\\.\\d+)\\s+(\\d+[,.]\\d+)$/);
+                                    if (mOver) {
+                                        const line = parseFloat(mOver[1]);
+                                        const odds = parseFloat(mOver[2].replace(',', '.'));
+                                        const key = 'over_' + line;
+                                        if (!isNaN(line) && !isNaN(odds) && odds > 1.0 && !seen.has(key)) {
+                                            seen.add(key);
+                                            mkts.push({
+                                                market: 'OVER ' + line + ' FT',
+                                                name: 'Over ' + line + ' FT',
+                                                line: line,
+                                                odds: odds,
+                                                label: 'Over ' + line
+                                            });
+                                        }
+                                    }
+                                });
+                                return mkts;
+                            }""")
+                            ev_page.close()
+                            reply_q.put(('OK', sub_markets))
+                        except Exception as ex:
+                            reply_q.put(('ERR', str(ex)))
+
                     elif cmd == 'SCRAPE_MATCH':
                         match_url = args[0]
                         try:
@@ -408,6 +456,17 @@ class _STSLiveWorker:
     def get_match_cards(self, timeout=10.0) -> List[Dict[str, str]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_MATCH_CARDS', (), q))
+        try:
+            status, res = q.get(timeout=timeout)
+            if status == 'OK':
+                return res
+        except queue.Empty:
+            pass
+        return []
+
+    def get_subpage_live_markets(self, match_url: str, timeout=4.5) -> List[Dict[str, Any]]:
+        q = queue.Queue()
+        self._cmd_queue.put(('GET_SUBPAGE_MARKETS', (match_url,), q))
         try:
             status, res = q.get(timeout=timeout)
             if status == 'OK':
@@ -561,6 +620,15 @@ class STSLiveEngine:
 
         return matches
 
+    def get_match_real_live_markets(self, match_url: str) -> List[Dict[str, Any]]:
+        """Pobiera 100% realne, dokładne kursy rynków bramkowych bezpośrednio z podstrony meczu w STS Live."""
+        if not match_url or not match_url.startswith('http'):
+            return []
+        try:
+            return self._worker.get_subpage_live_markets(match_url)
+        except Exception as e:
+            print(f"[STSLiveEngine] Błąd get_match_real_live_markets: {e}")
+            return []
 
     def _generate_fallback_live_markets(self, match: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Wyznacza dynamiczne rynki bramkowe jako natychmiastowy fallback."""
