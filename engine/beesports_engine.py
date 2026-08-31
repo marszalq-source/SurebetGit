@@ -110,11 +110,21 @@ class BeeSportsEngine:
         a_norm = self._normalize_name(away_team)
 
         for m in self._matches_cache:
-            slug = m['slug']
+            slug = m.get('slug', '')
             slug_norm = re.sub(r'[^a-z0-9]', '', slug)
-            # Sprawdź czy obie nazwy występują w slugu
-            if (h_norm and h_norm in slug_norm) or (a_norm and a_norm in slug_norm):
+            # 1. Obie drużyny w slugu
+            if (h_norm and h_norm in slug_norm) and (a_norm and a_norm in slug_norm):
                 return m['href']
+            # 2. Jedna z drużyn (jeśli wystarczająco unikalna nazwa >= 4 znaki)
+            if (h_norm and len(h_norm) >= 4 and h_norm in slug_norm) or (a_norm and len(a_norm) >= 4 and a_norm in slug_norm):
+                return m['href']
+            # 3. Sprawdź poszczególne słowa
+            for word in h_norm.split():
+                if len(word) >= 4 and word in slug_norm:
+                    return m['href']
+            for word in a_norm.split():
+                if len(word) >= 4 and word in slug_norm:
+                    return m['href']
 
         return None
 

@@ -10,15 +10,15 @@
     "league": "Młodzieżowe, U20 AFC Asian Cup - kwalifikacje",
     "minute": 31,
     "score_initial": "0:1",
-    "score_final": "0:1",
+    "score_final": "0:3",
     "market": "OVER 2.5 FT",
-    "odds": 1.62,
+    "odds": 1.28,
     "unit_tag": "3J",
     "units": 3,
     "stake_pln": 6.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "WON",
+    "profit_units": 0.84,
+    "profit_pln": 1.68,
+    "resolved_at": "2026-08-31 08:07:22"
   }
 ]
