@@ -266,9 +266,34 @@ class _STSLiveWorker:
                                         o2 = oddVals[2];
                                     }
 
-                                    let league = "Piłka Nożna – STS Live";
-                                    if (href.includes('epilka-nozna')) {
-                                        league = "Esport Piłka Nożna – STS Live";
+                                    // 6. DOKŁADNA LIGA Z NAGŁÓWKA STS (.one-ticket-region-info__text)
+                                    let league = "";
+                                    let curr = a;
+                                    while (curr && curr !== document.body) {
+                                        const regionEl = curr.querySelector('.one-ticket-region-info__text, .one-ticket-region-info, [class*="region-info__text"]');
+                                        if (regionEl && regionEl.innerText && regionEl.innerText.trim()) {
+                                            league = regionEl.innerText.trim();
+                                            break;
+                                        }
+                                        let prev = curr.previousElementSibling;
+                                        while (prev) {
+                                            const prevRegion = prev.querySelector ? prev.querySelector('.one-ticket-region-info__text, .one-ticket-region-info') : null;
+                                            if (prevRegion && prevRegion.innerText && prevRegion.innerText.trim()) {
+                                                league = prevRegion.innerText.trim();
+                                                break;
+                                            }
+                                            if (prev.classList && prev.classList.contains('one-ticket-region-info__text')) {
+                                                league = prev.innerText.trim();
+                                                break;
+                                            }
+                                            prev = prev.previousElementSibling;
+                                        }
+                                        if (league) break;
+                                        curr = curr.parentElement;
+                                    }
+
+                                    if (!league) {
+                                        league = href.includes('epilka-nozna') ? "Esport Piłka Nożna – STS Live" : "Piłka Nożna – STS Live";
                                     }
 
                                     results.push({
