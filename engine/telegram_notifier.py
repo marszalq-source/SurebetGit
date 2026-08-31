@@ -182,6 +182,11 @@ class TelegramNotifier:
                 print(f"[Telegram] Błąd odczytu kart: {e}")
                 cards = {}
 
+        if not isinstance(cards, dict):
+            cards = {}
+        if not isinstance(settled, dict):
+            settled = {}
+
         now = time.time()
         # Mecz piłkarski trwa max ~120 minut + 10 minut buforu = 7800 sekund
         # Karty starsze niż 130 minut bez rozliczenia zostaną automatycznie usunięte

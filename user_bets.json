@@ -1,7 +1,9 @@
 {
-  "initial_bankroll": 50.0,
-  "current_bankroll": 57.1,
-  "daily_target_profit": 10.0,
-  "daily_stop_loss": 6.0,
+  "bankroll": 20.0,
+  "starting_bankroll": 20.0,
+  "daily_goal": 10.0,
+  "stop_loss": 6.0,
+  "daily_profit": 0.0,
+  "daily_date": "2026-08-31",
   "bets": []
 }
