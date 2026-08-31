@@ -90,6 +90,13 @@ class _STSLiveWorker:
                 ])
                 self._page = self._context.new_page()
                 
+                # Czysty kontekst dla BeeSports (bez blokady skryptów)
+                self._bs_context = self._browser.new_context(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+                    locale='pl-PL',
+                    viewport={'width': 1920, 'height': 1080}
+                )
+
                 self._load_live_page()
                 self._ready_event.set()
                 self._last_reload = time.time()
@@ -387,9 +394,9 @@ class _STSLiveWorker:
 
                     elif cmd == 'GET_BEESPORTS_MATCHES':
                         try:
-                            bs_page = self._context.new_page()
-                            bs_page.goto('https://www.beesports.com/pl/live', timeout=12000, wait_until='domcontentloaded')
-                            bs_page.wait_for_timeout(800)
+                            bs_page = self._bs_context.new_page()
+                            bs_page.goto('https://www.beesports.com/pl/live', timeout=15000, wait_until='domcontentloaded')
+                            bs_page.wait_for_timeout(1500)
                             items = bs_page.evaluate("""() => {
                                 const list = [];
                                 const seen = new Set();
