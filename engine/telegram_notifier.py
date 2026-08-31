@@ -878,9 +878,16 @@ class TelegramNotifier:
             a_norm = self._normalize_name(away)
             if not h_norm or not a_norm:
                 return None
+
+            GENERIC_STOP_WORDS = {
+                'u15', 'u16', 'u17', 'u18', 'u19', 'u20', 'u21', 'u22', 'u23',
+                'fc', 'cf', 'sc', 'ac', 'fk', 'ks', 'sp', 'cd', 'sk', 'sv', 'afc', 'bsc', 'ffc',
+                'united', 'utd', 'city', 'town', 'women', 'kobiety', 'region', 'club', 'team',
+                'youth', 'juniors', 'reserve', 'reserves', 'ii', 'iii', 'b', 'c', '1', '2'
+            }
                 
-            h_words = set(w for w in h_norm.split() if len(w) > 1)
-            a_words = set(w for w in a_norm.split() if len(w) > 1)
+            h_words = set(w for w in h_norm.split() if len(w) >= 3 and w not in GENERIC_STOP_WORDS)
+            a_words = set(w for w in a_norm.split() if len(w) >= 3 and w not in GENERIC_STOP_WORDS)
 
             for key, card in self.active_match_cards.items():
                 card_h = card.get('home_team', '')
@@ -890,17 +897,14 @@ class TelegramNotifier:
                 if not ch_norm or not ca_norm:
                     continue
 
-                ch_words = set(w for w in ch_norm.split() if len(w) > 1)
-                ca_words = set(w for w in ca_norm.split() if len(w) > 1)
+                ch_words = set(w for w in ch_norm.split() if len(w) >= 3 and w not in GENERIC_STOP_WORDS)
+                ca_words = set(w for w in ca_norm.split() if len(w) >= 3 and w not in GENERIC_STOP_WORDS)
 
-                if (h_norm == ch_norm or h_norm in ch_norm or ch_norm in h_norm) and \
-                   (a_norm == ca_norm or a_norm in ca_norm or ca_norm in a_norm):
-                    return key
-
-                h_match = bool(h_words and ch_words and (h_words.intersection(ch_words) or any(w in ch_norm for w in h_words) or any(w in h_norm for w in ch_words)))
-                a_match = bool(a_words and ca_words and (a_words.intersection(ca_words) or any(w in ca_norm for w in a_words) or any(w in a_norm for w in ca_words)))
-                if h_match and a_match:
-                    return key
+                if h_words and ch_words and a_words and ca_words:
+                    h_match = bool(h_words.intersection(ch_words) or any(w in ch_norm for w in h_words if len(w) >= 4))
+                    a_match = bool(a_words.intersection(ca_words) or any(w in ca_norm for w in a_words if len(w) >= 4))
+                    if h_match and a_match:
+                        return key
 
             return None
         finally:
