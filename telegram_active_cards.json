@@ -1,3 +1,31 @@
 {
+  "mariany polnocne u20_vs_mongolia u20": {
+    "device_messages": {
+      "8773792302": 603,
+      "5445412227": 604
+    },
+    "home_team": "Mariany Północne U20",
+    "away_team": "Mongolia U20",
+    "league": "Młodzieżowe, U20 AFC Asian Cup - kwalifikacje",
+    "last_text": "<b>ALARM LIVE</b> <i>(32')</i>\n\n⚽️ <b>Mariany Północne U20 vs Mongolia U20</b>  <code>[0:1]</code>\n🏆 <b>Liga:</b> Młodzieżowe, U20 AFC Asian Cup - kwalifikacje\n⏱️ <b>Czas:</b> 32'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 2.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>1.68</b>\n🔥 <b>94%</b> (APM: 1.45)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3402882\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
+    "last_odds": 1.68,
+    "initial_score": "0:1",
+    "initial_goals": 1,
+    "target_goals": 3,
+    "target_period": "FT",
+    "created_at": 1788154262.1788793,
+    "last_edit_time": 1788154356.2748969,
+    "last_seen_time": 1788154356.2748969,
+    "last_seen_minute": 32,
+    "last_seen_score": "0:1",
+    "last_seen_half": "1H",
+    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3402882",
+    "badge": "OVER 2.5 FT",
+    "unit_tag": "3J",
+    "stars": 5,
+    "desc": "Błyskawiczna reakcja po bramce (31' min). Mecz otwarty po bramce (0:1), 4 strzały celne, Napór APM: 1.41, 14 łącznych strzałów, Wysokie xG: 2.00, Danger: 95%",
+    "danger": 94,
+    "apm": 1.45
+  },
   "__settled_matches__": {}
 }

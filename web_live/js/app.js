@@ -557,11 +557,11 @@ function renderPrematchMatches() {
                 <!-- Statystyki Przedmeczowe -->
                 <div class="stats-mini-grid">
                     <div class="mini-stat-card">
-                        <div class="label">Over 0.5 HT (1. Połowa)</div>
+                        <div class="label">Over 0.5 HT <small style="font-size: 9px; opacity: 0.7;">(Statystyka H2H)</small></div>
                         <div class="val" style="color: var(--accent-green);">${a.ht_over05_pct || 80}%</div>
                     </div>
                     <div class="mini-stat-card">
-                        <div class="label">Over 1.5 HT</div>
+                        <div class="label">Over 1.5 HT <small style="font-size: 9px; opacity: 0.7;">(Statystyka H2H)</small></div>
                         <div class="val">${a.ht_over15_pct || 40}%</div>
                     </div>
                     <div class="mini-stat-card">
@@ -588,45 +588,61 @@ function renderPrematchMatches() {
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, '1 (Gospodarze)') ? 'selected' : ''}" 
                                  title="Postaw na wygraną gospodarzy"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', '1 (Gospodarze)', ${o1Val})">
-                                <span class="odd-label">1:</span>
-                                <span class="odd-val">${o1Val}</span>
+                                 <span class="odd-label">1:</span>
+                                 <span class="odd-val">${o1Val}</span>
                             </div>
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Remis (X)') ? 'selected' : ''}" 
                                  title="Postaw na remis"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Remis (X)', ${oXVal})">
-                                <span class="odd-label">X:</span>
-                                <span class="odd-val">${oXVal}</span>
+                                 <span class="odd-label">X:</span>
+                                 <span class="odd-val">${oXVal}</span>
                             </div>
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, '2 (Goście)') ? 'selected' : ''}" 
                                  title="Postaw na wygraną gości"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', '2 (Goście)', ${o2Val})">
-                                <span class="odd-label">2:</span>
-                                <span class="odd-val">${o2Val}</span>
+                                 <span class="odd-label">2:</span>
+                                 <span class="odd-val">${o2Val}</span>
                             </div>
                         </div>
 
                         <!-- Rynki Bramkowe STS -->
                         <div class="odds-pills-group" style="gap: 4px;">
-                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 0.5 HT') ? 'selected' : ''}" 
-                                 title="Min. 1 gol w 1. połowie"
-                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 0.5 HT', ${o05HtVal})">
-                                <span class="odd-label">+ Over 0.5 HT:</span>
-                                <span class="odd-val" style="color: var(--accent-green);">${o05HtVal}</span>
-                            </div>
+                            ${(() => {
+                                const leg = (m.league || '').toLowerCase();
+                                const isTopTier = leg.includes('premier league') || leg.includes('ekstraklasa') || leg.includes('laliga') || leg.includes('serie a') || leg.includes('bundesliga') || leg.includes('champions league');
+                                if (isTopTier) {
+                                    return `
+                                        <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 0.5 HT') ? 'selected' : ''}" 
+                                             title="Min. 1 gol w 1. połowie (Oferta przedmeczowa)"
+                                             onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 0.5 HT', ${o05HtVal})">
+                                            <span class="odd-label">+ Over 0.5 HT:</span>
+                                            <span class="odd-val" style="color: var(--accent-green);">${o05HtVal}</span>
+                                        </div>
+                                    `;
+                                } else {
+                                    return `
+                                        <div class="odd-pill" style="opacity: 0.85; border: 1px dashed rgba(255,214,0,0.35); cursor: help;" 
+                                             title="Dla tej ligi STS otwiera rynek Over 0.5 HT na żywo (Live) zaraz po pierwszym gwizdku">
+                                            <span class="odd-label">⚡ Over 0.5 HT:</span>
+                                            <span class="odd-val" style="color: #ffd600; font-size: 11px;">W trybie Live 🔴</span>
+                                        </div>
+                                    `;
+                                }
+                            })()}
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 1.5 FT') ? 'selected' : ''}" 
-                                 title="Min. 2 gole w całym meczu"
+                                 title="Min. 2 gole w całym meczu (STS: Liczba goli)"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 1.5 FT', ${o15FtVal})">
                                 <span class="odd-label">+ Over 1.5 FT:</span>
                                 <span class="odd-val">${o15FtVal}</span>
                             </div>
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 2.5 FT') ? 'selected' : ''}" 
-                                 title="Min. 3 gole w całym meczu"
+                                 title="Min. 3 gole w całym meczu (STS: Liczba goli)"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 2.5 FT', ${o25FtVal})">
                                 <span class="odd-label">+ Over 2.5 FT:</span>
                                 <span class="odd-val">${o25FtVal}</span>
                             </div>
                             <div class="odd-pill clickable ${isLegInAko(matchTitle, 'BTTS (Obie strzelą)') ? 'selected' : ''}" 
-                                 title="Obie drużyny strzelą gola"
+                                 title="Obie drużyny strzelą gola (STS: Obie drużyny - strzelą gola)"
                                  onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'BTTS (Obie strzelą)', ${oBttsVal})">
                                 <span class="odd-label">+ BTTS:</span>
                                 <span class="odd-val">${oBttsVal}</span>
