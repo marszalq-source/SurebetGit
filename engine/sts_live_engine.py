@@ -385,6 +385,35 @@ class _STSLiveWorker:
                         except Exception as ex:
                             reply_q.put(('ERR', str(ex)))
 
+                    elif cmd == 'GET_BEESPORTS_MATCHES':
+                        try:
+                            bs_page = self._context.new_page()
+                            bs_page.goto('https://www.beesports.com/pl/live', timeout=12000, wait_until='domcontentloaded')
+                            bs_page.wait_for_timeout(800)
+                            items = bs_page.evaluate("""() => {
+                                const list = [];
+                                const seen = new Set();
+                                document.querySelectorAll('a[href*="/match/"]').forEach(a => {
+                                    if (!seen.has(a.href)) {
+                                        seen.add(a.href);
+                                        const slug = a.href.split('/match/')[1] || '';
+                                        const parts = slug.split('-');
+                                        if (parts.length >= 3) {
+                                            list.push({
+                                                href: a.href,
+                                                id: parts[parts.length - 1],
+                                                slug: parts.slice(0, -1).join('-').toLowerCase()
+                                            });
+                                        }
+                                    }
+                                });
+                                return list;
+                            }""")
+                            bs_page.close()
+                            reply_q.put(('OK', items))
+                        except Exception as ex:
+                            reply_q.put(('ERR', str(ex)))
+
                     elif cmd == 'SCRAPE_MATCH':
                         match_url = args[0]
                         try:
@@ -467,6 +496,17 @@ class _STSLiveWorker:
     def get_subpage_live_markets(self, match_url: str, timeout=4.5) -> List[Dict[str, Any]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_SUBPAGE_MARKETS', (match_url,), q))
+        try:
+            status, res = q.get(timeout=timeout)
+            if status == 'OK':
+                return res
+        except queue.Empty:
+            pass
+        return []
+
+    def get_beesports_matches(self, timeout=8.0) -> List[Dict[str, Any]]:
+        q = queue.Queue()
+        self._cmd_queue.put(('GET_BEESPORTS_MATCHES', (), q))
         try:
             status, res = q.get(timeout=timeout)
             if status == 'OK':

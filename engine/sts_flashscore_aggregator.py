@@ -152,26 +152,31 @@ class STSFlashscoreAggregator:
                     except Exception:
                         stats_map[m_id] = {}
 
+            # Zaktualizuj listę meczów na żywo z BeeSports przez worker
+            try:
+                if getattr(self.sts_engine, '_worker', None):
+                    bs_matches = self.sts_engine._worker.get_beesports_matches()
+                    if bs_matches:
+                        self.beesports._matches_cache = bs_matches
+                        self.beesports._matches_cache_time = time.time()
+            except Exception:
+                pass
+
             processed_matches = []
             signals_count = 0
             used_sts_urls = set()
 
             for fs_m in target_matches:
-                stats = stats_map.get(fs_m['flashscore_id'], {})
-                
-                # PRIORYTET 1: BeeSports (jeśli dostępne realne statystyki live)
-                try:
-                    if getattr(self.sts_engine, '_worker', None) and getattr(self.sts_engine._worker, '_page', None):
-                        bs_stats = self.beesports.get_live_stats(
-                            self.sts_engine._worker._page,
-                            fs_m.get('home_team', ''),
-                            fs_m.get('away_team', ''),
-                            minute=fs_m.get('minute', 1)
-                        )
-                        if bs_stats and bs_stats.get('has_stats'):
-                            stats = bs_stats
-                except Exception:
-                    pass
+                # 1. PRIORYTET 1: BeeSports (100% realne statystyki live)
+                stats = self.beesports.get_live_stats(
+                    fs_m.get('home_team', ''),
+                    fs_m.get('away_team', ''),
+                    minute=fs_m.get('minute', 1)
+                )
+
+                # Jeśli brak na BeeSports, weź Flashscore
+                if not stats or not stats.get('has_stats'):
+                    stats = stats_map.get(fs_m['flashscore_id'], {})
 
                 if stats.get('xg_total', 0.0) == 0.0 and (stats.get('shots_total', 0) > 0 or stats.get('shots_on_target_total', 0) > 0 or stats.get('corners_total', 0) > 0):
                     sot_h = stats.get('shots_on_target_home', 0)
@@ -313,16 +318,26 @@ class STSFlashscoreAggregator:
                     sts_id, sts_m['league'], sts_m['home_team'], sts_m['away_team'], fetch_h2h=False
                 )
 
-                # Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
-                stats = self._estimate_live_stats(
-                    score_h=sts_m['home_score'],
-                    score_a=sts_m['away_score'],
-                    minute=sts_m['minute'],
-                    o1=sts_m.get('odds_1', 2.20),
-                    oX=sts_m.get('odds_X', 3.20),
-                    o2=sts_m.get('odds_2', 3.10),
-                    league=sts_m['league']
+                # PRIORYTET 1: Sprawdź najpierw 100% realne statystyki z BeeSports
+                bs_stats = self.beesports.get_live_stats(
+                    sts_m['home_team'],
+                    sts_m['away_team'],
+                    minute=sts_m['minute']
                 )
+
+                if bs_stats and bs_stats.get('has_stats'):
+                    stats = bs_stats
+                else:
+                    # Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
+                    stats = self._estimate_live_stats(
+                        score_h=sts_m['home_score'],
+                        score_a=sts_m['away_score'],
+                        minute=sts_m['minute'],
+                        o1=sts_m.get('odds_1', 2.20),
+                        oX=sts_m.get('odds_X', 3.20),
+                        o2=sts_m.get('odds_2', 3.10),
+                        league=sts_m['league']
+                    )
 
                 fs_repr = {
                     'flashscore_id': sts_id,
@@ -337,6 +352,14 @@ class STSFlashscoreAggregator:
                 }
 
                 eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m['goals_odds'])
+
+                # Jeśli mecz generuje sygnał lub ma wysoki indeks, pobierz 100% realne kursy z podstrony STS
+                if sts_m.get('url') and '/live/' in sts_m['url'] and (eval_res.get('has_signals') or stats.get('danger_index', 0) >= 65):
+                    real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_m['url'])
+                    if real_sub_mkts:
+                        sts_m['live_markets'] = real_sub_mkts
+                        fs_repr['live_markets'] = real_sub_mkts
+                        eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m['goals_odds'])
                 if eval_res.get('has_signals'):
                     signals_count += len(eval_res['signals'])
 

@@ -254,7 +254,7 @@ function renderLiveMatches() {
             <!-- Danger / Momentum Gauge -->
             <div class="danger-section">
                 <div class="danger-header">
-                    <span>⚡ INDEKS GROŹNOŚCI / NAPÓR NA BRAMKĘ ${stats.is_estimated ? '<small style="color: var(--accent-yellow); font-size: 10px;">(Model STS Radar)</small>' : '<small style="color: var(--accent-green); font-size: 10px;">(Live Telemetria)</small>'}</span>
+                    <span>⚡ INDEKS GROŹNOŚCI / NAPÓR NA BRAMKĘ ${stats.source === 'BEESPORTS' ? '<small style="color: #ffd600; font-size: 10px; font-weight: 800;">(BeeSports Live 🐝)</small>' : (stats.is_estimated ? '<small style="color: var(--accent-yellow); font-size: 10px;">(Model STS Radar)</small>' : '<small style="color: var(--accent-green); font-size: 10px;">(Live Telemetria)</small>')}</span>
                     <span style="color: #fff; font-weight: 700;">${m.danger_index}% (${m.apm || 0} APM)</span>
                 </div>
                 <div class="danger-bar-bg">
