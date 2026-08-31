@@ -3,6 +3,7 @@ import threading
 from typing import Dict, List, Any
 from .flashscore_engine import FlashscoreEngine
 from .sts_live_engine import STSLiveEngine
+from .beesports_engine import BeeSportsEngine
 from .live_matcher import LiveMatcher
 from .goal_triggers import GoalTriggersEngine
 from .prematch_analyzer import PrematchAnalyzer
@@ -13,6 +14,7 @@ class STSFlashscoreAggregator:
     def __init__(self):
         self.fs_engine = FlashscoreEngine()
         self.sts_engine = STSLiveEngine()
+        self.beesports = BeeSportsEngine()
         self.matcher = LiveMatcher()
         self.triggers = GoalTriggersEngine()
         self.prematch_analyzer = PrematchAnalyzer()
@@ -156,6 +158,21 @@ class STSFlashscoreAggregator:
 
             for fs_m in target_matches:
                 stats = stats_map.get(fs_m['flashscore_id'], {})
+                
+                # PRIORYTET 1: BeeSports (jeśli dostępne realne statystyki live)
+                try:
+                    if getattr(self.sts_engine, '_worker', None) and getattr(self.sts_engine._worker, '_page', None):
+                        bs_stats = self.beesports.get_live_stats(
+                            self.sts_engine._worker._page,
+                            fs_m.get('home_team', ''),
+                            fs_m.get('away_team', ''),
+                            minute=fs_m.get('minute', 1)
+                        )
+                        if bs_stats and bs_stats.get('has_stats'):
+                            stats = bs_stats
+                except Exception:
+                    pass
+
                 if stats.get('xg_total', 0.0) == 0.0 and (stats.get('shots_total', 0) > 0 or stats.get('shots_on_target_total', 0) > 0 or stats.get('corners_total', 0) > 0):
                     sot_h = stats.get('shots_on_target_home', 0)
                     sot_a = stats.get('shots_on_target_away', 0)
