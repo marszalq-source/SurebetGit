@@ -10,6 +10,14 @@ import atexit
 from typing import List, Dict, Any, Optional
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeoutError
 
+import sys
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002)
+    except Exception:
+        pass
+
 STS_LIVE_SOCCER_URL = 'https://www.sts.pl/live/pilka-nozna'
 STS_PREMATCH_SOCCER_URL = 'https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/1'
 

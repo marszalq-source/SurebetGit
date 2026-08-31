@@ -9,6 +9,14 @@ if sys.stdout and hasattr(sys.stdout, 'buffer'):
     except Exception:
         pass
 
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        # SEM_FAILCRITICALERRORS (0x0001) | SEM_NOGPFAULTERRORBOX (0x0002)
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002)
+    except Exception:
+        pass
+
 import json
 import threading
 from http.server import SimpleHTTPRequestHandler
