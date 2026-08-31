@@ -190,10 +190,14 @@ class STSFlashscoreAggregator:
                     # GWARANCJA: Nazwa i liga z STS zawsze na pierwszym miejscu
                     sts_home = sts_match.get('home_team') or orig_fs_home
                     sts_away = sts_match.get('away_team') or orig_fs_away
-                    sts_league = sts_match.get('league') or orig_fs_league
+                    sts_league = sts_match.get('league', '')
+                    if sts_league and not sts_league.startswith('Piłka Nożna'):
+                        fs_m['league'] = sts_league
+                    else:
+                        fs_m['league'] = orig_fs_league or sts_league or "Piłka Nożna"
+
                     fs_m['home_team'] = sts_home
                     fs_m['away_team'] = sts_away
-                    fs_m['league'] = sts_league
 
                     # ZAWSZE bierz najświeższy czas z STS (lub ten o większej minucie)
                     sts_min = sts_match.get('minute', 0)
