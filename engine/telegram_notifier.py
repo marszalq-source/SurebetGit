@@ -859,17 +859,24 @@ class TelegramNotifier:
         return normalize_team_name(str(name or ""))
 
     def _find_existing_card_key(self, home: str, away: str) -> Optional[str]:
-        h_norm = self._normalize_name(home)
-        a_norm = self._normalize_name(away)
-        if not h_norm or not a_norm:
-            return None
-            
-        h_words = set(w for w in h_norm.split() if len(w) > 1)
-        a_words = set(w for w in a_norm.split() if len(w) > 1)
-
+        from engine.live_matcher import LiveMatcher
         lock = getattr(self, '_cards_lock', None)
         if lock: lock.acquire()
         try:
+            for key, card in self.active_match_cards.items():
+                card_h = card.get('home_team', '')
+                card_a = card.get('away_team', '')
+                if LiveMatcher.is_same_fixture(home, away, card_h, card_a):
+                    return key
+
+            h_norm = self._normalize_name(home)
+            a_norm = self._normalize_name(away)
+            if not h_norm or not a_norm:
+                return None
+                
+            h_words = set(w for w in h_norm.split() if len(w) > 1)
+            a_words = set(w for w in a_norm.split() if len(w) > 1)
+
             for key, card in self.active_match_cards.items():
                 card_h = card.get('home_team', '')
                 card_a = card.get('away_team', '')
@@ -881,22 +888,13 @@ class TelegramNotifier:
                 ch_words = set(w for w in ch_norm.split() if len(w) > 1)
                 ca_words = set(w for w in ca_norm.split() if len(w) > 1)
 
-                # 1. Dokładne lub zawierające się dopasowanie
                 if (h_norm == ch_norm or h_norm in ch_norm or ch_norm in h_norm) and \
                    (a_norm == ca_norm or a_norm in ca_norm or ca_norm in a_norm):
                     return key
 
-                # 2. Przecięcie słów kluczowych
                 h_match = bool(h_words and ch_words and (h_words.intersection(ch_words) or any(w in ch_norm for w in h_words) or any(w in h_norm for w in ch_words)))
                 a_match = bool(a_words and ca_words and (a_words.intersection(ca_words) or any(w in ca_norm for w in a_words) or any(w in a_norm for w in ca_words)))
                 if h_match and a_match:
-                    return key
-
-                # 3. Fuzzy similarity
-                import difflib
-                sim_h = difflib.SequenceMatcher(None, h_norm, ch_norm).ratio()
-                sim_a = difflib.SequenceMatcher(None, a_norm, ca_norm).ratio()
-                if (sim_h >= 0.55 and sim_a >= 0.55) or (sim_h >= 0.75 and sim_a >= 0.40) or (sim_a >= 0.75 and sim_h >= 0.40):
                     return key
 
             return None
@@ -905,28 +903,14 @@ class TelegramNotifier:
 
     def _is_match_already_settled(self, home: str, away: str) -> bool:
         """Sprawdza czy dany mecz został już dzisiaj definitywnie rozliczony (WIN / LOSS / VOID)."""
-        h_norm = self._normalize_name(home)
-        a_norm = self._normalize_name(away)
-        if not h_norm or not a_norm:
-            return False
-
-        h_words = set(w for w in h_norm.split() if len(w) > 1)
-        a_words = set(w for w in a_norm.split() if len(w) > 1)
-
+        from engine.live_matcher import LiveMatcher
         lock = getattr(self, '_cards_lock', None)
         if lock: lock.acquire()
         try:
             for key in list(getattr(self, 'settled_matches', {}).keys()):
                 if '_vs_' in key:
                     s_h, s_a = key.split('_vs_', 1)
-                    sh_norm = self._normalize_name(s_h)
-                    sa_norm = self._normalize_name(s_a)
-                    if not sh_norm or not sa_norm:
-                        continue
-                    sh_words = set(w for w in sh_norm.split() if len(w) > 1)
-                    sa_words = set(w for w in sa_norm.split() if len(w) > 1)
-                    if (h_words and sh_words and (h_words.intersection(sh_words) or h_norm in sh_norm or sh_norm in h_norm)) and \
-                       (a_words and sa_words and (a_words.intersection(sa_words) or a_norm in sa_norm or sa_norm in a_norm)):
+                    if LiveMatcher.is_same_fixture(home, away, s_h, s_a):
                         return True
             return False
         finally:
@@ -1165,7 +1149,7 @@ class TelegramNotifier:
             self.edit_message_all(dev_msgs, win_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "WON", current_score)
+            self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=odds_val)
             self._save_cards()
             return True
 
@@ -1186,7 +1170,7 @@ class TelegramNotifier:
             self.edit_message_all(dev_msgs, void_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "VOID", current_score)
+            self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=odds_val)
             self._save_cards()
             return True
 
@@ -1233,7 +1217,7 @@ class TelegramNotifier:
             self.edit_message_all(dev_msgs, loss_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "LOST", current_score)
+            self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=odds_val)
             self._save_cards()
             return True
 
@@ -1276,7 +1260,7 @@ class TelegramNotifier:
                 card["last_text"] = updated_msg
                 card["last_edit_time"] = now
                 self._save_cards()
-                return True
+            return False
 
     def auto_settle_active_cards(self, live_matches: List[Dict[str, Any]], finished_matches: Optional[List[Dict[str, Any]]] = None) -> int:
         """

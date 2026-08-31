@@ -176,6 +176,9 @@ class STSFlashscoreAggregator:
 
                 # Dopasuj do STS
                 sts_match = self.matcher.match_flashscore_with_sts(fs_m, sts_matches) if sts_matches else None
+                orig_fs_home = fs_m.get('home_team', '')
+                orig_fs_away = fs_m.get('away_team', '')
+                orig_fs_league = fs_m.get('league', '')
 
                 if sts_match:
                     used_sts_urls.add(sts_match.get('url'))
@@ -183,6 +186,14 @@ class STSFlashscoreAggregator:
                     sts_url = sts_match.get('url', 'https://www.sts.pl/live/pilka-nozna')
                     matched_with_sts = True
                     fs_m['live_markets'] = sts_match.get('live_markets', [])
+
+                    # GWARANCJA: Nazwa i liga z STS zawsze na pierwszym miejscu
+                    sts_home = sts_match.get('home_team') or orig_fs_home
+                    sts_away = sts_match.get('away_team') or orig_fs_away
+                    sts_league = sts_match.get('league') or orig_fs_league
+                    fs_m['home_team'] = sts_home
+                    fs_m['away_team'] = sts_away
+                    fs_m['league'] = sts_league
 
                     # ZAWSZE bierz najświeższy czas z STS (lub ten o większej minucie)
                     sts_min = sts_match.get('minute', 0)
@@ -201,6 +212,8 @@ class STSFlashscoreAggregator:
                     sts_url = 'https://www.sts.pl/live/pilka-nozna'
                     matched_with_sts = False
                     fs_m['live_markets'] = []
+                    sts_home = None
+                    sts_away = None
 
                 # Wyznacz wskaźniki i triggery bramkowe
                 eval_res = self.triggers.evaluate_match(fs_m, stats, odds_dict)
@@ -224,6 +237,10 @@ class STSFlashscoreAggregator:
                     'league': fs_m['league'],
                     'home_team': fs_m['home_team'],
                     'away_team': fs_m['away_team'],
+                    'sts_home_team': sts_home,
+                    'sts_away_team': sts_away,
+                    'flashscore_home_team': orig_fs_home,
+                    'flashscore_away_team': orig_fs_away,
                     'home_score': fs_m['home_score'],
                     'away_score': fs_m['away_score'],
                     'score_str': fs_m['score_str'],
@@ -306,6 +323,10 @@ class STSFlashscoreAggregator:
                     'league': sts_m['league'],
                     'home_team': sts_m['home_team'],
                     'away_team': sts_m['away_team'],
+                    'sts_home_team': sts_m['home_team'],
+                    'sts_away_team': sts_m['away_team'],
+                    'flashscore_home_team': sts_m['home_team'],
+                    'flashscore_away_team': sts_m['away_team'],
                     'home_score': sts_m['home_score'],
                     'away_score': sts_m['away_score'],
                     'score_str': sts_m['score_str'],

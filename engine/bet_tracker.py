@@ -210,6 +210,22 @@ class BetTracker:
 
     def _matches_fixture(self, bet_match: str, live_home: str, live_away: str) -> bool:
         """Sprawdza czy zdarzenie z kuponu odpowiada meczowi z feedu przy użyciu zaawansowanego fuzzy matching."""
+        if not bet_match or not live_home or not live_away:
+            return False
+
+        try:
+            from engine.live_matcher import LiveMatcher
+            if ' vs ' in bet_match:
+                bm_h, bm_a = bet_match.split(' vs ', 1)
+                if LiveMatcher.is_same_fixture(bm_h, bm_a, live_home, live_away):
+                    return True
+            elif ' - ' in bet_match:
+                bm_h, bm_a = bet_match.split(' - ', 1)
+                if LiveMatcher.is_same_fixture(bm_h, bm_a, live_home, live_away):
+                    return True
+        except ImportError:
+            pass
+
         bm_norm = self._normalize_name(bet_match)
         h_norm = self._normalize_name(live_home)
         a_norm = self._normalize_name(live_away)

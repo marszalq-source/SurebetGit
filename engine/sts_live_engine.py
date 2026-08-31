@@ -66,19 +66,8 @@ class _STSLiveWorker:
                         '--no-sandbox',
                         '--disable-dev-shm-usage',
                         '--disable-gpu',
-                        '--disable-gpu-compositing',
-                        '--disable-software-rasterizer',
-                        '--disable-d3d11',
-                        '--disable-accelerated-2d-canvas',
-                        '--disable-accelerated-video-decode',
-                        '--disable-background-networking',
-                        '--disable-default-apps',
                         '--disable-extensions',
-                        '--disable-sync',
                         '--mute-audio',
-                        '--no-zygote',
-                        '--js-flags=--max-old-space-size=128',
-                        '--renderer-process-limit=1',
                     ]
                 )
                 self._context = self._browser.new_context(
@@ -92,7 +81,6 @@ class _STSLiveWorker:
                     {'name': 'sts_cookie_consent', 'value': 'all', 'domain': '.sts.pl', 'path': '/'}
                 ])
                 self._page = self._context.new_page()
-                self._page.route('**/*', _sts_route_handler)
                 
                 self._load_live_page()
                 self._ready_event.set()
@@ -105,7 +93,6 @@ class _STSLiveWorker:
                     elif cmd == 'GET_LINES':
                         try:
                             now = time.time()
-                            # Auto-odświeżenie co 20 minut, aby zapobiec gromadzeniu śmieci w DOM
                             if now - self._last_reload > 1200:
                                 self._load_live_page()
                                 self._last_reload = now
@@ -113,7 +100,6 @@ class _STSLiveWorker:
                             txt = self._page.inner_text('body')
                             lines = [l.strip() for l in txt.split('\n') if l.strip()]
 
-                            # Jeśli strona straciła stan, załaduj ponownie
                             if len(lines) < 30:
                                 self._load_live_page()
                                 txt = self._page.inner_text('body')
@@ -121,7 +107,6 @@ class _STSLiveWorker:
 
                             reply_q.put(('OK', lines))
                         except Exception as ex:
-                            # Próba autorekonwersji
                             try:
                                 self._load_live_page()
                                 txt = self._page.inner_text('body')
@@ -131,106 +116,170 @@ class _STSLiveWorker:
                                 reply_q.put(('ERR', str(ex2)))
 
                     elif cmd == 'GET_STRUCTURED_MATCHES':
+                        include_esports = args[0] if args else False
                         try:
                             now = time.time()
-                            if now - self._last_reload > 1200:
-                                self._load_live_page()
+                            cur_url = self._page.url
+                            needs_nav = (include_esports and 'pilka-nozna' in cur_url) or (not include_esports and cur_url != STS_LIVE_SOCCER_URL) or (now - self._last_reload > 1200)
+                            if needs_nav:
+                                self._load_live_page(include_esports=include_esports)
                                 self._last_reload = now
 
                             matches_data = self._page.evaluate("""() => {
                                 const results = [];
-                                document.querySelectorAll('a[href*="/live/pilka-nozna/f"]').forEach(a => {
-                                    const href = a.getAttribute('href');
+                                const FINISHED_KW = ['zakończony', 'koniec', 'przerwany', 'odwołany', 'wycofany', 'krecz', 'walkower', 'ft'];
+
+                                document.querySelectorAll('a.one-ticket-match-tile-link, a[href*="/live/"]').forEach(a => {
+                                    const href = a.getAttribute('href') || '';
+                                    if (!href.match(/\\/live\\/[^/]+\\/f\\d+/) || href.includes('/sts-tv')) {
+                                        return;
+                                    }
                                     const fullHref = href.startsWith('http') ? href : 'https://www.sts.pl' + href;
-                                    const fullText = a.innerText.trim();
+                                    const fullText = (a.innerText || '').trim();
+                                    const textLower = fullText.toLowerCase();
 
-                                    // 1. Teams from dedicated elements
+                                    // 1. ELIMINACJA MECZÓW ZAKOŃCZONYCH I FANTOMOWYCH
+                                    if (FINISHED_KW.some(kw => textLower.includes(kw))) {
+                                        return;
+                                    }
+
+                                    // 2. DOKŁADNE NAZWY DRUŻYN Z STS
                                     let home = "", away = "";
-                                    const teamNodes = a.querySelectorAll('[class*="team"], [class*="participant"], [class*="competitor"]');
-                                    const uniqueTeams = [];
-                                    teamNodes.forEach(node => {
-                                        const t = node.innerText.trim();
-                                        if (t && !t.includes('\\n') && !uniqueTeams.includes(t) && t.length > 1) {
-                                            uniqueTeams.push(t);
-                                        }
-                                    });
-
-                                    if (uniqueTeams.length >= 2) {
-                                        home = uniqueTeams[0];
-                                        away = uniqueTeams[1];
+                                    const homeEl = a.querySelector('.one-ticket-match-tile-teams__home, [class*="teams__home"], [class*="team--home"]');
+                                    const awayEl = a.querySelector('.one-ticket-match-tile-teams__away, [class*="teams__away"], [class*="team--away"]');
+                                    if (homeEl && awayEl) {
+                                        home = homeEl.innerText.trim();
+                                        away = awayEl.innerText.trim();
                                     } else {
-                                        const lines = fullText.split('\\n').map(l => l.trim()).filter(Boolean);
-                                        const cand = lines.filter(l => 
-                                            l.length > 2 && 
-                                            !l.includes('LIVE') && 
-                                            !l.includes('połowa') && 
-                                            !l.toLowerCase().includes('przerwa') &&
-                                            !l.toLowerCase().includes('dogrywka') &&
-                                            !l.includes('Zakończony') &&
-                                            !l.includes('Przejdź do') &&
-                                            !l.match(/^[\\d\\.\\s]+$/) &&
-                                            !['1', 'X', '2', 'Filtruj', 'Koniec', 'Start o', 'Zapisane'].includes(l)
-                                        );
-                                        if (cand.length >= 2) {
-                                            home = cand[0];
-                                            away = cand[1];
+                                        const teamNodes = a.querySelectorAll('[class*="team"], [class*="participant"], [class*="competitor"]');
+                                        const uniqueTeams = [];
+                                        teamNodes.forEach(node => {
+                                            const t = node.innerText.trim();
+                                            if (t && !t.includes('\\n') && !uniqueTeams.includes(t) && t.length > 1 && !['LIVE', 'GOL', '1', 'X', '2'].includes(t)) {
+                                                uniqueTeams.push(t);
+                                            }
+                                        });
+                                        if (uniqueTeams.length >= 2) {
+                                            home = uniqueTeams[0];
+                                            away = uniqueTeams[1];
+                                        } else {
+                                            const lines = fullText.split('\\n').map(l => l.trim()).filter(Boolean);
+                                            const cand = lines.filter(l => 
+                                                l.length > 2 && 
+                                                !l.includes('LIVE') && 
+                                                !l.includes('połowa') && 
+                                                !l.toLowerCase().includes('przerwa') && 
+                                                !l.toLowerCase().includes('dogrywka') &&
+                                                !l.includes('Zakończony') &&
+                                                !l.includes('Wydarzenie') &&
+                                                !l.includes('Przejdź do') &&
+                                                !l.includes('GOL') &&
+                                                !l.match(/^[\\d\\.\\s]+$/) &&
+                                                !['1', 'X', '2', 'Filtruj', 'Koniec', 'Start o', 'Zapisane'].includes(l)
+                                            );
+                                            if (cand.length >= 2) {
+                                                home = cand[0];
+                                                away = cand[1];
+                                            }
                                         }
                                     }
 
-                                    // 2. Exact Total Score from .one-ticket-live-score__general
+                                    if (!home || !away || home === away) {
+                                        return;
+                                    }
+
+                                    // 3. DOKŁADNY WYNIK MECZU (Total Home : Total Away)
                                     let scoreH = 0, scoreA = 0;
-                                    const genEl = a.querySelector('.one-ticket-live-score__general, [class*="general"]');
+                                    const genEl = a.querySelector('.one-ticket-live-score__general, [class*="general"], [class*="match-tile-score"]');
                                     if (genEl) {
                                         const digits = genEl.innerText.trim().split(/\\s+/).filter(d => /^\\d+$/.test(d));
                                         if (digits.length >= 2) {
                                             scoreH = parseInt(digits[0], 10);
                                             scoreA = parseInt(digits[1], 10);
                                         }
+                                    } else {
+                                        const scoreEls = a.querySelectorAll('.one-ticket-match-tile-score div, [class*="score"] div');
+                                        const digits = [];
+                                        scoreEls.forEach(el => {
+                                            const t = el.innerText.trim();
+                                            if (/^\\d+$/.test(t)) digits.push(parseInt(t, 10));
+                                        });
+                                        if (digits.length >= 2) {
+                                            scoreH = digits[digits.length - 2];
+                                            scoreA = digits[digits.length - 1];
+                                        }
                                     }
 
-                                    // 3. Stage & Minute
+                                    // 4. CZAS GRY, MINUTA I POŁOWA (100% PRECYZJI)
                                     let minute = 0;
                                     let half = "1H";
                                     let stageText = "";
-                                    const minMatch = fullText.match(/(\\d+)(?:\\+\\d+)?'/);
-                                    if (minMatch) {
-                                        minute = parseInt(minMatch[1], 10);
-                                    }
-                                    if (fullText.toLowerCase().includes('przerwa')) {
+                                    let isStarted = true;
+
+                                    if (textLower.includes('start o') || textLower.includes('start wkrótce')) {
+                                        isStarted = false;
+                                        half = 'PRE';
+                                        const mTime = fullText.match(/start\\s*o?\\s*(\\d{1,2}:\\d{2})/i);
+                                        stageText = mTime ? `Start o ${mTime[1]}` : 'Start wkrótce';
+                                    } else if (textLower.includes('przerwa') || textLower.includes('ht')) {
                                         half = 'HT';
                                         stageText = 'Przerwa';
                                         minute = 45;
-                                    } else if (fullText.includes('2.połowa') || minute > 45) {
-                                        half = '2H';
+                                    } else if (textLower.includes('dogrywka') || textLower.includes('et')) {
+                                        half = 'ET';
+                                        stageText = 'Dogrywka';
+                                        const minMatch = fullText.match(/(\\d+)(?:\\+\\d+)?'/);
+                                        if (minMatch) minute = parseInt(minMatch[1], 10);
+                                    } else {
+                                        const minMatch = fullText.match(/(\\d+)(?:\\+\\d+)?'/);
+                                        if (minMatch) {
+                                            minute = parseInt(minMatch[1], 10);
+                                        }
+                                        if (textLower.includes('2.połowa') || textLower.includes('2. polowa') || textLower.includes('2h') || minute > 45) {
+                                            half = '2H';
+                                        } else {
+                                            half = '1H';
+                                        }
+                                        stageText = minute > 0 ? `${minute}'` : (half === '2H' ? '2. połowa' : '1. połowa');
                                     }
 
-                                    // 4. Odds 1X2 from .odds-button__odd-value
+                                    // 5. KURSY 1X2 (Z BEZPOŚREDNICH SPANÓW .odds-button__odd-value)
+                                    let o1 = 0.0, oX = 0.0, o2 = 0.0;
+                                    const valNodes = a.querySelectorAll('.odds-button__odd-value');
                                     const oddVals = [];
-                                    a.querySelectorAll('.odds-button__odd-value').forEach(el => {
-                                        const v = parseFloat(el.innerText.replace(',', '.'));
-                                        if (!isNaN(v)) oddVals.push(v);
+                                    valNodes.forEach(el => {
+                                        const v = parseFloat(el.innerText.replace(',', '.').trim());
+                                        if (!isNaN(v) && v > 1.0) oddVals.push(v);
                                     });
 
-                                    let o1 = oddVals[0] || 2.20;
-                                    let oX = oddVals[1] || 3.20;
-                                    let o2 = oddVals[2] || 3.10;
-
-                                    if (home && away) {
-                                        results.push({
-                                            url: fullHref,
-                                            home_team: home,
-                                            away_team: away,
-                                            home_score: scoreH,
-                                            away_score: scoreA,
-                                            score_str: scoreH + ':' + scoreA,
-                                            minute: minute,
-                                            half: half,
-                                            stage_text: stageText || (minute + "'"),
-                                            odds_1: o1,
-                                            odds_X: oX,
-                                            odds_2: o2
-                                        });
+                                    if (oddVals.length >= 3) {
+                                        o1 = oddVals[0];
+                                        oX = oddVals[1];
+                                        o2 = oddVals[2];
                                     }
+
+                                    let league = "Piłka Nożna – STS Live";
+                                    if (href.includes('epilka-nozna')) {
+                                        league = "Esport Piłka Nożna – STS Live";
+                                    }
+
+                                    results.push({
+                                        url: fullHref,
+                                        league: league,
+                                        home_team: home,
+                                        away_team: away,
+                                        home_score: scoreH,
+                                        away_score: scoreA,
+                                        score_str: scoreH + ':' + scoreA,
+                                        minute: minute,
+                                        half: half,
+                                        is_started: isStarted,
+                                        stage_text: stageText,
+                                        odds_1: o1,
+                                        odds_X: oX,
+                                        odds_2: o2,
+                                        is_esports: href.includes('epilka-nozna')
+                                    });
                                 });
                                 return results;
                             }""")
@@ -242,10 +291,12 @@ class _STSLiveWorker:
                         try:
                             cards = self._page.evaluate("""() => {
                                 const items = [];
-                                document.querySelectorAll('a[href*="/live/pilka-nozna/f"]').forEach(el => {
-                                    const href = el.getAttribute('href');
-                                    const fullHref = href.startsWith('http') ? href : 'https://www.sts.pl' + href;
-                                    items.push({ href: fullHref, text: el.innerText.trim() });
+                                document.querySelectorAll('a.one-ticket-match-tile-link, a[href*="/live/"]').forEach(el => {
+                                    const href = el.getAttribute('href') || '';
+                                    if (href.match(/\\/live\\/[^/]+\\/f\\d+/) && !href.includes('/sts-tv')) {
+                                        const fullHref = href.startsWith('http') ? href : 'https://www.sts.pl' + href;
+                                        items.push({ href: fullHref, text: el.innerText.trim() });
+                                    }
                                 });
                                 return items;
                             }""")
@@ -257,10 +308,11 @@ class _STSLiveWorker:
                         match_url = args[0]
                         try:
                             ev_page = self._context.new_page()
-                            ev_page.route('**/*', _sts_route_handler)
                             ev_page.goto(match_url, timeout=3500, wait_until='domcontentloaded')
                             ev_page.wait_for_timeout(600)
                             try:
+                                btn = ev_page.query_selector('button:has-text("Akceptuj wszystkie"), button:has-text("Zaakceptuj")')
+                                if btn: btn.click()
                                 ev_page.evaluate("() => { const el = document.getElementById('CybotCookiebotDialog'); if (el) el.remove(); }")
                             except Exception:
                                 pass
@@ -278,18 +330,27 @@ class _STSLiveWorker:
             print(f"[STSLiveWorker Top Level Error] {top_ex}")
             self._ready_event.set()
 
-    def _load_live_page(self):
+    def _load_live_page(self, include_esports: bool = False):
         try:
-            self._page.goto(STS_LIVE_SOCCER_URL, timeout=12000, wait_until='domcontentloaded')
+            target_url = STS_LIVE_SOCCER_URL if not include_esports else 'https://www.sts.pl/live'
+            self._page.goto(target_url, timeout=15000, wait_until='domcontentloaded')
+            self._page.wait_for_timeout(800)
             try:
+                btn = self._page.query_selector('button:has-text("Akceptuj wszystkie"), button:has-text("Zaakceptuj")')
+                if btn:
+                    btn.click()
+                    self._page.wait_for_timeout(800)
                 self._page.evaluate("() => { const el = document.getElementById('CybotCookiebotDialog'); if (el) el.remove(); }")
             except Exception:
                 pass
-            self._page.wait_for_timeout(1000)
+            try:
+                self._page.wait_for_selector('a.one-ticket-match-tile-link, .one-ticket-match-tile', timeout=3000)
+            except Exception:
+                pass
         except Exception as e:
             print(f"[STSLiveWorker _load_live_page] {e}")
 
-    def get_live_lines(self, timeout=8.0) -> List[str]:
+    def get_live_lines(self, timeout=12.0) -> List[str]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_LINES', (), q))
         try:
@@ -300,9 +361,9 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_structured_matches(self, timeout=8.0) -> List[Dict[str, Any]]:
+    def get_structured_matches(self, timeout=15.0, include_esports: bool = False) -> List[Dict[str, Any]]:
         q = queue.Queue()
-        self._cmd_queue.put(('GET_STRUCTURED_MATCHES', (), q))
+        self._cmd_queue.put(('GET_STRUCTURED_MATCHES', (include_esports,), q))
         try:
             status, res = q.get(timeout=timeout)
             if status == 'OK':
@@ -311,7 +372,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_match_cards(self, timeout=6.0) -> List[Dict[str, str]]:
+    def get_match_cards(self, timeout=10.0) -> List[Dict[str, str]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_MATCH_CARDS', (), q))
         try:
@@ -322,7 +383,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def scrape_match_page(self, match_url: str, timeout=4.0) -> str:
+    def scrape_match_page(self, match_url: str, timeout=6.0) -> str:
         q = queue.Queue()
         self._cmd_queue.put(('SCRAPE_MATCH', (match_url,), q))
         try:
@@ -393,22 +454,27 @@ class STSLiveEngine:
         matches = []
         try:
             # 1. Strukturalne, 100% dokładne pobranie z DOM
-            raw_struct = self._worker.get_structured_matches(timeout=6.0)
+            raw_struct = self._worker.get_structured_matches(timeout=15.0, include_esports=include_esports)
             if raw_struct:
                 for sm in raw_struct:
                     h_score = int(sm.get('home_score', 0))
                     a_score = int(sm.get('away_score', 0))
-                    o1 = float(sm.get('odds_1', 2.2))
-                    oX = float(sm.get('odds_X', 3.2))
-                    o2 = float(sm.get('odds_2', 3.1))
+                    o1 = float(sm.get('odds_1', 0.0))
+                    oX = float(sm.get('odds_X', 0.0))
+                    o2 = float(sm.get('odds_2', 0.0))
                     minute = int(sm.get('minute', 0))
                     half_val = str(sm.get('half', '1H'))
+                    is_started = bool(sm.get('is_started', True))
+
+                    calc_o1 = o1 if o1 > 1.0 else 2.20
+                    calc_oX = oX if oX > 1.0 else 3.20
+                    calc_o2 = o2 if o2 > 1.0 else 3.10
 
                     over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
-                        o1, oX, o2, h_score + a_score, minute
+                        calc_o1, calc_oX, calc_o2, h_score + a_score, minute
                     )
                     live_markets = self.calculate_dynamic_live_markets(
-                        h_score, a_score, minute, half_val, o1, oX, o2
+                        h_score, a_score, minute, half_val, calc_o1, calc_oX, calc_o2, league=sm.get('league', '')
                     )
 
                     goals_odds = {
@@ -428,7 +494,7 @@ class STSLiveEngine:
 
                     matches.append({
                         'bookmaker': 'STS',
-                        'league': 'Piłka Nożna – STS Live',
+                        'league': sm.get('league', 'Piłka Nożna – STS Live'),
                         'home_team': sm['home_team'],
                         'away_team': sm['away_team'],
                         'score_str': f"{h_score}:{a_score}",
@@ -436,7 +502,7 @@ class STSLiveEngine:
                         'away_score': a_score,
                         'minute': minute,
                         'half': half_val,
-                        'is_started': True,
+                        'is_started': is_started,
                         'stage_text': sm.get('stage_text', f"{minute}'"),
                         'odds_1': o1,
                         'odds_X': oX,
@@ -709,10 +775,15 @@ class STSLiveEngine:
                         j += 5
                     elif l.isdigit() and len(l) <= 2:
                         score_lines.append(int(l))
-                    elif (len(l) > 2 and l not in ['Filtruj', 'Koniec', 'Start o', 'Zapisane', 'Akceptuj', 'Ustawienia']
+                    elif (len(l) > 2 and l not in ['Filtruj', 'Koniec', 'Start o', 'Zapisane', 'Akceptuj', 'Ustawienia', 'GOL', 'Wydarzenie trwa', 'Przejdź do wydarzenia', 'Zakończony', 'Przerwany', 'Odwołany', 'Po dogrywce', 'Po karnych']
                           and not self._is_league_line(l) and not _is_odds(l)):
                         text_lines.append(l)
                     j += 1
+
+                # Odrzuć mecze zakończone
+                if any(kw in stage.lower() for kw in ['zakończony', 'koniec', 'przerwany', 'odwołany', 'wycofany', 'ft']):
+                    i = j
+                    continue
 
                 if len(text_lines) >= 2:
                     home_team = text_lines[0]

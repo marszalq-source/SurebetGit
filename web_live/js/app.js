@@ -234,6 +234,7 @@ function renderLiveMatches() {
             <div class="match-main-row">
                 <div class="team-box home">
                     <span class="team-name">${escapeHtml(m.home_team)}</span>
+                    ${m.flashscore_home_team && m.flashscore_home_team !== m.home_team ? `<span class="team-name-sub">FS: ${escapeHtml(m.flashscore_home_team)}</span>` : ''}
                 </div>
                 <div class="score-box">
                     <div class="score-display">${m.score_str || '0:0'}</div>
@@ -246,6 +247,7 @@ function renderLiveMatches() {
                 </div>
                 <div class="team-box away">
                     <span class="team-name">${escapeHtml(m.away_team)}</span>
+                    ${m.flashscore_away_team && m.flashscore_away_team !== m.away_team ? `<span class="team-name-sub">FS: ${escapeHtml(m.flashscore_away_team)}</span>` : ''}
                 </div>
             </div>
 
@@ -495,6 +497,7 @@ function renderPrematchMatches() {
             const card = document.createElement('div');
             card.className = 'match-card';
             const a = m.analysis || {};
+            const o = m.odds || a.odds || {};
             const isWatched = watchlistMap[m.id] !== undefined;
 
             let timeBadge = `<span style="font-size: 12px; font-weight: 700; color: var(--accent-yellow);">⏰ ${m.time_str}</span>`;
@@ -514,10 +517,21 @@ function renderPrematchMatches() {
                 notesHtml += `</div>`;
             }
 
+            const o1Val = o.odds_1 ? o.odds_1.toFixed(2) : '2.15';
+            const oXVal = o.odds_X ? o.odds_X.toFixed(2) : '3.40';
+            const o2Val = o.odds_2 ? o.odds_2.toFixed(2) : '3.25';
+            const o05HtVal = o.over_05_ht ? o.over_05_ht.toFixed(2) : (a.ht_over05_pct > 80 ? '1.34' : '1.58');
+            const o15FtVal = o.over_15_ft ? o.over_15_ft.toFixed(2) : '1.25';
+            const o25FtVal = o.over_25_ft ? o.over_25_ft.toFixed(2) : (a.avg_total_goals > 3.0 ? '1.62' : '1.82');
+            const oBttsVal = o.btts ? o.btts.toFixed(2) : '1.75';
+
+            const matchTitle = `${m.home_team} vs ${m.away_team}`;
+
             card.innerHTML = `
                 <div class="match-header">
                     <div class="league-tag">🏆 ${escapeHtml(m.league)}</div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        ${m.matched_with_sts ? '<span class="badge-worth-top" style="background: rgba(255, 214, 0, 0.15); color: #ffd600; border: 1px solid rgba(255, 214, 0, 0.4); font-size: 10px; padding: 2px 6px; border-radius: 4px;">👑 100% STS OFERTA</span>' : ''}
                         ${timeBadge}
                         <button class="btn-star ${isWatched ? 'active' : ''}" data-id="${m.id}" title="Dodaj do Watchlisty">
                             ${isWatched ? '⭐ Obserwowany' : '☆ Obserwuj'}
@@ -565,23 +579,68 @@ function renderPrematchMatches() {
                 <!-- Porównanie Statystyk: FootyStats, Transfermarkt, MakeYourStats -->
                 ${a.comparison ? renderComparisonPanelHtml(a.comparison, 'pre-' + m.id) : ''}
 
-                <div class="odds-footer-row">
-                    <div class="odds-pills-group">
-                        <div class="odd-pill clickable ${isLegInAko(m.home_team + ' vs ' + m.away_team, 'Over 0.5 HT') ? 'selected' : ''}" onclick="toggleAkoLeg('${escapeHtml(m.home_team)} vs ${escapeHtml(m.away_team)}', 'Over 0.5 HT', ${(a.ht_over05_pct > 80 ? 1.65 : 1.75).toFixed(2)})">
-                            <span class="odd-label">+ Over 0.5 HT:</span>
-                            <span class="odd-val">${(a.ht_over05_pct > 80 ? 1.65 : 1.75).toFixed(2)}</span>
+                <!-- Kursy STS 1X2 & Rynki Bramkowe -->
+                <div class="odds-footer-row" style="flex-direction: column; gap: 8px; align-items: stretch;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <!-- Rynki 1X2 STS -->
+                        <div class="odds-pills-group" style="gap: 4px;">
+                            <span style="font-size: 11px; font-weight: 800; color: #ffd600; align-self: center; margin-right: 2px;">STS 1X2:</span>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, '1 (Gospodarze)') ? 'selected' : ''}" 
+                                 title="Postaw na wygraną gospodarzy"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', '1 (Gospodarze)', ${o1Val})">
+                                <span class="odd-label">1:</span>
+                                <span class="odd-val">${o1Val}</span>
+                            </div>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Remis (X)') ? 'selected' : ''}" 
+                                 title="Postaw na remis"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Remis (X)', ${oXVal})">
+                                <span class="odd-label">X:</span>
+                                <span class="odd-val">${oXVal}</span>
+                            </div>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, '2 (Goście)') ? 'selected' : ''}" 
+                                 title="Postaw na wygraną gości"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', '2 (Goście)', ${o2Val})">
+                                <span class="odd-label">2:</span>
+                                <span class="odd-val">${o2Val}</span>
+                            </div>
                         </div>
-                        <div class="odd-pill clickable ${isLegInAko(m.home_team + ' vs ' + m.away_team, 'Over 1.5 FT') ? 'selected' : ''}" onclick="toggleAkoLeg('${escapeHtml(m.home_team)} vs ${escapeHtml(m.away_team)}', 'Over 1.5 FT', 1.55)">
-                            <span class="odd-label">+ Over 1.5 FT:</span>
-                            <span class="odd-val">1.55</span>
-                        </div>
-                        <div class="odd-pill clickable ${isLegInAko(m.home_team + ' vs ' + m.away_team, 'Over 2.5 FT') ? 'selected' : ''}" onclick="toggleAkoLeg('${escapeHtml(m.home_team)} vs ${escapeHtml(m.away_team)}', 'Over 2.5 FT', ${(a.avg_total_goals > 3.2 ? 1.60 : 1.75).toFixed(2)})">
-                            <span class="odd-label">+ Over 2.5 FT:</span>
-                            <span class="odd-val">${(a.avg_total_goals > 3.2 ? 1.60 : 1.75).toFixed(2)}</span>
+
+                        <!-- Rynki Bramkowe STS -->
+                        <div class="odds-pills-group" style="gap: 4px;">
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 0.5 HT') ? 'selected' : ''}" 
+                                 title="Min. 1 gol w 1. połowie"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 0.5 HT', ${o05HtVal})">
+                                <span class="odd-label">+ Over 0.5 HT:</span>
+                                <span class="odd-val" style="color: var(--accent-green);">${o05HtVal}</span>
+                            </div>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 1.5 FT') ? 'selected' : ''}" 
+                                 title="Min. 2 gole w całym meczu"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 1.5 FT', ${o15FtVal})">
+                                <span class="odd-label">+ Over 1.5 FT:</span>
+                                <span class="odd-val">${o15FtVal}</span>
+                            </div>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'Over 2.5 FT') ? 'selected' : ''}" 
+                                 title="Min. 3 gole w całym meczu"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'Over 2.5 FT', ${o25FtVal})">
+                                <span class="odd-label">+ Over 2.5 FT:</span>
+                                <span class="odd-val">${o25FtVal}</span>
+                            </div>
+                            <div class="odd-pill clickable ${isLegInAko(matchTitle, 'BTTS (Obie strzelą)') ? 'selected' : ''}" 
+                                 title="Obie drużyny strzelą gola"
+                                 onclick="toggleAkoLeg('${escapeHtml(matchTitle)}', 'BTTS (Obie strzelą)', ${oBttsVal})">
+                                <span class="odd-label">+ BTTS:</span>
+                                <span class="odd-val">${oBttsVal}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="match-links">
-                        <a href="https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/1" target="_blank" class="btn btn-sm btn-sts">
+
+                    <!-- Przyciski akcji -->
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; align-items: center; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px;">
+                        <button class="btn btn-sm" style="border-color: rgba(255, 214, 0, 0.4); color: #ffd600;" 
+                                onclick="quickLogToTracker('${escapeHtml(matchTitle)}', 'Over 0.5 HT', ${o05HtVal})">
+                            📝 Do Dziennika
+                        </button>
+                        <a href="${m.sts_url || 'https://www.sts.pl/zaklady-bukmacherskie/pilka-nozna/dzisiaj'}" target="_blank" class="btn btn-sm btn-sts">
                             STS Oferta ↗
                         </a>
                         <a href="${m.url}" target="_blank" class="btn btn-sm btn-fs">

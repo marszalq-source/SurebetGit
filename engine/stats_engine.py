@@ -3,6 +3,7 @@ import json
 import time
 import datetime
 from collections import defaultdict
+from typing import Optional, Dict, Any, List
 
 SIGNALS_HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_signals_history.json")
 
@@ -122,7 +123,7 @@ class StatsEngine:
         self.save_history(history)
         return entry
 
-    def settle_signal(self, home: str, away: str, status: str, final_score: str) -> bool:
+    def settle_signal(self, home: str, away: str, status: str, final_score: str, final_odds: Optional[float] = None) -> bool:
         history = self.load_history()
         h_norm = self._normalize_name(home)
         a_norm = self._normalize_name(away)
@@ -131,13 +132,22 @@ class StatsEngine:
         now_str = time.strftime('%Y-%m-%d %H:%M:%S')
         now_ts = time.time()
         
+        try:
+            from engine.live_matcher import LiveMatcher
+        except ImportError:
+            LiveMatcher = None
+
         for item in reversed(history):
-            ih_norm = self._normalize_name(item.get('home_team', ''))
-            ia_norm = self._normalize_name(item.get('away_team', ''))
+            item_h = item.get('home_team', '')
+            item_a = item.get('away_team', '')
+            ih_norm = self._normalize_name(item_h)
+            ia_norm = self._normalize_name(item_a)
             
             is_match = False
-            if (h_norm and ih_norm and (h_norm == ih_norm or h_norm in ih_norm or ih_norm in h_norm)) and \
-               (a_norm and ia_norm and (a_norm == ia_norm or a_norm in ia_norm or ia_norm in a_norm)):
+            if LiveMatcher and LiveMatcher.is_same_fixture(home, away, item_h, item_a):
+                is_match = True
+            elif (h_norm and ih_norm and (h_norm == ih_norm or h_norm in ih_norm or ih_norm in h_norm)) and \
+                 (a_norm and ia_norm and (a_norm == ia_norm or a_norm in ia_norm or ia_norm in a_norm)):
                 is_match = True
             
             if is_match:
@@ -147,6 +157,8 @@ class StatsEngine:
                     continue
                 if cur_st in ('WON', 'VOID') and status == cur_st:
                     item['score_final'] = final_score
+                    if final_odds is not None and final_odds > 1.0:
+                        item['odds'] = float(final_odds)
                     updated = True
                     continue
                 
@@ -155,6 +167,9 @@ class StatsEngine:
                     item['score_final'] = final_score
                     item['resolved_at'] = now_str
                     
+                    if final_odds is not None and final_odds > 1.0:
+                        item['odds'] = float(final_odds)
+
                     units = item.get('units', 1)
                     odds = item.get('odds', 1.80)
                     stake_pln = item.get('stake_pln', units * 2.0)

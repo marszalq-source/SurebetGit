@@ -59,17 +59,31 @@ NAME_REPLACEMENTS = {
     'west ham united': 'west ham',
     'paris sg': 'psg',
     'paris saint-germain': 'psg',
+    'marsylia': 'marseille',
+    'olympique marsylia': 'marseille',
+    'olympique marseille': 'marseille',
+    'olympique lyon': 'lyon',
+    'olympique lyonnais': 'lyon',
+    'bvb': 'borussia dortmund',
+    'barca': 'barcelona',
     'inter mediolan': 'inter',
     'ac milan': 'milan',
     'as roma': 'roma',
+    'juventus turyn': 'juventus',
+    'neapol': 'napoli',
+    'genua': 'genoa',
     'atletico madryt': 'atletico madrid',
     'athletic bilbao': 'athletic club',
     'sporting lizbona': 'sporting cp',
+    'psv eindhoven': 'psv',
+    'az alkmaar': 'az',
+    'feyenoord rotterdam': 'feyenoord',
+    'ajax amsterdam': 'ajax',
 }
 
 PL_TRANS = str.maketrans('ąćęłńóśźżĄĆĘŁŃÓŚŹŻ', 'acelnoszzACELNOSZZ')
 RE_PARENS = re.compile(r'\s*(\([^)]*\)|\[[^\]]*\])')
-RE_PREFIX = re.compile(r'\b(fc|cf|fk|sk|sc|ks|bk|afc|ssc|cd|ac|as|ca|tsv|sv|vfb|1\.)\b')
+RE_PREFIX = re.compile(r'\b(fc|cf|fk|sk|sc|ks|bk|afc|ssc|cd|ac|as|ca|tsv|sv|vfb|vfl|rb|rc|bsc|spvgg|olympique|1\.)\b')
 RE_ROMAN_II = re.compile(r'\b(ii)\b')
 RE_ROMAN_III = re.compile(r'\b(iii)\b')
 RE_ROMAN_IV = re.compile(r'\b(iv)\b')
