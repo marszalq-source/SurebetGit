@@ -348,27 +348,27 @@ class _STSLiveWorker:
                         match_url = args[0]
                         try:
                             ev_page = self._context.new_page()
-                            ev_page.goto(match_url, timeout=10000, wait_until='domcontentloaded')
+                            ev_page.goto(match_url, timeout=12000, wait_until='domcontentloaded')
                             try:
                                 btn = ev_page.query_selector('button:has-text("Akceptuj wszystkie"), button:has-text("Zaakceptuj")')
                                 if btn:
                                     btn.click()
-                                    ev_page.wait_for_timeout(400)
+                                    ev_page.wait_for_timeout(300)
                                 ev_page.evaluate("() => { const el = document.getElementById('CybotCookiebotDialog'); if (el) el.remove(); }")
                             except Exception:
                                 pass
 
                             try:
-                                ev_page.wait_for_selector('button.odds-button, .odds-button', timeout=3000)
+                                ev_page.wait_for_selector('sds-odds-button, button.odds-button, [class*="odds-button"]', timeout=6000)
                             except Exception:
                                 pass
+                            ev_page.wait_for_timeout(800)
                             
                             sub_markets = ev_page.evaluate("""() => {
                                 const mkts = [];
                                 const seen = new Set();
                                 document.querySelectorAll('button, .odds-button, [class*="odds-button"], sds-odds-button').forEach(b => {
                                     let label = (b.getAttribute('aria-label') || b.innerText || '').replace(/\\s+/g, ' ').trim();
-                                    // Dopasowanie linii typu "+4.5 1.30", "+2.5 1.65", "+0.5 1.45"
                                     const m = label.match(/^([+-]?\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
                                     if (m) {
                                         const lineStr = m[1];
@@ -505,7 +505,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_subpage_live_markets(self, match_url: str, timeout=4.5) -> List[Dict[str, Any]]:
+    def get_subpage_live_markets(self, match_url: str, timeout=15.0) -> List[Dict[str, Any]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_SUBPAGE_MARKETS', (match_url,), q))
         try:
