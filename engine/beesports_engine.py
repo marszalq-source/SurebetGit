@@ -53,9 +53,10 @@ class BeeSportsEngine:
         for pl, en in _TEAM_TRANSLATIONS.items():
             if pl in n:
                 n = n.replace(pl, en)
+        n = re.sub(r'\[.*?\]|\(.*?\)', '', n)
         n = re.sub(r'\b(u\d{2}|fc|cf|sc|ac|fk|ks|sp|cd|sk|sv|united|utd|city|town|women|kobiety)\b', '', n)
-        n = re.sub(r'[^a-z0-9]', '', n)
-        return n
+        n = re.sub(r'[^a-z0-9\s]', ' ', n)
+        return ' '.join(n.split())
 
     def update_live_matches_list(self, page) -> List[Dict[str, Any]]:
         """Pobiera aktualną listę meczów na żywo z BeeSports przy użyciu Playwright."""
@@ -106,25 +107,29 @@ class BeeSportsEngine:
 
     def find_match_url(self, home_team: str, away_team: str) -> Optional[str]:
         """Dopasowuje drużyny do linku meczu na BeeSports."""
-        h_norm = self._normalize_name(home_team)
-        a_norm = self._normalize_name(away_team)
+        h_words = [w for w in self._normalize_name(home_team).split() if len(w) >= 3]
+        a_words = [w for w in self._normalize_name(away_team).split() if len(w) >= 3]
 
+        def match_word(w, slug):
+            if w in slug: return True
+            if w.replace('y', 'i') in slug or w.replace('i', 'y') in slug: return True
+            return False
+
+        # 1. Obie drużyny w slugu
         for m in self._matches_cache:
-            slug = m.get('slug', '')
-            slug_norm = re.sub(r'[^a-z0-9]', '', slug)
-            # 1. Obie drużyny w slugu
-            if (h_norm and h_norm in slug_norm) and (a_norm and a_norm in slug_norm):
+            slug = m.get('slug', '').lower()
+            h_match = any(match_word(w, slug) for w in h_words)
+            a_match = any(match_word(w, slug) for w in a_words)
+            if h_match and a_match:
                 return m['href']
-            # 2. Jedna z drużyn (jeśli wystarczająco unikalna nazwa >= 4 znaki)
-            if (h_norm and len(h_norm) >= 4 and h_norm in slug_norm) or (a_norm and len(a_norm) >= 4 and a_norm in slug_norm):
+
+        # 2. Przynajmniej jedna unikalna nazwa (>= 4 znaki)
+        for m in self._matches_cache:
+            slug = m.get('slug', '').lower()
+            h_match = any(match_word(w, slug) for w in h_words if len(w) >= 4)
+            a_match = any(match_word(w, slug) for w in a_words if len(w) >= 4)
+            if h_match or a_match:
                 return m['href']
-            # 3. Sprawdź poszczególne słowa
-            for word in h_norm.split():
-                if len(word) >= 4 and word in slug_norm:
-                    return m['href']
-            for word in a_norm.split():
-                if len(word) >= 4 and word in slug_norm:
-                    return m['href']
 
         return None
 

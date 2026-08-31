@@ -178,6 +178,8 @@ class GoalooEngine:
             s_on_a, s_off_a = 0, 0
             corn_h, corn_a = 0, 0
 
+            shots_tot_h, shots_tot_a = 0, 0
+
             if len(sections) > 8 and ',' in sections[8]:
                 p = sections[8].split(',')
                 if len(p) >= 3:
@@ -195,14 +197,16 @@ class GoalooEngine:
             if len(sections) > 10 and ',' in sections[10]:
                 p = sections[10].split(',')
                 if len(p) >= 2:
-                    s_on_h = int(p[0]) if p[0].isdigit() else 0
-                    s_off_h = int(p[1]) if p[1].isdigit() else 0
+                    shots_tot_h = int(p[0]) if p[0].isdigit() else 0
+                    s_on_h = int(p[1]) if p[1].isdigit() else 0
+                    s_off_h = max(0, shots_tot_h - s_on_h)
 
             if len(sections) > 11 and ',' in sections[11]:
                 p = sections[11].split(',')
                 if len(p) >= 2:
-                    s_on_a = int(p[0]) if p[0].isdigit() else 0
-                    s_off_a = int(p[1]) if p[1].isdigit() else 0
+                    shots_tot_a = int(p[0]) if p[0].isdigit() else 0
+                    s_on_a = int(p[1]) if p[1].isdigit() else 0
+                    s_off_a = max(0, shots_tot_a - s_on_a)
 
             if len(sections) > 14 and sections[14].isdigit():
                 corn_h = int(sections[14])
@@ -211,8 +215,6 @@ class GoalooEngine:
                 corn_a = int(sections[17])
 
             sot_total = s_on_h + s_on_a
-            shots_tot_h = s_on_h + s_off_h
-            shots_tot_a = s_on_a + s_off_a
             shots_total = shots_tot_h + shots_tot_a
             corn_total = corn_h + corn_a
             dang_total = dang_h + dang_a
