@@ -9,6 +9,27 @@ from typing import Dict, Any, Optional, Tuple, List
 
 # Słownik zamienników i normalizacji dla popularnych klubów i krajów
 NAME_REPLACEMENTS = {
+    'the town': 'san jose earthquakes 2',
+    'the town fc': 'san jose earthquakes 2',
+    'san jose earthquakes ii': 'san jose earthquakes 2',
+    'san jose ii': 'san jose earthquakes 2',
+    'los angeles fc ii': 'los angeles fc 2',
+    'lafc 2': 'los angeles fc 2',
+    'real monarchs': 'real salt lake 2',
+    'crown legacy': 'charlotte 2',
+    'huntsville city': 'nashville 2',
+    'whitecaps 2': 'vancouver whitecaps 2',
+    'timbers 2': 'portland timbers 2',
+    'sporting kc ii': 'sporting kansas city 2',
+    'atlanta utd 2': 'atlanta united 2',
+    'ny red bulls ii': 'new york red bulls 2',
+    'chicago fire ii': 'chicago fire 2',
+    'austin fc ii': 'austin 2',
+    'colorado rapids 2': 'colorado rapids 2',
+    'houston dynamo 2': 'houston dynamo 2',
+    'tacoma defiance': 'seattle sounders 2',
+    'ventura county': 'la galaxy 2',
+    'la galaxy ii': 'la galaxy 2',
     'monachium': 'munich',
     'madryt': 'madrid',
     'rzym': 'roma',
@@ -49,6 +70,10 @@ NAME_REPLACEMENTS = {
 PL_TRANS = str.maketrans('ąćęłńóśźżĄĆĘŁŃÓŚŹŻ', 'acelnoszzACELNOSZZ')
 RE_PARENS = re.compile(r'\s*(\([^)]*\)|\[[^\]]*\])')
 RE_PREFIX = re.compile(r'\b(fc|cf|fk|sk|sc|ks|bk|afc|ssc|cd|ac|as|ca|tsv|sv|vfb|1\.)\b')
+RE_ROMAN_II = re.compile(r'\b(ii)\b')
+RE_ROMAN_III = re.compile(r'\b(iii)\b')
+RE_ROMAN_IV = re.compile(r'\b(iv)\b')
+RE_UTD = re.compile(r'\b(utd)\b')
 RE_NON_ALPHANUM = re.compile(r'[^a-z0-9\s]')
 RE_SPACES = re.compile(r'\s+')
 
@@ -60,6 +85,10 @@ def normalize_team_name(name: str) -> str:
     name = name.lower().translate(PL_TRANS)
     name = RE_PARENS.sub('', name)
     name = RE_PREFIX.sub('', name)
+    name = RE_ROMAN_II.sub('2', name)
+    name = RE_ROMAN_III.sub('3', name)
+    name = RE_ROMAN_IV.sub('4', name)
+    name = RE_UTD.sub('united', name)
     name = RE_NON_ALPHANUM.sub(' ', name)
     name = RE_SPACES.sub(' ', name).strip()
 
@@ -122,6 +151,9 @@ class LiveMatcher:
         if not fs_home or not fs_away:
             return None
 
+        fs_sh = int(fs_match.get('home_score', -1))
+        fs_sa = int(fs_match.get('away_score', -1))
+
         best_sts = None
         best_score = 0.0
 
@@ -137,18 +169,31 @@ class LiveMatcher:
                 sts['_norm_away'] = sts_away
 
             score_home = match_teams_similarity(fs_home, sts_home)
-            if score_home < 0.65:
-                continue
-
             score_away = match_teams_similarity(fs_away, sts_away)
-            if score_away < 0.65:
+
+            # Identyczność wyniku (wsparcie dopasowania przy zmianie nazwy klubu)
+            same_score = False
+            sts_sh = int(sts.get('home_score', -2))
+            sts_sa = int(sts.get('away_score', -2))
+            if fs_sh >= 0 and fs_sa >= 0 and fs_sh == sts_sh and fs_sa == sts_sa:
+                same_score = True
+
+            # 1. Standardowe dopasowanie (obie drużyny >= 0.60)
+            if score_home >= 0.60 and score_away >= 0.60:
+                avg_score = (score_home + score_away) / 2.0
+            # 2. Jedna drużyna idealna (>= 0.85) i ten sam wynik w meczu
+            elif (score_home >= 0.85 or score_away >= 0.85) and same_score:
+                avg_score = 0.88
+            # 3. Jedna drużyna idealna (>= 0.85) i druga częściowa (>= 0.35)
+            elif (score_home >= 0.85 and score_away >= 0.35) or (score_away >= 0.85 and score_home >= 0.35):
+                avg_score = 0.80
+            else:
                 continue
 
-            avg_score = (score_home + score_away) / 2.0
             if avg_score > best_score:
                 best_score = avg_score
                 best_sts = sts
-                if avg_score >= 0.95:  # Natychmiastowe perfekcyjne dopasowanie
+                if avg_score >= 0.95:
                     break
 
         if best_score >= 0.70:
