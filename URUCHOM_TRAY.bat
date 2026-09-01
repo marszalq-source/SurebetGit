@@ -1,3 +1,4 @@
 @echo off
-start "" wscript.exe "%~dp0URUCHOM_W_TLE_TRAY.vbs"
+cd /d "%~dp0"
+start "" "C:\Users\Technolog\AppData\Local\Programs\Python\Python38\pythonw.exe" "%~dp0tray_launcher.py"
 exit
