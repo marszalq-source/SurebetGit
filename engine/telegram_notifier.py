@@ -1047,6 +1047,8 @@ class TelegramNotifier:
                 "league": league,
                 "last_text": msg,
                 "last_odds": odds_val,
+                "initial_odds": odds_val,
+                "initial_minute": minute,
                 "initial_score": score,
                 "initial_goals": init_tot,
                 "target_goals": target_goals,
@@ -1141,24 +1143,27 @@ class TelegramNotifier:
         danger = match.get('danger_index', card.get('danger', 50))
         apm = match.get('apm', card.get('apm', 0.8))
 
+        init_m = card.get('initial_minute', card.get('last_seen_minute', minute))
+        init_odds = card.get('initial_odds', card.get('last_odds', 1.70))
+
         if is_won:
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
-            profit_units = round(units * (odds_val - 1.0), 2)
+            profit_units = round(units * (init_odds - 1.0), 2)
             win_msg = (
-                f"✅ <b>ALARM LIVE</b> <i>({win_time})</i>\n\n"
+                f"✅ <b>ALARM LIVE</b> <i>(Trafiono: {win_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {win_time}\n\n"
+                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
                 f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Trafiony Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"📈 <b>Trafiony Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                 f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J</b>"
             )
             self.edit_message_all(dev_msgs, win_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=odds_val)
+            self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=init_odds)
             self._save_cards()
             return True
 
@@ -1169,17 +1174,17 @@ class TelegramNotifier:
                 f"🟡 <b>ALARM LIVE</b> <i>({stage_text})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {stage_text}\n\n"
+                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
                 f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Aktualny Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                 f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
             )
             self.edit_message_all(dev_msgs, void_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=odds_val)
+            self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=init_odds)
             self._save_cards()
             return True
 
@@ -1213,20 +1218,20 @@ class TelegramNotifier:
             loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
             loss_msg = (
-                f"❌ <b>ALARM LIVE</b> <i>({loss_time})</i>\n\n"
+                f"❌ <b>ALARM LIVE</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {loss_time}\n\n"
+                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
                 f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+                f"📈 <b>Kurs początkowy STS:</b> <b>{init_odds:.2f}</b>\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                 f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J</b>"
             )
             self.edit_message_all(dev_msgs, loss_msg)
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
-            self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=odds_val)
+            self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=init_odds)
             self._save_cards()
             return True
 
@@ -1240,18 +1245,22 @@ class TelegramNotifier:
 
             danger = match.get('danger_index', card.get('danger', 50))
             apm = match.get('apm', card.get('apm', 0.8))
-            desc = card.get('desc', '')
-            sts_url = match.get('sts_url', card.get('sts_url', 'https://www.sts.pl/live/pilka-nozna'))
-            open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
+            orig_odds = card.get('initial_odds', card.get('last_odds', 1.70))
+            init_m = card.get('initial_minute', '')
+            time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
+            
+            odds_str = f"<b>{orig_odds:.2f}</b>"
+            if 1.10 <= latest_odds <= 3.20 and abs(latest_odds - orig_odds) > 0.05:
+                odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
             updated_msg = (
                 f"<b>ALARM LIVE</b> <i>({time_display})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {time_display}\n\n"
+                f"⏱️ <b>Czas:</b> {time_info}\n\n"
                 f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Aktualny Kurs STS:</b> <b>{latest_odds:.2f}</b>\n"
+                f"📈 <b>Kurs STS:</b> {odds_str}\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                 f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
             )
@@ -1262,7 +1271,8 @@ class TelegramNotifier:
             card["last_seen_score"] = current_score
             card["last_seen_minute"] = minute
             card["last_seen_time"] = now
-            card["last_odds"] = latest_odds
+            if latest_odds <= 3.20:
+                card["last_odds"] = latest_odds
 
             if card.get("last_text") != updated_msg and (score_changed or time_since_edit >= 45):
                 self.edit_message_all(dev_msgs, updated_msg)

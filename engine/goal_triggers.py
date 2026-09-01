@@ -83,6 +83,18 @@ class GoalTriggersEngine:
 
         d_rat = "EKSTREMALNY" if danger_index >= 75 else ("WYSOKI" if danger_index >= 55 else ("ŚREDNI" if danger_index >= 35 else "NISKI"))
 
+        # BEZWZGLĘDNA BLOKADA KOŃCÓWKI MECZU: Żadnych nowych sygnałów od 76. minuty (eliminacja loterii w końcówce)
+        if minute >= 76 or half in ('FT', 'AET', 'PEN') or 'koniec' in str(match_data.get('stage_text', '')).lower():
+            return {
+                'apm': apm,
+                'danger_index': danger_index,
+                'danger_rating': d_rat,
+                'signals': [],
+                'has_signals': False,
+                'primary_signal': None,
+                'top_recommendation': 'Końcówka meczu (zakaz wejścia po 75. minucie)'
+            }
+
         # 3. Analiza rynków STS — sygnały tylko dla potwierdzonych i istniejących rynków
         live_mkts = match_data.get('live_markets', [])
         if not live_mkts:
@@ -103,7 +115,7 @@ class GoalTriggersEngine:
             market_name = str(m.get('market', '')).upper()
             combined_txt = f"{name} {market_name}"
             odds = float(m.get('odds', 0.0))
-            if odds < 1.15:
+            if odds < 1.15 or odds > 2.45:
                 continue
 
             if 'OVER' in combined_txt and ('FT' in combined_txt or 'MECZ' in combined_txt or 'LICZBA GOLI' in combined_txt):
