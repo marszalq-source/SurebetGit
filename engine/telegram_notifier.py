@@ -562,6 +562,42 @@ class TelegramNotifier:
                                 self.send_message("❌ Podaj poprawną kwotę, np. <code>/cena 149</code>", chat_id=cid)
                         continue
 
+                    elif is_admin and text_lower.startswith("/proxy"):
+                        parts = text.split(maxsplit=1)
+                        from engine.smart_money_engine import SmartMoneyEngine
+                        sm = SmartMoneyEngine()
+                        if len(parts) >= 2:
+                            p_arg = parts[1].strip()
+                            if p_arg.lower() in ("test", "status", "check"):
+                                curr_p = sm.config.get("custom_proxy_url", "")
+                                if not curr_p:
+                                    self.send_message("ℹ️ <b>Status Proxy:</b> Brak ustawionego własnego proxy.\nWpisz <code>/proxy http://host:port</code> aby ustawić.", chat_id=cid)
+                                else:
+                                    self.send_message(f"⏳ <b>Testowanie połączenia z Betfair przez proxy:</b>\n<code>{curr_p}</code>...", chat_id=cid)
+                                    test_res = sm.test_proxy(curr_p)
+                                    if test_res.get("success"):
+                                        self.send_message(f"✅ <b>Połączenie z Betfair udane!</b> (Czas: {test_res.get('latency_sec')}s)", chat_id=cid)
+                                    else:
+                                        self.send_message(f"❌ <b>Błąd połączenia z Betfair:</b>\n{test_res.get('error')}", chat_id=cid)
+                            elif p_arg.lower() in ("off", "wylacz", "wyłącz", "clear", "usun", "usuń"):
+                                sm.update_proxy("")
+                                self.send_message("✅ Wyłączono własne proxy (powrót do trybu domyślnego).", chat_id=cid)
+                            else:
+                                sm.update_proxy(p_arg)
+                                self.send_message(f"✅ <b>Zapisano nowe proxy dla Betfair:</b>\n<code>{p_arg}</code>\nWpisz <code>/proxy test</code> aby sprawdzić połączenie.", chat_id=cid)
+                        else:
+                            curr_p = sm.config.get("custom_proxy_url", "Brak")
+                            self.send_message(
+                                f"🌐 <b>ZARZĄDZANIE PROXY (BETFAIR):</b>\n\n"
+                                f"• <b>Aktualne proxy:</b> <code>{curr_p}</code>\n\n"
+                                f"<b>Komendy:</b>\n"
+                                f"• <code>/proxy http://host:port</code> – Ustawienie nowego proxy (UK/DE/NL)\n"
+                                f"• <code>/proxy test</code> – Test połączenia z Betfair\n"
+                                f"• <code>/proxy off</code> – Wyłączenie własnego proxy",
+                                chat_id=cid
+                            )
+                        continue
+
                     elif is_admin and text_lower.startswith(("/reset", "/resetstats", "/czysc", "/wyczysc", "/clean", "/zeruj")):
                         # 1. Reset statystyk i bazy
                         self.stats_engine.reset_history()
@@ -983,20 +1019,11 @@ class TelegramNotifier:
                 time_display = "23'" if half == '1H' else "68'"
                 header_time = time_display
 
-        # Dynamiczne wyliczenie Smart Money (Betfair Exchange)
-        matched_vol = int(min(95000, max(12500, (danger * 480) + (apm * 19000) + (minute * 340))))
-        vol_formatted = f"{matched_vol:,}".replace(",", " ")
-        vol_pct = int(min(96, max(81, 72 + (danger * 0.22) + (apm * 7))))
-        
-        open_odds = round(odds_val * (1.22 + (danger * 0.0012)), 2)
-        drop_pct = int(round(((open_odds - odds_val) / open_odds) * 100))
-        if drop_pct < 12: drop_pct = 21
-
-        smart_money_section = (
-            f"💰 <b>SMART MONEY (Betfair Exchange):</b>\n"
-            f"• Obrót na Over: <b>{vol_formatted} €</b> ({vol_pct}% wolumenu rynku)\n"
-            f"• {open_odds:.2f} ➔ {odds_val:.2f} (Gwałtowny spadek -{drop_pct}% 📉)\n\n"
-        )
+        # Smart Money (Betfair Exchange) - Pobieranie przez silnik SmartMoneyEngine z obsługą Proxy
+        from engine.smart_money_engine import SmartMoneyEngine
+        sm_engine = SmartMoneyEngine()
+        sm_data = sm_engine.get_smart_money_data(match, signal)
+        smart_money_section = sm_engine.format_telegram_section(sm_data)
 
         msg = (
             f"<b>ALARM LIVE</b> <i>({header_time})</i>\n\n"

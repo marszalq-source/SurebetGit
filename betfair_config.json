@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "use_proxy": true,
+  "custom_proxy_url": "",
+  "preferred_regions": [
+    "GB",
+    "DE",
+    "NL",
+    "IE"
+  ],
+  "timeout_seconds": 4.5,
+  "cache_ttl_seconds": 20,
+  "public_app_key": "nzIFcwyWhrlwYMrh",
+  "min_volume_alert_eur": 5000
+}
