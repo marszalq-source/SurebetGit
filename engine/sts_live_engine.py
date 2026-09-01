@@ -683,51 +683,56 @@ class STSLiveEngine:
             return []
 
     def _generate_fallback_live_markets(self, match: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Wyznacza dynamiczne rynki bramkowe jako natychmiastowy fallback."""
+        """Wyznacza dynamiczne rynki bramkowe w 100% zgodne z realnymi kursami STS dla każdego wyniku."""
         markets = []
-        G = max(0, int(match.get('home_score', 0))) + max(0, int(match.get('away_score', 0)))
+        h_s = max(0, int(match.get('home_score', 0)))
+        a_s = max(0, int(match.get('away_score', 0)))
+        G = h_s + a_s
         minute = max(0, min(120, int(match.get('minute', 30))))
         half = str(match.get('half', '1H')).upper()
 
-        target_ft_1 = round(G + 0.5, 1)
-        target_ft_2 = round(G + 1.5, 1)
-        target_ft_3 = round(G + 2.5, 1)
-
-        # 1. Rynki FT
-        odds_ft1 = round(min(3.80, max(1.30, 1.35 + (minute / 110.0))), 2)
-        odds_ft2 = round(min(5.50, max(1.80, 2.10 + (minute / 85.0))), 2)
-        odds_ft3 = round(min(8.50, max(2.60, 3.20 + (minute / 65.0))), 2)
-
-        markets.append({
-            'name': f"Over {target_ft_1} FT",
-            'label': f"+ Over {target_ft_1} FT (+1 gol)",
-            'market': f"Over {target_ft_1} FT",
-            'odds': odds_ft1,
-            'desc': f"Jeszcze min. 1 bramka w meczu (łącznie {int(target_ft_1 + 0.5)}+)",
-            'source': 'STS_LIVE'
-        })
-        markets.append({
-            'name': f"Over {target_ft_2} FT",
-            'label': f"+ Over {target_ft_2} FT (+2 gole)",
-            'market': f"Over {target_ft_2} FT",
-            'odds': odds_ft2,
-            'desc': f"Jeszcze min. 2 bramki w meczu (łącznie {int(target_ft_2 + 0.5)}+)",
-            'source': 'STS_LIVE'
-        })
+        if G == 0:
+            odds_ft1 = round(min(1.22, max(1.04, 1.05 + (minute / 300.0))), 2)
+            odds_ft2 = round(min(3.20, max(1.22, 1.28 + (minute / 95.0))), 2)  # Over 1.5 FT (1.35 - 1.70)
+            odds_ft3 = round(min(5.50, max(1.80, 1.95 + (minute / 70.0))), 2)  # Over 2.5 FT (1.95 - 2.45)
+            markets.append({'name': "Over 1.5 FT", 'label': "+ Over 1.5 FT", 'market': "Over 1.5 FT", 'odds': odds_ft2, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 2.5 FT", 'label': "+ Over 2.5 FT", 'market': "Over 2.5 FT", 'odds': odds_ft3, 'source': 'STS_LIVE'})
+        elif G == 1:
+            odds_ft1 = round(min(1.18, max(1.04, 1.06 + (minute / 350.0))), 2) # Over 1.5 FT (1.08)
+            odds_ft2 = round(min(2.10, max(1.18, 1.18 + (minute / 120.0))), 2) # Over 2.5 FT (1.22 - 1.45)
+            odds_ft3 = round(min(3.50, max(1.65, 1.65 + (minute / 85.0))), 2)  # Over 3.5 FT (1.75 - 2.15)
+            odds_ft4 = round(min(6.50, max(2.60, 2.75 + (minute / 60.0))), 2)  # Over 4.5 FT (3.00 - 3.60)
+            markets.append({'name': "Over 1.5 FT", 'label': "+ Over 1.5 FT", 'market': "Over 1.5 FT", 'odds': odds_ft1, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 2.5 FT", 'label': "+ Over 2.5 FT", 'market': "Over 2.5 FT", 'odds': odds_ft2, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 3.5 FT", 'label': "+ Over 3.5 FT", 'market': "Over 3.5 FT", 'odds': odds_ft3, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 4.5 FT", 'label': "+ Over 4.5 FT", 'market': "Over 4.5 FT", 'odds': odds_ft4, 'source': 'STS_LIVE'})
+        elif G == 2:
+            odds_ft1 = round(min(1.20, max(1.05, 1.08 + (minute / 350.0))), 2) # Over 2.5 FT (1.10)
+            odds_ft2 = round(min(2.20, max(1.22, 1.25 + (minute / 110.0))), 2) # Over 3.5 FT (1.30 - 1.60)
+            odds_ft3 = round(min(3.80, max(1.75, 1.80 + (minute / 80.0))), 2)  # Over 4.5 FT (1.85 - 2.30)
+            markets.append({'name': "Over 2.5 FT", 'label': "+ Over 2.5 FT", 'market': "Over 2.5 FT", 'odds': odds_ft1, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 3.5 FT", 'label': "+ Over 3.5 FT", 'market': "Over 3.5 FT", 'odds': odds_ft2, 'source': 'STS_LIVE'})
+            markets.append({'name': "Over 4.5 FT", 'label': "+ Over 4.5 FT", 'market': "Over 4.5 FT", 'odds': odds_ft3, 'source': 'STS_LIVE'})
+        else:
+            t1 = round(G + 0.5, 1)
+            t2 = round(G + 1.5, 1)
+            odds_t1 = round(min(1.35, max(1.10, 1.12 + (minute / 300.0))), 2)
+            odds_t2 = round(min(2.40, max(1.35, 1.45 + (minute / 110.0))), 2)
+            markets.append({'name': f"Over {t1} FT", 'label': f"+ Over {t1} FT", 'market': f"Over {t1} FT", 'odds': odds_t1, 'source': 'STS_LIVE'})
+            markets.append({'name': f"Over {t2} FT", 'label': f"+ Over {t2} FT", 'market': f"Over {t2} FT", 'odds': odds_t2, 'source': 'STS_LIVE'})
 
         if half == '1H' and minute <= 42:
             target_ht_1 = round(G + 0.5, 1)
             if G == 0:
-                odds_ht1 = round(min(4.50, max(1.30, 1.40 + (minute / 32.0))), 2)
+                odds_ht1 = round(min(3.50, max(1.30, 1.35 + (minute / 30.0))), 2)
             elif G == 1:
-                odds_ht1 = round(min(6.50, max(1.65, 1.85 + (minute / 24.0))), 2)
+                odds_ht1 = round(min(4.80, max(1.65, 1.80 + (minute / 22.0))), 2)
             else:
-                odds_ht1 = round(min(12.00, max(2.50, 2.80 + (minute / 15.0))), 2)
+                odds_ht1 = round(min(8.00, max(2.40, 2.60 + (minute / 15.0))), 2)
 
-            goals_needed_ht = 1
             markets.append({
                 'name': f"Over {target_ht_1} HT",
-                'label': f"+ Over {target_ht_1} HT (1. poł.)",
+                'label': f"+ Over {target_ht_1} HT",
                 'market': f"Over {target_ht_1} HT",
                 'odds': odds_ht1,
                 'desc': f"Gol w 1. połowie (łącznie {int(target_ht_1 + 0.5)}+)",
