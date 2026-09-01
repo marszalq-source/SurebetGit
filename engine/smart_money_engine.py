@@ -92,7 +92,7 @@ class SmartMoneyEngine:
         """Testuje podane proxy pod kątem łączności z Betfair."""
         t0 = time.time()
         opener = self._build_opener(proxy_url)
-        test_url = f"https://ero.betfair.com/www/sports/exchange/readonly/v1/bymarket?_ak={self.config.get('public_app_key', PUBLIC_APP_KEY)}&alt=json&currencyCode=EUR&locale=en&types=MARKET_STATE,RUNNER_STATE"
+        test_url = f"https://ero.betfair.com/www/sports/exchange/readonly/v1/bymarket?_ak={self.config.get('public_app_key', PUBLIC_APP_KEY)}&alt=json&currencyCode=EUR&locale=en&marketIds=1.23456789&types=MARKET_STATE"
         req = urllib.request.Request(
             test_url,
             headers={

@@ -1,7 +1,12 @@
 {
   "enabled": true,
   "use_proxy": true,
-  "custom_proxy_url": "",
+  "custom_proxy_url": "http://45.38.107.97:6014",
+  "backup_proxies": [
+    "http://198.105.121.200:6462",
+    "http://31.59.20.176:6754",
+    "http://64.137.96.74:6641"
+  ],
   "preferred_regions": [
     "GB",
     "DE",
