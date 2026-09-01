@@ -1426,6 +1426,44 @@ class TelegramNotifier:
     def check_and_notify_goal_event(self, match: Dict[str, Any]) -> bool:
         return self.check_and_update_match_status(match)
 
+    def check_and_notify_whale_anomaly(self, match: Dict[str, Any], signals: Optional[List[Dict[str, Any]]] = None) -> bool:
+        """
+        Weryfikuje czy dany mecz wykazuje anomalię zrzutu kapitału (Whale Surge)
+        i wysyła dedykowany alert anomalii giełdowej na Telegram.
+        """
+        if not self.config.get("enabled", False):
+            return False
+            
+        from engine.smart_money_engine import SmartMoneyEngine
+        sm = SmartMoneyEngine()
+        
+        sig = signals[0] if signals else None
+        anomaly = sm.detect_and_format_anomaly(match, sig)
+        if not anomaly:
+            return False
+            
+        home = anomaly.get("home", "")
+        away = anomaly.get("away", "")
+        badge = anomaly.get("badge", "")
+        
+        anomaly_key = f"whale_{self._normalize_name(home)}_vs_{self._normalize_name(away)}_{badge}"
+        
+        now = time.time()
+        if not hasattr(self, '_seen_whale_anomalies'):
+            self._seen_whale_anomalies = {}
+            
+        last_sent = self._seen_whale_anomalies.get(anomaly_key, 0)
+        # Wyślij max 1 alert anomalii na ten sam mecz w ciągu 35 minut
+        if now - last_sent < 2100:
+            return False
+            
+        msg = anomaly.get("msg_text", "")
+        dev_msgs = self.send_message_all(msg)
+        if dev_msgs:
+            self._seen_whale_anomalies[anomaly_key] = now
+            return True
+        return False
+
     def notify_daily_goal_achieved(self, profit: float, target: float) -> bool:
         if not self.config.get("enabled", False) or not self.config.get("notify_daily_goal", True):
             return False

@@ -337,6 +337,8 @@ class STSFlashscoreAggregator:
                 if eval_res.get('has_signals'):
                     for sig in eval_res.get('signals', []):
                         self.telegram.notify_goal_signal(processed_matches[-1], sig)
+                elif eval_res.get('danger_index', 0) >= 70 or eval_res.get('apm', 0) >= 1.05:
+                    self.telegram.check_and_notify_whale_anomaly(processed_matches[-1], eval_res.get('signals', []))
 
             # Dołącz mecze obecne na żywo w STS, które nie zostały jeszcze sparsowane przez Flashscore
             for sts_m in sts_matches:
@@ -457,6 +459,8 @@ class STSFlashscoreAggregator:
                 if eval_res.get('has_signals') and eval_res.get('signals'):
                     primary_sig = eval_res['signals'][0]
                     self.telegram.notify_goal_signal(processed_matches[-1], primary_sig)
+                elif eval_res.get('danger_index', 0) >= 70 or eval_res.get('apm', 0) >= 1.05:
+                    self.telegram.check_and_notify_whale_anomaly(processed_matches[-1], eval_res.get('signals', []))
 
             # Sortuj mecze: najpierw te z aktywnymi sygnałami, potem wg Danger Index
             processed_matches.sort(
