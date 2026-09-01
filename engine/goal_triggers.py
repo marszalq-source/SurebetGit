@@ -18,12 +18,15 @@ ANTI_GOAL_LEAGUES_KEYWORDS = [
     'algeria: ligue 1', 'algeria: ligue 2', 'algieria',
     'greece: super league 2', 'grecja: super league 2',
     'argentina: primera b', 'argentina: torneo federal', 'argentina: primera nacional',
-    'argentyna: primera b', 'argentyna: torneo federal', 'argentyna: primera c',
+    'argentyna: primera b', 'argentyna: torneo federal', 'argentyna: primera c', 'argentina: primera c', 'primera c',
+    'gruzja', 'georgia', 'erovnuli',
+    'azerbejdżan', 'azerbejdzan', 'azerbaijan',
+    'oman', 'omani',
+    'national league south', 'national league - south',
     'south africa: premier league', 'rpa: premier league', 'south africa: national first',
     'tunisia: ligue 1', 'tunezja',
-    'venezuela: primera division', 'wenezuela',
+    'venezuela: primera division', 'wenezuela', 'venezuela',
     'romania: liga 2', 'rumunia: liga 2',
-    'rezerwy', 'reserve league', 'torneo juvenil', 'u19 league', 'u20 league', 'młodzieżowa'
 ]
 
 
@@ -115,20 +118,23 @@ class GoalTriggersEngine:
             market_name = str(m.get('market', '')).upper()
             combined_txt = f"{name} {market_name}"
             odds = float(m.get('odds', 0.0))
-            if odds < 1.15 or odds > 2.45:
+            # ŻELAZNA ZASADA: Tylko bezpieczny przedział kursowy 1.35 - 2.45
+            if odds < 1.35 or odds > 2.45:
                 continue
 
             if 'OVER' in combined_txt and ('FT' in combined_txt or 'MECZ' in combined_txt or 'LICZBA GOLI' in combined_txt):
                 m_match = re.search(r'OVER\s+(\d+(?:\.\d+)?)', combined_txt)
                 if m_match:
                     l_val = float(m_match.group(1))
-                    if l_val > total_goals:
+                    # ŻELAZNA ZASADA: Maksymalna linia to OVER 4.5 FT (żadnych 5.5+, 6.5+ FT)
+                    if total_goals < l_val <= 4.5:
                         available_over_ft.append((l_val, m))
             elif 'OVER' in combined_txt and ('HT' in combined_txt or '1. POŁ' in combined_txt or '1.POŁ' in combined_txt or '1H' in combined_txt):
                 m_match = re.search(r'OVER\s+(\d+(?:\.\d+)?)', combined_txt)
                 if m_match:
                     l_val = float(m_match.group(1))
-                    if l_val > total_goals:
+                    # Usunięto Over 0.5 HT - dopuszczamy wyłącznie Over 1.5 HT lub wyżej
+                    if l_val >= 1.5 and total_goals < l_val <= 2.5:
                         available_over_ht.append((l_val, m))
 
         available_over_ft.sort(key=lambda x: (x[0], x[1].get('odds', 99)))
@@ -145,7 +151,7 @@ class GoalTriggersEngine:
         is_anti_goal_league = any(kw in league_str for kw in ANTI_GOAL_LEAGUES_KEYWORDS)
 
         # Filtrowanie anomalii: jałowe posiadanie (dużo ataków, ale 0 strzałów celnych w minucie 25+)
-        is_sterile_possession = (minute >= 25 and sot == 0 and shots_total <= 2)
+        is_sterile_possession = (minute >= 25 and sot == 0 and dangerous_attacks >= 20)
 
         # Filtrowanie anomalii: mecz rozstrzygnięty (blowout w 2. połowie)
         is_blowout_game = (half in ('2H', 'FT') and score_diff >= 3 and minute >= 60)
@@ -153,58 +159,10 @@ class GoalTriggersEngine:
         signals = []
 
         # =========================================================================
-        # --- A. STRATEGIA 1: OVER 0.5 HT (ZŁOTE OKNO 14'-34' MIN, WYNIK 0:0) ---
+        # --- A. STRATEGIA 1: OVER 0.5 HT -> CAŁKOWICIE WYŁĄCZONA (RYNEK STRATNY) ---
         # =========================================================================
-        cfg_05_ht = self.config.get('OVER_05_HT', {})
-        min_m_05ht = cfg_05_ht.get('min_minute', 14)
-        max_m_05ht = cfg_05_ht.get('max_minute', 34)
-
-        if (lowest_over_ht and lowest_over_ht_line == 0.5 and total_goals == 0 and half == '1H' and
-                min_m_05ht <= minute <= max_m_05ht and not is_anti_goal_league and not is_sterile_possession):
-
-            min_sot = max(2, cfg_05_ht.get('min_sot', 2))
-            if sot >= min_sot and shots_total >= 5 and (apm >= 0.82 or xg_total >= 0.45 or danger_index >= 60):
-                odds_val = float(lowest_over_ht['odds'])
-                reasons = []
-                confidence = 1
-
-                # Weryfikacja statystyczna
-                if apm >= 0.88:
-                    confidence += 1
-                    reasons.append(f"Wysokie tempo APM ({apm:.2f} ataku/min)")
-                if sot >= 4:
-                    confidence += 2
-                    reasons.append(f"{sot} celne strzały w światło")
-                elif sot >= 3:
-                    confidence += 1
-                    reasons.append(f"{sot} celne strzały")
-                if shots_total >= 7:
-                    confidence += 1
-                    reasons.append(f"{shots_total} oddanych strzałów")
-                if xg_total >= 0.60:
-                    confidence += 1
-                    reasons.append(f"Wysokie xG: {xg_total:.2f}")
-                if danger_index >= 70:
-                    confidence += 1
-                    reasons.append(f"Danger Index: {danger_index}%")
-
-                rem_mins_1h = max(1, 45 - minute)
-                ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_1h, odds_val)
-
-                # Sweet spot dla Over 0.5 HT: 1.45 - 2.15
-                odds_ok = (1.40 <= odds_val <= 2.15 and confidence >= 2) or (2.15 < odds_val <= 2.50 and confidence >= 4 and sot >= 3)
-                if odds_ok and ev >= -0.04:
-                    stars_count = min(5, max(2, confidence))
-                    signals.append({
-                        'type': 'OVER_05_HT',
-                        'title': f"🎯 ALARM: OVER 0.5 HT",
-                        'badge': f"OVER 0.5 HT",
-                        'color': '#00E676',
-                        'odds': odds_val,
-                        'stars': stars_count,
-                        'ev': round(ev, 3),
-                        'desc': f"Złote Okno 1H ({minute}'). Wysokie prawdopodobieństwo gola do przerwy. " + ", ".join(reasons)
-                    })
+        # Rynek Over 0.5 HT został usunięty na podstawie analizy statystycznej (40% WR, jedyny rynek na minusie).
+        # Mecz w 1. połowie z potencjałem kwalifikuje się od razu do bezpiecznego rynku OVER 1.5 FT.
 
         # =========================================================================
         # --- B. STRATEGIA 2: OVER 1.5 HT (ZŁOTE OKNO 14'-34' MIN, WYNIK 1:0/0:1) ---
@@ -394,17 +352,17 @@ class GoalTriggersEngine:
                     })
 
         # =========================================================================
-        # --- E. STRATEGIA 5: LATE GOAL W KOŃCÓWCE (OVER 0.5 2H / 63'-85' MIN) ---
+        # --- E. STRATEGIA 5: KOLEJNY GOL W 2. POŁOWIE (OVER 0.5 2H / 63'-75' MIN) ---
         # =========================================================================
         cfg_05_2h = self.config.get('OVER_05_2H', {})
         min_m_2h = cfg_05_2h.get('min_minute', 63)
-        max_m_2h = cfg_05_2h.get('max_minute', 85)
+        max_m_2h = min(75, cfg_05_2h.get('max_minute', 75))
 
         if (lowest_over_ft and half == '2H' and min_m_2h <= minute <= max_m_2h and
                 score_diff <= cfg_05_2h.get('allowed_score_diff', 2) and not is_blowout_game and not is_sterile_possession):
 
             # Zabezpieczenie przed wysokimi liniami Over 4.5+ w samej końcówce
-            is_high_line_late = (lowest_over_ft_line is not None and lowest_over_ft_line >= 4.5 and minute >= 75)
+            is_high_line_late = (lowest_over_ft_line is not None and lowest_over_ft_line >= 4.5)
 
             if not is_high_line_late and sot >= cfg_05_2h.get('min_sot', 2):
                 reasons = []
@@ -412,7 +370,7 @@ class GoalTriggersEngine:
 
                 if apm >= cfg_05_2h.get('min_apm', 0.85):
                     confidence += 1
-                    reasons.append(f"Wysokie APM końcówki: {apm:.2f}")
+                    reasons.append(f"Wysokie APM: {apm:.2f}")
                 if sot >= 3:
                     confidence += 1
                     reasons.append(f"{sot} celnych strzałów")
@@ -426,14 +384,14 @@ class GoalTriggersEngine:
                     reasons.append(f"xG: {xg_total:.2f}")
                 if danger_index >= 60:
                     confidence += 1
-                    reasons.append(f"Napór końcówki: {danger_index}%")
+                    reasons.append(f"Napór 2H: {danger_index}%")
 
                 odds_val = float(lowest_over_ft['odds'])
                 rem_mins_ft = max(1, 90 - minute)
                 ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_ft, odds_val)
 
-                # Sweet spot kursowy: 1.50 - 2.45
-                if confidence >= 2 and 1.45 <= odds_val <= 2.45 and ev >= -0.05:
+                # Żelazny sweet spot kursowy: 1.35 - 2.45
+                if confidence >= 2 and 1.35 <= odds_val <= 2.45 and ev >= -0.05:
                     stars_count = min(5, max(2, confidence))
                     signals.append({
                         'type': 'OVER_05_2H',
