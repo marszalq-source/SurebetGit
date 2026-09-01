@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "use_proxy": true,
+  "proxy_url": "http://45.38.107.97:6014",
+  "timeout_seconds": 4.5,
+  "cache_ttl_seconds": 30,
+  "min_value_edge_pct": 5.0
+}

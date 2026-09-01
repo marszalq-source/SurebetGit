@@ -1025,6 +1025,16 @@ class TelegramNotifier:
         sm_data = sm_engine.get_smart_money_data(match, signal)
         smart_money_section = sm_engine.format_telegram_section(sm_data)
 
+        # Pinnacle Benchmark & Valuebet
+        from engine.pinnacle_engine import PinnacleEngine
+        pin_engine = PinnacleEngine()
+        pin_data = pin_engine.get_sharp_benchmark(match, signal)
+        pin_badge = pin_data.get("badge_text", "")
+
+        odds_line = f"<b>{odds_val:.2f}</b>"
+        if pin_badge:
+            odds_line += f"  <i>({pin_badge})</i>"
+
         msg = (
             f"<b>ALARM LIVE</b> <i>({header_time})</i>\n\n"
             f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
@@ -1032,7 +1042,7 @@ class TelegramNotifier:
             f"⏱️ <b>Czas:</b> {time_display}\n\n"
             f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
             f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-            f"📈 <b>Aktualny Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+            f"📈 <b>Aktualny Kurs STS:</b> {odds_line}\n"
             f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
             f"{smart_money_section}"
             f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
