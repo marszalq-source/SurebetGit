@@ -1,23 +1,28 @@
-"""
-OverRadar Live – System Tray Launcher (Windows Notification Area)
-Uruchamia skaner STS Live w tle (zasobnik systemowy obok zegarka)
-BEZ ŻADNYCH OKIEN I BEZ IKON NA PASKU ZADAŃ.
-"""
 import os
 import sys
-import time
-import subprocess
 import threading
 import webbrowser
 from PIL import Image, ImageDraw
 import pystray
 from pystray import MenuItem as item
 
+# Przekieruj stdout/stderr w trybie pythonw (brak konsoli), aby print() nie rzucał błędu
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+from sts_live_scanner import LiveApi, run_http_server
+
 SERVER_URL = "http://127.0.0.1:5050"
 ICON_PATH = os.path.join(BASE_DIR, "assets", "app_icon.png")
 
-server_proc = None
+api_instance = None
+server_thread = None
 
 def get_or_create_icon_image():
     if os.path.exists(ICON_PATH):
@@ -26,7 +31,6 @@ def get_or_create_icon_image():
         except Exception:
             pass
             
-    # Fallback dynamic icon
     width, height = 64, 64
     img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -35,42 +39,13 @@ def get_or_create_icon_image():
     draw.ellipse([26, 26, width - 27, height - 27], fill='#ffffff')
     return img
 
-def start_scanner_server():
-    global server_proc
-    if server_proc and server_proc.poll() is None:
+def start_inprocess_server():
+    global api_instance, server_thread
+    if server_thread and server_thread.is_alive():
         return
-    py_bin = sys.executable
-    if 'pythonw' in py_bin.lower():
-        cand = os.path.join(os.path.dirname(py_bin), 'python.exe')
-        if os.path.exists(cand):
-            py_bin = cand
-    cmd = [py_bin, os.path.join(BASE_DIR, "sts_live_scanner.py"), "--server"]
-    
-    # Flagi Windows ukrywające okno konsoli
-    CREATE_NO_WINDOW = 0x08000000
-    try:
-        server_proc = subprocess.Popen(
-            cmd,
-            cwd=BASE_DIR,
-            creationflags=CREATE_NO_WINDOW,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    except Exception as e:
-        pass
-
-def stop_scanner_server():
-    global server_proc
-    if server_proc:
-        try:
-            server_proc.terminate()
-            server_proc.wait(timeout=2.0)
-        except Exception:
-            try:
-                server_proc.kill()
-            except Exception:
-                pass
-        server_proc = None
+    api_instance = LiveApi()
+    server_thread = threading.Thread(target=run_http_server, args=(5050, api_instance), daemon=True)
+    server_thread.start()
 
 def on_open_panel(icon, item):
     webbrowser.open(SERVER_URL)
@@ -79,30 +54,33 @@ def on_open_stats(icon, item):
     webbrowser.open(f"{SERVER_URL}#stats")
 
 def on_restart(icon, item):
-    stop_scanner_server()
-    time.sleep(1.0)
-    start_scanner_server()
+    # Wymuś odświeżenie w API
+    if api_instance:
+        try:
+            api_instance.refresh_all()
+        except Exception:
+            pass
     try:
-        icon.notify("Skaner STS Live został zrestartowany pomyślnie!", "OverRadar Live")
+        icon.notify("Skaner STS Live został odświeżony!", "OverRadar Live")
     except Exception:
         pass
 
 def on_quit(icon, item):
-    stop_scanner_server()
     icon.stop()
+    os._exit(0)
 
 def main():
-    # 1. Start serwera w tle
-    start_scanner_server()
+    # 1. Start skanera i serwera w wątku w tle
+    start_inprocess_server()
     
     # 2. Utworzenie menu zasobnika
     menu = pystray.Menu(
-        item('⚽ OverRadar Live (Aktywny)', lambda icon, item: None, enabled=False),
+        item('⚽ OverRadar Live (Działa w tle)', lambda icon, item: None, enabled=False),
         pystray.Menu.SEPARATOR,
         item('🌐 Otwórz Panel Skanera', on_open_panel, default=True),
         item('📊 Otwórz Dziennik Typera & Stats', on_open_stats),
         pystray.Menu.SEPARATOR,
-        item('🔄 Restartuj Skaner', on_restart),
+        item('🔄 Odśwież Skaner', on_restart),
         item('❌ Wyłącz i Wyjdź', on_quit)
     )
     
@@ -114,7 +92,7 @@ def main():
         menu
     )
     
-    # Uruchomienie pętli ikony w trayu (blokuje wątek główny)
+    # Uruchomienie pętli ikony w trayu (działa w zasobniku po prawej stronie koło zegarka)
     icon.run()
 
 if __name__ == "__main__":
