@@ -1430,37 +1430,52 @@ class TelegramNotifier:
         """
         Weryfikuje czy dany mecz wykazuje anomalię zrzutu kapitału (Whale Surge)
         i wysyła dedykowany alert anomalii giełdowej na Telegram.
+        Gwarantuje 100% brak duplikatów (zapis na dysku w telegram_whale_anomalies.json).
         """
         if not self.config.get("enabled", False):
             return False
             
+        home = match.get("home_team", "")
+        away = match.get("away_team", "")
+        if not home or not away:
+            return False
+            
+        # Jeśli mecz ma już aktywną kartę sygnału lub został już rozliczony -> NIE wysyłaj osobnego alertu
+        if self._find_existing_card_key(home, away) or self._is_match_already_settled(home, away):
+            return False
+            
+        anomaly_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_whale_anomalies.json")
+        seen_anomalies = {}
+        if os.path.exists(anomaly_file):
+            try:
+                with open(anomaly_file, 'r', encoding='utf-8') as f:
+                    seen_anomalies = json.load(f)
+            except Exception:
+                seen_anomalies = {}
+                
+        match_key = f"{self._normalize_name(home)}_vs_{self._normalize_name(away)}"
+        now = time.time()
+        last_sent = seen_anomalies.get(match_key, 0)
+        # Twarda blokada: max 1 alert na ten sam mecz w ciągu 6 godzin
+        if now - last_sent < 21600:
+            return False
+            
         from engine.smart_money_engine import SmartMoneyEngine
         sm = SmartMoneyEngine()
-        
         sig = signals[0] if signals else None
         anomaly = sm.detect_and_format_anomaly(match, sig)
         if not anomaly:
             return False
             
-        home = anomaly.get("home", "")
-        away = anomaly.get("away", "")
-        badge = anomaly.get("badge", "")
-        
-        anomaly_key = f"whale_{self._normalize_name(home)}_vs_{self._normalize_name(away)}_{badge}"
-        
-        now = time.time()
-        if not hasattr(self, '_seen_whale_anomalies'):
-            self._seen_whale_anomalies = {}
-            
-        last_sent = self._seen_whale_anomalies.get(anomaly_key, 0)
-        # Wyślij max 1 alert anomalii na ten sam mecz w ciągu 35 minut
-        if now - last_sent < 2100:
-            return False
-            
         msg = anomaly.get("msg_text", "")
         dev_msgs = self.send_message_all(msg)
         if dev_msgs:
-            self._seen_whale_anomalies[anomaly_key] = now
+            seen_anomalies[match_key] = now
+            try:
+                with open(anomaly_file, 'w', encoding='utf-8') as f:
+                    json.dump(seen_anomalies, f, indent=2)
+            except Exception as ex:
+                print(f"[Whale] Błąd zapisu telegram_whale_anomalies.json: {ex}")
             return True
         return False
 
