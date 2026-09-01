@@ -214,19 +214,31 @@ class SmartMoneyEngine:
         league = str(match.get('league', 'Piłka Nożna'))
         score = str(match.get('score_str', '0:0'))
         
-        # Wyznacz linię i kurs
+        # Wyznacz linię i kurs (zawsze bezpieczna linia max Over 4.5 FT i sweet spot 1.35 - 2.45)
+        try:
+            curr_tot = sum(map(int, score.split(":")))
+        except Exception:
+            curr_tot = 0
+
         if signal:
             badge = str(signal.get('badge', 'OVER 1.5 FT')).upper()
             sts_odds = float(signal.get('odds', 1.85))
         else:
-            # Domyślny rynek bramkowy
-            badge = 'OVER 1.5 FT' if minute < 45 else 'OVER 2.5 FT'
+            target_line = min(4.5, curr_tot + 0.5) if curr_tot > 0 else 1.5
+            badge = f'OVER {target_line} FT'
             sts_odds = 1.85
             for mkt in match.get('live_markets', []):
-                if 'OVER' in str(mkt.get('name', '')).upper():
-                    badge = mkt.get('name')
-                    sts_odds = float(mkt.get('odds', 1.85))
-                    break
+                m_name = str(mkt.get('name', '')).upper()
+                if 'OVER' in m_name:
+                    m_val_m = re.search(r'OVER\s+(\d+(?:\.\d+)?)', m_name)
+                    if m_val_m:
+                        l_v = float(m_val_m.group(1))
+                        if curr_tot < l_v <= 4.5:
+                            o_v = float(mkt.get('odds', 0))
+                            if 1.35 <= o_v <= 2.45:
+                                badge = mkt.get('name')
+                                sts_odds = o_v
+                                break
 
         # Warunki anomalii: wysokie APM lub wysoki Danger + odpowiedni moment meczu
         if danger < 68 and apm < 0.95:
