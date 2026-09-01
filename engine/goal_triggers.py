@@ -137,6 +137,15 @@ class GoalTriggersEngine:
                     if l_val >= 1.5 and total_goals < l_val <= 2.5:
                         available_over_ht.append((l_val, m))
 
+        # Priorytet dla rynków pobranych w 100% bezpośrednio ze strony STS (STS_REAL)
+        real_ft = [item for item in available_over_ft if item[1].get('source') == 'STS_REAL']
+        if real_ft:
+            available_over_ft = real_ft
+
+        real_ht = [item for item in available_over_ht if item[1].get('source') == 'STS_REAL']
+        if real_ht:
+            available_over_ht = real_ht
+
         available_over_ft.sort(key=lambda x: (x[0], x[1].get('odds', 99)))
         available_over_ht.sort(key=lambda x: (x[0], x[1].get('odds', 99)))
 

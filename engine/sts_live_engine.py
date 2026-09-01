@@ -367,25 +367,33 @@ class _STSLiveWorker:
                             sub_markets = ev_page.evaluate("""() => {
                                 const mkts = [];
                                 const seen = new Set();
-                                document.querySelectorAll('button, .odds-button, [class*="odds-button"], sds-odds-button').forEach(b => {
-                                    let label = (b.getAttribute('aria-label') || b.innerText || '').replace(/\\s+/g, ' ').trim();
-                                    const m = label.match(/^([+-]?\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
-                                    if (m) {
-                                        const lineStr = m[1];
-                                        const odds = parseFloat(m[2].replace(',', '.'));
-                                        if (lineStr.startsWith('+') && !isNaN(odds) && odds > 1.0) {
-                                            const line = parseFloat(lineStr.replace('+', ''));
-                                            const key = 'over_' + line;
-                                            if (!seen.has(key)) {
-                                                seen.add(key);
-                                                mkts.push({
-                                                    market: 'OVER ' + line + ' FT',
-                                                    name: 'Over ' + line + ' FT',
-                                                    line: line,
-                                                    odds: odds,
-                                                    label: '+ Over ' + line + ' FT',
-                                                    source: 'STS_REAL'
-                                                });
+                                document.querySelectorAll('button, .odds-button, [class*="odds-button"], sds-odds-button, div[role="button"]').forEach(b => {
+                                    const rawText = (b.innerText || '').trim();
+                                    const aria = (b.getAttribute('aria-label') || '').trim();
+                                    const candidates = [rawText, aria];
+
+                                    for (let str of candidates) {
+                                        if (!str) continue;
+                                        const clean = str.replace(/\\s+/g, ' ').trim();
+                                        const m = clean.match(/^([+-]?\\s*\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/) ||
+                                                  clean.match(/([+-]?\\s*\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
+                                        if (m) {
+                                            const lineStr = m[1].replace(/\\s+/g, '');
+                                            const odds = parseFloat(m[2].replace(',', '.'));
+                                            if (lineStr.startsWith('+') && !isNaN(odds) && odds > 1.0) {
+                                                const line = parseFloat(lineStr.replace('+', ''));
+                                                const key = 'over_' + line;
+                                                if (!seen.has(key)) {
+                                                    seen.add(key);
+                                                    mkts.push({
+                                                        market: 'OVER ' + line + ' FT',
+                                                        name: 'Over ' + line + ' FT',
+                                                        line: line,
+                                                        odds: odds,
+                                                        label: '+ Over ' + line + ' FT',
+                                                        source: 'STS_REAL'
+                                                    });
+                                                }
                                             }
                                         }
                                     }

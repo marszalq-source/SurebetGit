@@ -284,5 +284,27 @@
     "profit_units": 0.0,
     "profit_pln": 0.0,
     "resolved_at": ""
+  },
+  {
+    "id": "sig_1788266507_dalsha",
+    "created_at": "2026-09-01 14:41:47",
+    "timestamp": 1788266507.8761933,
+    "date": "2026-09-01",
+    "home_team": "Dalian Young Boy",
+    "away_team": "Shanghai Shenhua",
+    "match_title": "Dalian Young Boy vs Shanghai Shenhua",
+    "league": "Chiny, Puchar",
+    "minute": 47,
+    "score_initial": "0:0",
+    "score_final": "0:0",
+    "market": "OVER 1.5 FT",
+    "odds": 1.7,
+    "unit_tag": "2J",
+    "units": 2,
+    "stake_pln": 4.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]
