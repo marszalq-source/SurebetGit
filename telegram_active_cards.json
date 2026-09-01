@@ -1,4 +1,68 @@
 {
+  "lawtngtlai_vs_chanmari": {
+    "device_messages": {
+      "5445412227": 1338,
+      "8773792302": 1339,
+      "1584798763": 1340
+    },
+    "home_team": "FC Lawtngtlai",
+    "away_team": "Chanmari FC",
+    "league": "Indie, Mizoram Premier League",
+    "last_text": "<b>ALARM LIVE</b> <i>(57')</i>\n\n⚽️ <b>FC Lawtngtlai vs Chanmari FC</b>  <code>[0:3]</code>\n🏆 <b>Liga:</b> Indie, Mizoram Premier League\n⏱️ <b>Czas:</b> 57'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 4.5 FT</code>\n💰 <b>Sugerowana Stawka:</b> <code>2J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>2.20</b>\n🔥 <b>60%</b> (APM: 0.62)\n\n💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>220 000 €</b> (89% wolumenu rynku)\n• 2.83 ➔ 2.20 (Gwałtowny spadek -22% 📉)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3312704\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
+    "last_odds": 2.2,
+    "initial_odds": 2.2,
+    "initial_minute": 57,
+    "initial_score": "0:3",
+    "initial_goals": 3,
+    "target_goals": 5,
+    "target_period": "FT",
+    "smart_money_section": "💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>220 000 €</b> (89% wolumenu rynku)\n• 2.83 ➔ 2.20 (Gwałtowny spadek -22% 📉)\n\n",
+    "created_at": 1788257850.8712332,
+    "last_edit_time": 1788257850.8712332,
+    "last_seen_time": 1788257920.4154797,
+    "last_seen_minute": 59,
+    "last_seen_score": "0:3",
+    "last_seen_half": "2H",
+    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3312704",
+    "badge": "OVER 4.5 FT",
+    "unit_tag": "2J",
+    "stars": 4,
+    "desc": "Błyskawiczna reakcja po bramce (57' min). Mecz otwarty po bramce (0:3), 3 strzały celne, 12 łącznych strzałów, Wysokie xG: 2.83",
+    "danger": 60,
+    "apm": 0.62
+  },
+  "farense u23_vs_famalicao u23": {
+    "device_messages": {
+      "5445412227": 1341,
+      "8773792302": 1342,
+      "1584798763": 1343
+    },
+    "home_team": "SC Farense U23",
+    "away_team": "FC Famalicao U23",
+    "league": "Portugalia, Liga Revelacao U23",
+    "last_text": "<b>ALARM LIVE</b> <i>(18')</i>\n\n⚽️ <b>SC Farense U23 vs FC Famalicao U23</b>  <code>[1:0]</code>\n🏆 <b>Liga:</b> Portugalia, Liga Revelacao U23\n⏱️ <b>Czas:</b> 18'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 1.5 HT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>1.80</b>\n🔥 <b>87%</b> (APM: 1.77)\n\n💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>148 071 €</b> (97% wolumenu rynku)\n• 2.37 ➔ 1.80 (Gwałtowny spadek -24% 📉)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3176600\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
+    "last_odds": 1.8,
+    "initial_odds": 1.8,
+    "initial_minute": 18,
+    "initial_score": "1:0",
+    "initial_goals": 1,
+    "target_goals": 2,
+    "target_period": "1H",
+    "smart_money_section": "💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>148 071 €</b> (97% wolumenu rynku)\n• 2.37 ➔ 1.80 (Gwałtowny spadek -24% 📉)\n\n",
+    "created_at": 1788257934.9566178,
+    "last_edit_time": 1788257934.9566178,
+    "last_seen_time": 1788257934.9566178,
+    "last_seen_minute": 18,
+    "last_seen_score": "1:0",
+    "last_seen_half": "1H",
+    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3176600",
+    "badge": "OVER 1.5 HT",
+    "unit_tag": "3J",
+    "stars": 5,
+    "desc": "Złote Okno 1H (18'). Wysoka dynamika na 2. gola do przerwy. Mecz otwarty (wynik 1:0), Intensywność APM (1.77), 3 strzały celne, 14 strzałów, xG: 1.43",
+    "danger": 87,
+    "apm": 1.77
+  },
   "__settled_matches__": {
     "northerners_vs_sikkim police xi": 1788256064.078945
   }

@@ -272,7 +272,7 @@ class SmartMoneyEngine:
         open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
         danger_int = int(round(danger))
         msg_text = (
-            f"💰 <b>{surge_str} w 2 min!</b>\n"
+            f"💰 <b>{surge_str} w 2 min!</b>\n\n"
             f"⚽️ <b>{home} vs {away}</b> ({minute}')\n"
             f"🏆 <b>Liga:</b> {league}\n"
             f"🎯 <b>Rynek:</b> <code>{badge}</code>\n"
@@ -281,7 +281,7 @@ class SmartMoneyEngine:
             f"• Udział w Over: <b>{over_pct}% całego kapitału meczu</b>\n"
             f"{open_odds:.2f} ➔ {exch_odds:.2f}\n"
             f"⚡️ <b>Kurs STS:</b> <b>{sts_odds:.2f}</b>\n"
-            f"🔥  <b>APM {apm} | Danger {danger_int}%</b>\n"
+            f"🔥  <b>APM {apm} | Danger {danger_int}%</b>\n\n"
             f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
         )
         
