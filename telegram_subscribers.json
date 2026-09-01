@@ -26,9 +26,9 @@
       "chat_id": "1584798763",
       "first_name": "Sebastian",
       "username": "",
-      "role": "TRIAL",
+      "role": "VIP",
       "joined_at": "2026-08-31 18:39:07",
-      "expires_at": "2026-09-01 18:39:07",
+      "expires_at": "2026-10-31 06:34:47",
       "is_active": true
     }
   ],
@@ -49,6 +49,10 @@
     },
     "VIP30-1958": {
       "days": 30,
+      "uses_left": 1
+    },
+    "VIP60-2306": {
+      "days": 60,
       "uses_left": 1
     }
   }
