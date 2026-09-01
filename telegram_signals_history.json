@@ -130,5 +130,27 @@
     "profit_units": 0.0,
     "profit_pln": 0.0,
     "resolved_at": ""
+  },
+  {
+    "id": "sig_1788260640_morpor",
+    "created_at": "2026-09-01 13:04:00",
+    "timestamp": 1788260640.2792127,
+    "date": "2026-09-01",
+    "home_team": "Moreirense FC U23",
+    "away_team": "Portimonense SAD U23",
+    "match_title": "Moreirense FC U23 vs Portimonense SAD U23",
+    "league": "Portugalia, Liga Revelacao U23",
+    "minute": 46,
+    "score_initial": "0:0",
+    "score_final": "0:0",
+    "market": "OVER 1.5 FT",
+    "odds": 1.68,
+    "unit_tag": "1J",
+    "units": 1,
+    "stake_pln": 2.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]
