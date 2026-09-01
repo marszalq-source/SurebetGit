@@ -39,8 +39,12 @@ def start_scanner_server():
     global server_proc
     if server_proc and server_proc.poll() is None:
         return
-        
-    cmd = [sys.executable, os.path.join(BASE_DIR, "sts_live_scanner.py"), "--server"]
+    py_bin = sys.executable
+    if 'pythonw' in py_bin.lower():
+        cand = os.path.join(os.path.dirname(py_bin), 'python.exe')
+        if os.path.exists(cand):
+            py_bin = cand
+    cmd = [py_bin, os.path.join(BASE_DIR, "sts_live_scanner.py"), "--server"]
     
     # Flagi Windows ukrywające okno konsoli
     CREATE_NO_WINDOW = 0x08000000
@@ -53,7 +57,7 @@ def start_scanner_server():
             stderr=subprocess.DEVNULL
         )
     except Exception as e:
-        print(f"Błąd uruchamiania serwera: {e}")
+        pass
 
 def stop_scanner_server():
     global server_proc
