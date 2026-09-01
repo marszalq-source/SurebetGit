@@ -1298,6 +1298,8 @@ class TelegramNotifier:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
             sm_sec = card.get("smart_money_section", "")
+            sts_url = card.get('sts_url') or match.get('sts_url') or 'https://www.sts.pl/live/pilka-nozna'
+            open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
 
             updated_msg = (
                 f"<b>ALARM LIVE</b> <i>({time_display})</i>\n\n"

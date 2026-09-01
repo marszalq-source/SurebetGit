@@ -31,38 +31,6 @@
     "danger": 60,
     "apm": 0.62
   },
-  "farense u23_vs_famalicao u23": {
-    "device_messages": {
-      "5445412227": 1341,
-      "8773792302": 1342,
-      "1584798763": 1343
-    },
-    "home_team": "SC Farense U23",
-    "away_team": "FC Famalicao U23",
-    "league": "Portugalia, Liga Revelacao U23",
-    "last_text": "<b>ALARM LIVE</b> <i>(18')</i>\n\n⚽️ <b>SC Farense U23 vs FC Famalicao U23</b>  <code>[1:0]</code>\n🏆 <b>Liga:</b> Portugalia, Liga Revelacao U23\n⏱️ <b>Czas:</b> 18'\n\n🎯 <b>Rekomendacja:</b> <code>OVER 1.5 HT</code>\n💰 <b>Sugerowana Stawka:</b> <code>3J</code>\n📈 <b>Aktualny Kurs STS:</b> <b>1.80</b>\n🔥 <b>87%</b> (APM: 1.77)\n\n💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>148 071 €</b> (97% wolumenu rynku)\n• 2.37 ➔ 1.80 (Gwałtowny spadek -24% 📉)\n\n👉 <a href=\"http://127.0.0.1:5050/open?url=https%3A//www.sts.pl/live/pilka-nozna/f3176600\"><b>OBSTAW NA STS LIVE ↗️</b></a>",
-    "last_odds": 1.8,
-    "initial_odds": 1.8,
-    "initial_minute": 18,
-    "initial_score": "1:0",
-    "initial_goals": 1,
-    "target_goals": 2,
-    "target_period": "1H",
-    "smart_money_section": "💰 <b>SMART MONEY (Betfair Exchange):</b>\n• Obrót na Over: <b>148 071 €</b> (97% wolumenu rynku)\n• 2.37 ➔ 1.80 (Gwałtowny spadek -24% 📉)\n\n",
-    "created_at": 1788257934.9566178,
-    "last_edit_time": 1788257934.9566178,
-    "last_seen_time": 1788257934.9566178,
-    "last_seen_minute": 18,
-    "last_seen_score": "1:0",
-    "last_seen_half": "1H",
-    "sts_url": "https://www.sts.pl/live/pilka-nozna/f3176600",
-    "badge": "OVER 1.5 HT",
-    "unit_tag": "3J",
-    "stars": 5,
-    "desc": "Złote Okno 1H (18'). Wysoka dynamika na 2. gola do przerwy. Mecz otwarty (wynik 1:0), Intensywność APM (1.77), 3 strzały celne, 14 strzałów, xG: 1.43",
-    "danger": 87,
-    "apm": 1.77
-  },
   "railway_vs_kidderpore": {
     "device_messages": {
       "5445412227": 1344,
@@ -96,6 +64,7 @@
     "apm": 0.61
   },
   "__settled_matches__": {
-    "northerners_vs_sikkim police xi": 1788256064.078945
+    "northerners_vs_sikkim police xi": 1788256064.078945,
+    "farense u23_vs_famalicao u23": 1788258941.939105
   }
 }
