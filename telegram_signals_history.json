@@ -32,16 +32,16 @@
     "league": "Indie, Mizoram Premier League",
     "minute": 57,
     "score_initial": "0:3",
-    "score_final": "0:3",
+    "score_final": "0:4",
     "market": "OVER 4.5 FT",
     "odds": 2.2,
     "unit_tag": "2J",
     "units": 2,
     "stake_pln": 4.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "LOST",
+    "profit_units": -2.0,
+    "profit_pln": -4.0,
+    "resolved_at": "2026-09-01 14:17:39"
   },
   {
     "id": "sig_1788257935_sc fc ",
@@ -98,16 +98,16 @@
     "league": "Indie, Shillong Premier League",
     "minute": 39,
     "score_initial": "0:1",
-    "score_final": "0:1",
+    "score_final": "0:2",
     "market": "OVER 2.5 FT",
     "odds": 1.75,
     "unit_tag": "3J",
     "units": 3,
     "stake_pln": 6.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "LOST",
+    "profit_units": -3.0,
+    "profit_pln": -6.0,
+    "resolved_at": "2026-09-01 14:07:19"
   },
   {
     "id": "sig_1788259823_sigspa",
@@ -120,16 +120,16 @@
     "league": "Czechy, 1. Liga U19",
     "minute": 20,
     "score_initial": "1:1",
-    "score_final": "1:1",
+    "score_final": "2:1",
     "market": "OVER 2.5 FT",
     "odds": 1.75,
     "unit_tag": "3J",
     "units": 3,
     "stake_pln": 6.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "WON",
+    "profit_units": 2.25,
+    "profit_pln": 4.5,
+    "resolved_at": "2026-09-01 13:40:27"
   },
   {
     "id": "sig_1788260640_morpor",
@@ -148,10 +148,10 @@
     "unit_tag": "1J",
     "units": 1,
     "stake_pln": 2.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "LOST",
+    "profit_units": -1.0,
+    "profit_pln": -2.0,
+    "resolved_at": "2026-09-01 13:55:14"
   },
   {
     "id": "sig_1788261586_metkff",
@@ -164,15 +164,15 @@
     "league": "Klubowe, Europa Cup - kobiety",
     "minute": 20,
     "score_initial": "2:0",
-    "score_final": "2:0",
+    "score_final": "3:0",
     "market": "OVER 2.5 FT",
     "odds": 1.55,
     "unit_tag": "3J",
     "units": 3,
     "stake_pln": 6.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "WON",
+    "profit_units": 1.65,
+    "profit_pln": 3.3,
+    "resolved_at": "2026-09-01 14:04:23"
   }
 ]

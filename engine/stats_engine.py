@@ -327,8 +327,10 @@ class StatsEngine:
         )
         if v > 0:
             msg += f"🟡 <b>Zwroty:</b> <b>{v}</b>\n"
-        if stats.get('pending', 0) > 0:
-            msg += f"⏳ <b>W trakcie gry:</b> <b>{stats['pending']}</b>\n"
+        
+        # Zawsze wyświetlaj liczbę meczów w trakcie gry
+        pending_count = stats.get('pending', 0)
+        msg += f"⏳ <b>W trakcie gry:</b> <b>{pending_count}</b>\n"
             
         msg += (
             f"💰 <b>Bilans jednostek:</b> <b>{pu_sign} J</b> {profit_emoji}\n"
