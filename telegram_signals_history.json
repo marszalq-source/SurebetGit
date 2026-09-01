@@ -152,5 +152,27 @@
     "profit_units": 0.0,
     "profit_pln": 0.0,
     "resolved_at": ""
+  },
+  {
+    "id": "sig_1788261586_metkff",
+    "created_at": "2026-09-01 13:19:46",
+    "timestamp": 1788261586.496656,
+    "date": "2026-09-01",
+    "home_team": "Metalist 1925 Kharkiv [K]",
+    "away_team": "KFF Mitrovica [K]",
+    "match_title": "Metalist 1925 Kharkiv [K] vs KFF Mitrovica [K]",
+    "league": "Klubowe, Europa Cup - kobiety",
+    "minute": 20,
+    "score_initial": "2:0",
+    "score_final": "2:0",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "unit_tag": "3J",
+    "units": 3,
+    "stake_pln": 6.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]

@@ -1019,15 +1019,12 @@ class TelegramNotifier:
                 time_display = "23'" if half == '1H' else "68'"
                 header_time = time_display
 
-        # Smart Money (Betfair Exchange) - Pobieranie przez silnik SmartMoneyEngine z obsługą Proxy
+        # Smart Money (Betfair) & Pinnacle Benchmark wykorzystywane wewnątrz silnika
         from engine.smart_money_engine import SmartMoneyEngine
-        sm_engine = SmartMoneyEngine()
-        sm_data = sm_engine.get_smart_money_data(match, signal)
-        smart_money_section = sm_engine.format_telegram_section(sm_data)
-
-        # Pinnacle Benchmark & Value Engine (używany wewnętrznie do walidacji matematycznej)
         from engine.pinnacle_engine import PinnacleEngine
+        sm_engine = SmartMoneyEngine()
         pin_engine = PinnacleEngine()
+        sm_data = sm_engine.get_smart_money_data(match, signal)
         pin_data = pin_engine.get_sharp_benchmark(match, signal)
 
         msg = (
@@ -1037,9 +1034,8 @@ class TelegramNotifier:
             f"⏱️ <b>Czas:</b> {time_display}\n\n"
             f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
             f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-            f"📈 <b>Aktualny Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+            f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
             f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-            f"{smart_money_section}"
             f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
         )
 
@@ -1302,7 +1298,6 @@ class TelegramNotifier:
             if 1.10 <= latest_odds <= 3.20 and abs(latest_odds - orig_odds) > 0.05:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
-            sm_sec = card.get("smart_money_section", "")
             sts_url = card.get('sts_url') or match.get('sts_url') or 'https://www.sts.pl/live/pilka-nozna'
             open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
 
@@ -1315,7 +1310,6 @@ class TelegramNotifier:
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
                 f"📈 <b>Kurs STS:</b> {odds_str}\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"{sm_sec}"
                 f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
             )
 
