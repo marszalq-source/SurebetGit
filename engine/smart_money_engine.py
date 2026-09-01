@@ -208,13 +208,19 @@ class SmartMoneyEngine:
         # Wywołanie z buforem timeout
         return None
 
-    def format_telegram_section(self, sm_data: Dict[str, Any]) -> str:
-        """Formatuje elegancki dopisek Smart Money do wiadomości Telegram."""
-        vol_str = sm_data.get("matched_volume_str", "48 500 €")
-        vol_pct = sm_data.get("over_volume_pct", 87)
-        o_open = sm_data.get("opening_odds", 2.15)
-        o_curr = sm_data.get("current_odds", 1.70)
-        drop = sm_data.get("drop_pct", 21)
+    def format_telegram_section(self, sm_data: Optional[Dict[str, Any]]) -> str:
+        """Formatuje elegancki dopisek Smart Money do wiadomości Telegram TYLKO gdy są rzeczywiste dane z giełdy."""
+        if not sm_data or not sm_data.get("matched_volume_str"):
+            return ""
+
+        vol_str = sm_data.get("matched_volume_str", "")
+        vol_pct = sm_data.get("over_volume_pct", 0)
+        o_open = sm_data.get("opening_odds", 0)
+        o_curr = sm_data.get("current_odds", 0)
+        drop = sm_data.get("drop_pct", 0)
+
+        if not vol_str or vol_pct <= 0:
+            return ""
 
         return (
             f"💰 <b>SMART MONEY (Betfair Exchange):</b>\n"
