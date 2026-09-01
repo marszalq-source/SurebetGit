@@ -1097,7 +1097,7 @@ class TelegramNotifier:
                 "initial_goals": init_tot,
                 "target_goals": target_goals,
                 "target_period": target_period,
-                "smart_money_section": smart_money_section,
+                "smart_money_section": "",
                 "created_at": now,
                 "last_edit_time": now,
                 "last_seen_time": now,
