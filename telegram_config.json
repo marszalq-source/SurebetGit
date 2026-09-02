@@ -1,11 +1,13 @@
 {
   "enabled": true,
   "bot_token": "8905274355:AAH1w0s-qlc_6WOVRilkiXfz1ceGR638ENE",
-  "chat_id": "8773792302",
+  "chat_id": "-1004480240058",
   "min_stars": 4,
-  "sniper_mode": true,
-  "max_active_cards": 3,
   "notify_signals": true,
   "notify_daily_goal": true,
-  "live_update_mode": true
+  "live_update_mode": true,
+  "sniper_mode": true,
+  "max_active_cards": 3,
+  "free_channel_id": "-1003953802945",
+  "vip_channel_id": "-1004480240058"
 }

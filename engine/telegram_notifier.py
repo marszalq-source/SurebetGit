@@ -441,12 +441,46 @@ class TelegramNotifier:
                                 self.edit_message(cb_mid, new_text, chat_id=cb_cid, reply_markup=kb)
                             continue
 
+                    post = u.get("channel_post")
+                    if post:
+                        p_chat = post.get("chat", {})
+                        p_cid = str(p_chat.get("id", ""))
+                        p_title = p_chat.get("title", "")
+                        print(f"📡 TELEGRAM CHANNEL POST DETECTED: '{p_title}' -> ID: {p_cid}", flush=True)
+                        if "vip" in p_title.lower():
+                            self.config["vip_channel_id"] = p_cid
+                            self.config["chat_id"] = p_cid
+                            self.save_config(self.config)
+                            print(f"✅ AUTO-SAVED VIP CHANNEL ID: {p_cid}", flush=True)
+                        elif "live" in p_title.lower():
+                            self.config["free_channel_id"] = p_cid
+                            self.save_config(self.config)
+                            print(f"✅ AUTO-SAVED FREE CHANNEL ID: {p_cid}", flush=True)
+                        continue
+
                     msg = u.get("message")
                     if not msg:
                         continue
 
                     chat = msg.get("chat", {})
                     cid = str(chat.get("id", ""))
+
+                    # Sprawdź, czy wiadomość została przekazana (forward) z kanału VIP
+                    fwd_chat = msg.get("forward_from_chat")
+                    if fwd_chat:
+                        fwd_cid = str(fwd_chat.get("id", ""))
+                        fwd_title = fwd_chat.get("title", "")
+                        print(f"📡 FORWARDED FROM CHANNEL: '{fwd_title}' -> ID: {fwd_cid}", flush=True)
+                        if "vip" in fwd_title.lower():
+                            self.config["vip_channel_id"] = fwd_cid
+                            self.config["chat_id"] = fwd_cid
+                            self.save_config(self.config)
+                            self.send_message(f"✅ <b>Rozpoznano i połączono kanał VIP!</b>\n\nNazwa: <b>{fwd_title}</b>\nID: <code>{fwd_cid}</code>", chat_id=cid)
+                        elif "live" in fwd_title.lower():
+                            self.config["free_channel_id"] = fwd_cid
+                            self.save_config(self.config)
+                            self.send_message(f"✅ <b>Rozpoznano i połączono kanał FREE!</b>\n\nNazwa: <b>{fwd_title}</b>\nID: <code>{fwd_cid}</code>", chat_id=cid)
+                        continue
                     from_user = msg.get("from", {})
                     first_name = from_user.get("first_name", "Użytkownik")
                     username = from_user.get("username", "")
@@ -1241,6 +1275,28 @@ class TelegramNotifier:
         dev_msgs = self.send_message_all(msg)
         if dev_msgs:
             new_key = f"{self._normalize_name(home)}_vs_{self._normalize_name(away)}"
+            
+            # Dystrybucja na kanał FREE (Darmowy Typ Dnia - max 2 alerty dziennie)
+            free_cid = self.config.get("free_channel_id")
+            if free_cid:
+                today_str = time.strftime('%Y-%m-%d')
+                free_data = self.config.setdefault("_free_picks_tracker", {})
+                picks_today = free_data.setdefault(today_str, [])
+                if len(picks_today) < 2 and stars >= 4:
+                    picks_today.append(new_key)
+                    self.save_config(self.config)
+                    free_msg = (
+                        "🎁 <b>DARMOWY TYP DNIA | OVERRADAR LIVE</b> ⚽\n\n"
+                        + msg + "\n\n"
+                        + "<i>To jest bezpłatna próbka możliwości algorytmu.</i>\n"
+                        + "👑 <b>Chcesz wszystkie alerty na żywo 24/7 i Tryb Snajper (91.4%)?</b>\n"
+                        + "👉 Odbierz 3 dni darmowego Trialu VIP!"
+                    )
+                    res_free = self.send_message(free_msg, chat_id=free_cid)
+                    if res_free.get("success"):
+                        f_mid = res_free.get("result", {}).get("message_id")
+                        if f_mid:
+                            dev_msgs[str(free_cid)] = f_mid
             badge_u = badge.upper()
             sig_type = str(signal.get("type", "")).upper()
             try:
