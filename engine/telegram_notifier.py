@@ -1067,22 +1067,15 @@ class TelegramNotifier:
         sm_data = sm_engine.get_smart_money_data(match, signal)
         pin_data = pin_engine.get_sharp_benchmark(match, signal)
 
-        sniper_mode = self.config.get("sniper_mode", True) or min_stars >= 4
-        if sniper_mode:
-            header_title = f"🎯 <b>ALARM SNAJPER</b> <i>({header_time})</i>"
-        else:
-            header_title = f"<b>ALARM LIVE</b> <i>({header_time})</i>"
-
         msg = (
-            f"{header_title}\n\n"
+            f"<b>ALERT</b> <i>({header_time})</i>\n\n"
             f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
             f"🏆 <b>Liga:</b> {league}\n"
             f"⏱️ <b>Czas:</b> {time_display}\n\n"
             f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
             f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
             f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
-            f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-            f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
+            f"🔥 <b>{danger}%</b> (APM: {apm})"
         )
 
         now = time.time()
@@ -1241,7 +1234,7 @@ class TelegramNotifier:
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
             profit_units = round(units * (init_odds - 1.0), 2)
             win_msg = (
-                f"✅ <b>ALARM LIVE</b> <i>(Trafiono: {win_time})</i>\n\n"
+                f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
@@ -1262,7 +1255,7 @@ class TelegramNotifier:
         st_lower = str(stage_text).lower()
         if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
             void_msg = (
-                f"🟡 <b>ALARM LIVE</b> <i>({stage_text})</i>\n\n"
+                f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
@@ -1309,7 +1302,7 @@ class TelegramNotifier:
             loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
             loss_msg = (
-                f"❌ <b>ALARM LIVE</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
+                f"❌ <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
@@ -1344,22 +1337,15 @@ class TelegramNotifier:
             if 1.10 <= latest_odds <= 3.20 and abs(latest_odds - orig_odds) > 0.05:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
-            sts_url = card.get('sts_url') or match.get('sts_url') or 'https://www.sts.pl/live/pilka-nozna'
-            open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
-
-            sniper_mode = self.config.get("sniper_mode", True) or self.config.get("min_stars", 2) >= 4
-            header_prefix = "🎯 <b>ALARM SNAJPER</b>" if sniper_mode else "<b>ALARM LIVE</b>"
-
             updated_msg = (
-                f"{header_prefix} <i>({time_display})</i>\n\n"
+                f"<b>ALERT</b> <i>({time_display})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Czas:</b> {time_info}\n\n"
                 f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
                 f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
                 f"📈 <b>Kurs STS:</b> {odds_str}\n"
-                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"👉 <a href=\"{open_url}\"><b>OBSTAW NA STS LIVE ↗️</b></a>"
+                f"🔥 <b>{danger}%</b> (APM: {apm})"
             )
 
             score_changed = (current_score != card.get("last_seen_score"))
