@@ -5,7 +5,7 @@
   "bankroll_id": 1,
   "bankroll_global_id": 1921642,
   "bankroll_name": "OverRadar Live",
-  "stake_unit_value": 2.0,
+  "stake_unit_value": 10.0,
   "use_units_as_stake": false,
   "bookmaker_id": 362,
   "auto_settle": true
