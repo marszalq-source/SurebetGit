@@ -1347,8 +1347,11 @@ class TelegramNotifier:
             sts_url = card.get('sts_url') or match.get('sts_url') or 'https://www.sts.pl/live/pilka-nozna'
             open_url = f"http://127.0.0.1:5050/open?url={urllib.parse.quote(sts_url)}"
 
+            sniper_mode = self.config.get("sniper_mode", True) or self.config.get("min_stars", 2) >= 4
+            header_prefix = "🎯 <b>ALARM SNAJPER</b>" if sniper_mode else "<b>ALARM LIVE</b>"
+
             updated_msg = (
-                f"<b>ALARM LIVE</b> <i>({time_display})</i>\n\n"
+                f"{header_prefix} <i>({time_display})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Czas:</b> {time_info}\n\n"
