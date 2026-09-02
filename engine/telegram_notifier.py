@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 from typing import Dict, Any, Optional, List, Tuple
 from engine.stats_engine import StatsEngine
+from engine.bet_analytix_sync import BetAnalytixSync
 
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_config.json")
@@ -30,6 +31,7 @@ class TelegramNotifier:
         self.active_match_cards, self.settled_matches = self._load_cards()
         self.subscribers_data = self._load_subscribers()
         self.stats_engine = StatsEngine()
+        self.ba_sync = BetAnalytixSync()
         self._last_update_id = 0
         self.setup_bot_menu_commands()
         self.start_polling_thread()
@@ -42,6 +44,7 @@ class TelegramNotifier:
         commands = [
             {"command": "stats", "description": "📊 Statystyki skuteczności (dzień, tydzień, ...)"},
             {"command": "sniper", "description": "🎯 Włącz / Wyłącz Tryb Snajper (VIP)"},
+            {"command": "ba", "description": "📈 Bet-Analytix (Status i synchronizacja)"},
             {"command": "komendy", "description": "👑 Centrum dowodzenia i lista komend"},
             {"command": "start", "description": "🚀 Status konta i powitanie"},
             {"command": "mojekonto", "description": "👤 Twoja subskrypcja i ważność"},
@@ -536,6 +539,84 @@ class TelegramNotifier:
                             f"<i>Wybierz tryb przyciskami poniżej:</i>"
                         )
                         self.send_message(menu_msg, chat_id=cid, reply_markup=kb)
+                        continue
+
+                    elif text_lower.startswith(("/ba", "/betanalytix")):
+                        parts = text.split()
+                        if len(parts) >= 3 and parts[1].lower() == "login":
+                            em = parts[2].strip()
+                            pw = parts[3].strip() if len(parts) >= 4 else ""
+                            if not pw:
+                                self.send_message("⚠️ <b>Użycie:</b> <code>/ba login email haslo</code>", chat_id=cid)
+                                continue
+                            self.send_message("⏳ <i>Logowanie do Bet-Analytix...</i>", chat_id=cid)
+                            res = self.ba_sync.login(em, pw)
+                            if res.get("success"):
+                                bankrolls = self.ba_sync.get_bankrolls()
+                                b_txt = ""
+                                for i, b in enumerate(bankrolls, 1):
+                                    b_name = b.get("name", "Bankroll")
+                                    b_id = b.get("id") or b.get("id_bankroll")
+                                    b_txt += f"• <b>{b_name}</b> (ID: <code>{b_id}</code>)\n"
+                                self.send_message(
+                                    f"✅ <b>Zalogowano do Bet-Analytix!</b>\n\n"
+                                    f"👤 Konto: <code>{em}</code>\n"
+                                    f"📁 Wykryte bankrolle:\n{b_txt or '• Brak bankrolli'}\n"
+                                    f"🎯 Aktywny bankroll: <b>{self.ba_sync.config.get('bankroll_name')}</b>\n\n"
+                                    f"🚀 <i>Wszystkie nowe alerty ze skanera będą automatycznie dodawane i rozliczane na Twoim koncie!</i>",
+                                    chat_id=cid
+                                )
+                            else:
+                                self.send_message(
+                                    f"❌ <b>Błąd logowania do Bet-Analytix:</b>\n<code>{res.get('error')}</code>\n\n"
+                                    f"💡 Upewnij się, że podajesz poprawny e-mail i hasło do <a href=\"https://app.bet-analytix.com/\">app.bet-analytix.com</a>.",
+                                    chat_id=cid
+                                )
+                            continue
+
+                        elif len(parts) >= 3 and parts[1].lower() in ("bankroll", "b"):
+                            try:
+                                b_id = int(parts[2].strip())
+                                self.ba_sync.config["bankroll_id"] = b_id
+                                self.ba_sync.save_config()
+                                self.send_message(f"✅ Ustawiono aktywny bankroll ID: <code>{b_id}</code>", chat_id=cid)
+                            except Exception:
+                                self.send_message("⚠️ Podaj poprawne numeryczne ID bankrolla, np. <code>/ba bankroll 12345</code>", chat_id=cid)
+                            continue
+
+                        elif len(parts) >= 2 and parts[1].lower() in ("off", "wylacz", "stop"):
+                            self.ba_sync.config["enabled"] = False
+                            self.ba_sync.save_config()
+                            self.send_message("⚪ <b>Automatyczna synchronizacja z Bet-Analytix została wyłączona.</b>", chat_id=cid)
+                            continue
+
+                        elif len(parts) >= 2 and parts[1].lower() in ("on", "wlacz", "start"):
+                            self.ba_sync.config["enabled"] = True
+                            self.ba_sync.save_config()
+                            self.send_message("🟢 <b>Automatyczna synchronizacja z Bet-Analytix została włączona.</b>", chat_id=cid)
+                            continue
+
+                        # Default: status panel
+                        st = self.ba_sync.get_status()
+                        auth_txt = "<b>POŁĄCZONO 🟢</b>" if st["authenticated"] else "<b>WYMAGANE LOGOWANIE 🔴</b>"
+                        sync_txt = "<b>WŁĄCZONA 🟢</b>" if st["enabled"] else "<b>WYŁĄCZONA ⚪</b>"
+                        email_txt = f"<code>{st['email']}</code>" if st['email'] else "<i>Nie zalogowano</i>"
+                        b_txt = f"<b>{st['bankroll_name']}</b> (ID: <code>{st['bankroll_id']}</code>)" if st['bankroll_id'] else "<i>Brak</i>"
+
+                        help_txt = (
+                            f"📈 <b>INTEGRACJA BET-ANALYTIX</b> (app.bet-analytix.com)\n\n"
+                            f"• Status konta: {auth_txt}\n"
+                            f"• Auto-synchronizacja: {sync_txt}\n"
+                            f"• E-mail: {email_txt}\n"
+                            f"• Aktywny Bankroll: {b_txt}\n"
+                            f"• Zsynchronizowanych typów: <b>{st['total_synced_bets']}</b>\n\n"
+                            f"🔑 <b>KOMENDY STEROWANIA:</b>\n"
+                            f"• <code>/ba login email haslo</code> – logowanie do konta Bet-Analytix\n"
+                            f"• <code>/ba on</code> / <code>/ba off</code> – włączenie / wyłączenie auto-syncu\n"
+                            f"• <code>/ba bankroll &lt;id&gt;</code> – zmiana aktywnego bankrolla\n\n"
+                            f"💡 <i>Gdy jesteś zalogowany, każdy ALERT na Telegramie ląduje automatycznie na Twoim profilu Bet-Analytix i sam się rozlicza!</i>"
+                        )
+                        self.send_message(help_txt, chat_id=cid)
                         continue
 
                     elif is_admin and text_lower.startswith("/dodaj"):
@@ -1210,6 +1291,10 @@ class TelegramNotifier:
                 "apm": apm
             }
             self.stats_engine.record_signal(match, signal, unit_tag)
+            try:
+                self.ba_sync.create_bet_async(match, signal)
+            except Exception:
+                pass
             self._save_cards()
             return True
         return False
@@ -1306,6 +1391,10 @@ class TelegramNotifier:
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=init_odds)
+            try:
+                self.ba_sync.settle_bet_async(match, "WON")
+            except Exception:
+                pass
             self._save_cards()
             return True
 
@@ -1327,6 +1416,10 @@ class TelegramNotifier:
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=init_odds)
+            try:
+                self.ba_sync.settle_bet_async(match, "VOID")
+            except Exception:
+                pass
             self._save_cards()
             return True
 
@@ -1374,6 +1467,10 @@ class TelegramNotifier:
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=init_odds)
+            try:
+                self.ba_sync.settle_bet_async(match, "LOST")
+            except Exception:
+                pass
             self._save_cards()
             return True
 

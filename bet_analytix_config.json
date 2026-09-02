@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "email": "",
+  "password": "",
+  "bankroll_id": null,
+  "bankroll_name": "",
+  "stake_unit_value": 2.0,
+  "use_units_as_stake": false,
+  "bookmaker_id": null,
+  "auto_settle": true
+}
