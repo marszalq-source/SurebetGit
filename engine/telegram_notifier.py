@@ -31,7 +31,29 @@ class TelegramNotifier:
         self.subscribers_data = self._load_subscribers()
         self.stats_engine = StatsEngine()
         self._last_update_id = 0
+        self.setup_bot_menu_commands()
         self.start_polling_thread()
+
+    def setup_bot_menu_commands(self):
+        """Rejestruje oficjalne komendy w menu bocznym Telegrama (Menu Button)."""
+        token = self.config.get("bot_token", "").strip()
+        if not token:
+            return
+        commands = [
+            {"command": "stats", "description": "📊 Statystyki skuteczności (dzień, tydzień, ...)"},
+            {"command": "sniper", "description": "🎯 Włącz / Wyłącz Tryb Snajper (VIP)"},
+            {"command": "komendy", "description": "👑 Centrum dowodzenia i lista komend"},
+            {"command": "start", "description": "🚀 Status konta i powitanie"},
+            {"command": "mojekonto", "description": "👤 Twoja subskrypcja i ważność"},
+            {"command": "kup", "description": "💎 Oferta i cennik VIP"}
+        ]
+        url = f"https://api.telegram.org/bot{token}/setMyCommands"
+        try:
+            payload = json.dumps({"commands": commands}).encode('utf-8')
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json", "User-Agent": "SurebetScanner/2.0"})
+            urllib.request.urlopen(req, timeout=4)
+        except Exception:
+            pass
 
     def start_polling_thread(self):
         """Uruchamia ciągły wątek nasłuchujący poleceń z Telegrama (reakcja < 1s)."""
@@ -385,7 +407,36 @@ class TelegramNotifier:
                             kb = self.stats_engine.get_inline_keyboard(current_period=period)
                             if cb_mid and cb_cid:
                                 self.edit_message(cb_mid, stats_msg, chat_id=cb_cid, reply_markup=kb)
-                        continue
+                            continue
+
+                        if cb_data in ("sniper_on", "sniper_off"):
+                            is_on = (cb_data == "sniper_on")
+                            self.config["min_stars"] = 4 if is_on else 2
+                            self.config["sniper_mode"] = is_on
+                            if is_on:
+                                self.config["max_active_cards"] = 3
+                            self.save_config(self.config)
+                            
+                            status_txt = "<b>WŁĄCZONY 🟢</b>" if is_on else "<b>WYŁĄCZONY ⚪ (Tryb Pełny)</b>"
+                            kb = {
+                                "inline_keyboard": [
+                                    [
+                                        {"text": f"{'✅ ' if is_on else ''}🟢 Włącz Snajper (VIP)", "callback_data": "sniper_on"},
+                                        {"text": f"{'✅ ' if not is_on else ''}⚪ Wyłącz (Tryb Pełny)", "callback_data": "sniper_off"}
+                                    ]
+                                ]
+                            }
+                            new_text = (
+                                f"🎯 <b>TRYB SNAJPER (VIP)</b>\n\n"
+                                f"Aktualny status: {status_txt}\n\n"
+                                f"• <b>Minimalna ocena:</b> {'4⭐ - 5⭐ (Stawki 2J i 3J)' if is_on else 'Wszystkie sygnały (od 2⭐)'}\n"
+                                f"• <b>Maksymalnie otwartych:</b> {'3 aktywne mecze naraz' if is_on else 'Bez limitu'}\n"
+                                f"• <b>Okno godzinowe:</b> 16:00 – 06:00\n\n"
+                                f"<i>Wybierz tryb przyciskami poniżej:</i>"
+                            )
+                            if cb_mid and cb_cid:
+                                self.edit_message(cb_mid, new_text, chat_id=cb_cid, reply_markup=kb)
+                            continue
 
                     msg = u.get("message")
                     if not msg:
@@ -457,27 +508,34 @@ class TelegramNotifier:
                             self.config["min_stars"] = 2
                             self.config["sniper_mode"] = False
                             self.save_config(self.config)
-                            self.send_message(
-                                "🌊 <b>TRYB STANDARDOWY AKTYWNY</b>\n\n"
-                                "Bot wysyła wszystkie wykryte sygnały z minimalnym progiem 2⭐.\n"
-                                "Aby wrócić do selekcji VIP, wpisz <code>/sniper</code>.",
-                                chat_id=cid
-                            )
-                        else:
+                            is_on = False
+                        elif len(parts) >= 2 and parts[1].lower() in ("on", "wlacz", "vip", "start"):
                             self.config["min_stars"] = 4
                             self.config["sniper_mode"] = True
                             self.config["max_active_cards"] = 3
                             self.save_config(self.config)
-                            self.send_message(
-                                "🎯 <b>TRYB SNAJPER (VIP) AKTYWNY!</b> 💎\n\n"
-                                "🛡️ <b>Maksymalna selekcja i ochrona kapitału:</b>\n"
-                                "• Tylko sygnały <b>4⭐ i 5⭐ (Stawki 2J i 3J)</b>\n"
-                                "• Złote Okno 1H (16'-30') oraz Ekstremalny Napór 2H (Danger 85%+)\n"
-                                "• Limit maksymalnie <b>3 aktywnych meczów naraz</b> w czacie\n"
-                                "• Aktywne okno godzinowe: <b>16:00 – 06:00</b>\n\n"
-                                "📊 <i>Oczekiwana skuteczność: 85% – 91% przy wysokim Yieldzie.</i>",
-                                chat_id=cid
-                            )
+                            is_on = True
+                        else:
+                            is_on = bool(self.config.get("sniper_mode", True))
+
+                        status_txt = "<b>WŁĄCZONY 🟢</b>" if is_on else "<b>WYŁĄCZONY ⚪ (Tryb Pełny)</b>"
+                        kb = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": f"{'✅ ' if is_on else ''}🟢 Włącz Snajper (VIP)", "callback_data": "sniper_on"},
+                                    {"text": f"{'✅ ' if not is_on else ''}⚪ Wyłącz (Tryb Pełny)", "callback_data": "sniper_off"}
+                                ]
+                            ]
+                        }
+                        menu_msg = (
+                            f"🎯 <b>TRYB SNAJPER (VIP)</b>\n\n"
+                            f"Aktualny status: {status_txt}\n\n"
+                            f"• <b>Minimalna ocena:</b> {'4⭐ - 5⭐ (Stawki 2J i 3J)' if is_on else 'Wszystkie sygnały (od 2⭐)'}\n"
+                            f"• <b>Maksymalnie otwartych:</b> {'3 aktywne mecze naraz' if is_on else 'Bez limitu'}\n"
+                            f"• <b>Okno godzinowe:</b> 16:00 – 06:00\n\n"
+                            f"<i>Wybierz tryb przyciskami poniżej:</i>"
+                        )
+                        self.send_message(menu_msg, chat_id=cid, reply_markup=kb)
                         continue
 
                     elif is_admin and text_lower.startswith("/dodaj"):
