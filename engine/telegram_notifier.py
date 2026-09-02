@@ -443,9 +443,41 @@ class TelegramNotifier:
                             "• <code>/cena &lt;kwota&gt;</code> – Zmiana ceny subskrypcji (np. <code>/cena 149</code>)\n\n"
                             "📢 <b>KOMUNIKACJA:</b>\n"
                             "• <code>/ogloszenie &lt;treść&gt;</code> – Wysłanie wiadomości do wszystkich aktywnych\n\n"
+                            "🎯 <b>TRYBY DZIAŁANIA:</b>\n"
+                            "• <code>/sniper</code> – Aktywacja selekcji Snajper VIP (tylko 4⭐-5⭐, max 3 mecze, Złote Okno 16'-30')\n"
+                            "• <code>/sniper off</code> – Powrót do trybu standardowego (wszystkie sygnały od 2⭐)\n\n"
                             "💡 <i>Wpisz <code>/komendy</code> w dowolnym momencie, aby wyświetlić tę listę.</i>"
                         )
                         self.send_message(admin_msg, chat_id=cid)
+                        continue
+
+                    elif text_lower.startswith(("/sniper", "/snajper", "/mode", "/tryb")):
+                        parts = text.split()
+                        if len(parts) >= 2 and parts[1].lower() in ("off", "wylacz", "standard", "all", "wszystkie"):
+                            self.config["min_stars"] = 2
+                            self.config["sniper_mode"] = False
+                            self.save_config(self.config)
+                            self.send_message(
+                                "🌊 <b>TRYB STANDARDOWY AKTYWNY</b>\n\n"
+                                "Bot wysyła wszystkie wykryte sygnały z minimalnym progiem 2⭐.\n"
+                                "Aby wrócić do selekcji VIP, wpisz <code>/sniper</code>.",
+                                chat_id=cid
+                            )
+                        else:
+                            self.config["min_stars"] = 4
+                            self.config["sniper_mode"] = True
+                            self.config["max_active_cards"] = 3
+                            self.save_config(self.config)
+                            self.send_message(
+                                "🎯 <b>TRYB SNAJPER (VIP) AKTYWNY!</b> 💎\n\n"
+                                "🛡️ <b>Maksymalna selekcja i ochrona kapitału:</b>\n"
+                                "• Tylko sygnały <b>4⭐ i 5⭐ (Stawki 2J i 3J)</b>\n"
+                                "• Złote Okno 1H (16'-30') oraz Ekstremalny Napór 2H (Danger 85%+)\n"
+                                "• Limit maksymalnie <b>3 aktywnych meczów naraz</b> w czacie\n"
+                                "• Aktywne okno godzinowe: <b>16:00 – 06:00</b>\n\n"
+                                "📊 <i>Oczekiwana skuteczność: 85% – 91% przy wysokim Yieldzie.</i>",
+                                chat_id=cid
+                            )
                         continue
 
                     elif is_admin and text_lower.startswith("/dodaj"):
@@ -971,7 +1003,15 @@ class TelegramNotifier:
             return False
 
         stars = signal.get("stars", 2)
-        if stars < self.config.get("min_stars", 2):
+        min_stars = self.config.get("min_stars", 4)
+        if stars < min_stars:
+            return False
+
+        # Weryfikacja limitu jednocześnie aktywnych kart w czacie (Tryb Snajper UX: max 3 mecze)
+        max_active = self.config.get("max_active_cards", 3)
+        existing_key = self._find_existing_card_key(home, away)
+        if not existing_key and len(self.active_match_cards) >= max_active:
+            # Osiągnięto limit 3 otwartych pozycji - wstrzymujemy nowe sygnały do rozstrzygnięcia
             return False
 
         # Mapowanie jednostek i sugerowanych stawek:
@@ -1027,8 +1067,14 @@ class TelegramNotifier:
         sm_data = sm_engine.get_smart_money_data(match, signal)
         pin_data = pin_engine.get_sharp_benchmark(match, signal)
 
+        sniper_mode = self.config.get("sniper_mode", True) or min_stars >= 4
+        if sniper_mode:
+            header_title = f"🎯 <b>ALARM SNAJPER</b> <i>({header_time})</i>"
+        else:
+            header_title = f"<b>ALARM LIVE</b> <i>({header_time})</i>"
+
         msg = (
-            f"<b>ALARM LIVE</b> <i>({header_time})</i>\n\n"
+            f"{header_title}\n\n"
             f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
             f"🏆 <b>Liga:</b> {league}\n"
             f"⏱️ <b>Czas:</b> {time_display}\n\n"

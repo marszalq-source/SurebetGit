@@ -2,7 +2,9 @@
   "enabled": true,
   "bot_token": "8905274355:AAH1w0s-qlc_6WOVRilkiXfz1ceGR638ENE",
   "chat_id": "8773792302",
-  "min_stars": 2,
+  "min_stars": 4,
+  "sniper_mode": true,
+  "max_active_cards": 3,
   "notify_signals": true,
   "notify_daily_goal": true,
   "live_update_mode": true
