@@ -234,12 +234,20 @@ class BetAnalytixSync:
 
         label_txt = f"{home} vs {away} - {badge}"
 
+        commission_obj = {
+            "percentage": int(self.config.get("tax_rate_percent", 12)),
+            "base": self.config.get("commission_base", "grossGain"),
+            "applyOnLoss": False
+        } if self.config.get("deduct_tax", True) else None
+
         bet_data = {
             "bankroll": bankroll_id,
             "date": date_str,
             "time": time_str,
             "type": 1,
             "stake": stake_val,
+            "bookmaker": self.config.get("bookmaker_id", 362),
+            "commission": commission_obj,
             "selections": [
                 {
                     "label": label_txt,
