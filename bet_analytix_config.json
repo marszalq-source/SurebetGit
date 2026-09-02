@@ -9,7 +9,7 @@
   "use_units_as_stake": false,
   "bookmaker_id": 362,
   "auto_settle": true,
-  "deduct_tax": true,
-  "tax_rate_percent": 12,
+  "deduct_tax": false,
+  "tax_rate_percent": 0,
   "commission_base": "grossGain"
 }
