@@ -37,7 +37,7 @@ class BetAnalytixSync:
             "bankroll_name": "OverRadar Live",
             "stake_unit_value": 2.0,
             "use_units_as_stake": False,
-            "bookmaker_id": 362,
+            "bookmaker_id": 2,
             "auto_settle": True
         }
         if os.path.exists(CONFIG_FILE):
@@ -246,7 +246,7 @@ class BetAnalytixSync:
             "time": time_str,
             "type": 1,
             "stake": stake_val,
-            "bookmaker": self.config.get("bookmaker_id", 362),
+            "bookmaker": self.config.get("bookmaker_id", 2),
             "commission": commission_obj,
             "selections": [
                 {
@@ -254,7 +254,7 @@ class BetAnalytixSync:
                     "odds": odds,
                     "sport": 1,
                     "status": 0,
-                    "bookmaker": self.config.get("bookmaker_id", 362),
+                    "bookmaker": self.config.get("bookmaker_id", 2),
                     "competition": None
                 }
             ]
