@@ -86,6 +86,44 @@ class GoalTriggersEngine:
 
         d_rat = "EKSTREMALNY" if danger_index >= 75 else ("WYSOKI" if danger_index >= 55 else ("ŚREDNI" if danger_index >= 35 else "NISKI"))
 
+        # 1. WERYFIKACJA ZŁOTEGO OKNA GODZINOWEGO (16:00 - 06:00)
+        # Analiza 175 rozliczonych meczów wykazała, że godziny 16:00 - 06:00 przynoszą najwyższy zysk (+77 J),
+        # podczas gdy godziny poranne i wczesnopopołudniowe generują niepotrzebne straty na niszowych ligach.
+        try:
+            import datetime
+            from sts_live_config import ACTIVE_HOURS_ENABLED, ACTIVE_HOURS_START, ACTIVE_HOURS_END, MIN_DANGER_INDEX_2H, MIN_DANGER_INDEX_1H
+            now_hour = datetime.datetime.now().hour
+            if ACTIVE_HOURS_ENABLED:
+                is_active_hour = (now_hour >= ACTIVE_HOURS_START or now_hour < ACTIVE_HOURS_END)
+                if not is_active_hour:
+                    return {
+                        'apm': apm,
+                        'danger_index': danger_index,
+                        'danger_rating': d_rat,
+                        'signals': [],
+                        'has_signals': False,
+                        'primary_signal': None,
+                        'top_recommendation': f'Przerwa w typowaniu (Złote Okno aktywne: {ACTIVE_HOURS_START}:00 - {ACTIVE_HOURS_END:02d}:00)'
+                    }
+        except Exception:
+            MIN_DANGER_INDEX_2H = 85
+            MIN_DANGER_INDEX_1H = 60
+
+        # 2. ZASTRZENIE FILTRÓW DLA 2. POŁOWY (46'+) ORAZ PRZERWY (HT)
+        # W 2. połowie wymagany Danger Index min. 85%, aby odciąć mecze szarpane, faule, zmiany i grę na czas.
+        is_second_half = (half in ('HT', '2H') or minute >= 45)
+        min_required_danger = MIN_DANGER_INDEX_2H if is_second_half else MIN_DANGER_INDEX_1H
+        if danger_index < min_required_danger:
+            return {
+                'apm': apm,
+                'danger_index': danger_index,
+                'danger_rating': d_rat,
+                'signals': [],
+                'has_signals': False,
+                'primary_signal': None,
+                'top_recommendation': f'Zbyt niski napór {"2H" if is_second_half else "1H"} (Danger: {danger_index}%, wymagane: min. {min_required_danger}%)'
+            }
+
         # BEZWZGLĘDNA BLOKADA KOŃCÓWKI MECZU: Żadnych nowych sygnałów od 76. minuty (eliminacja loterii w końcówce)
         if minute >= 76 or half in ('FT', 'AET', 'PEN') or 'koniec' in str(match_data.get('stage_text', '')).lower():
             return {

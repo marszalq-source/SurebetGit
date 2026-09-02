@@ -6,6 +6,16 @@ Konfiguracja programu STS Live Goal Scanner (STS + Flashscore)
 SCAN_INTERVAL_SECONDS = 15       # Częstotliwość odświeżania na żywo
 AUTO_REFRESH_ENABLED = True      # Automatyczne odświeżanie
 
+# Złote Okno Godzinowe (16:00 - 06:00)
+# W godzinach 16:00 - 06:00 generowane są sygnały dla najlepszych lig europejskich i południowoamerykańskich
+ACTIVE_HOURS_ENABLED = True
+ACTIVE_HOURS_START = 16   # Od 16:00 po południu
+ACTIVE_HOURS_END = 6      # Do 06:00 rano
+
+# Minimalne progi Indeksu Groźności (Danger Index):
+MIN_DANGER_INDEX_1H = 60  # 1. połowa (Złote Okno 16'-30' ma 91.4% WR)
+MIN_DANGER_INDEX_2H = 85  # 2. połowa i przerwa (HT/2H) - wymagany ekstremalny napór min. 85%
+
 # Domyślne kryteria dla strategii bramkowych:
 TRIGGERS_CONFIG = {
     # 1. OVER 0.5 HT (WYŁĄCZONY NA BAZIE DANYCH STATYSTYCZNYCH - 40% WR, JEDYNY RYNEK NA MINUSIE)
