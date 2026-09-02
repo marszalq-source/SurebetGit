@@ -1,0 +1,1586 @@
+{
+  "sig_1788255291_norsik": {
+    "bet_id": 119012325,
+    "match": "Northerners FC vs Sikkim Police XI FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329354.9613302
+  },
+  "sig_1788257851_fc cha": {
+    "bet_id": 119012326,
+    "match": "FC Lawtngtlai vs Chanmari FC",
+    "market": "OVER 4.5 FT",
+    "odds": 2.2,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329355.263893
+  },
+  "sig_1788257935_sc fc ": {
+    "bet_id": 119012327,
+    "match": "SC Farense U23 vs FC Famalicao U23",
+    "market": "OVER 1.5 HT",
+    "odds": 1.8,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329355.6139877
+  },
+  "sig_1788258080_raikid": {
+    "bet_id": 119012328,
+    "match": "Railway FC vs Kidderpore AC",
+    "market": "OVER 4.5 FT",
+    "odds": 1.9,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329355.9932415
+  },
+  "sig_1788259727_megshi": {
+    "bet_id": 119012329,
+    "match": "Meghalaya Police vs Shillong Lajong FC II",
+    "market": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329356.318836
+  },
+  "sig_1788259823_sigspa": {
+    "bet_id": 119012330,
+    "match": "Sigma Olomouc U19 vs Sparta Praga U19",
+    "market": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329356.735765
+  },
+  "sig_1788260640_morpor": {
+    "bet_id": 119012331,
+    "match": "Moreirense FC U23 vs Portimonense SAD U23",
+    "market": "OVER 1.5 FT",
+    "odds": 1.68,
+    "stake": 2.0,
+    "status": "LOST",
+    "uploaded_at": 1788329357.0398526
+  },
+  "sig_1788261586_metkff": {
+    "bet_id": 119012332,
+    "match": "Metalist 1925 Kharkiv [K] vs KFF Mitrovica [K]",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329357.3859444
+  },
+  "sig_1788265920_brishe": {
+    "bet_id": 119012333,
+    "match": "Bristol City U21 vs Sheffield United U21",
+    "market": "OVER 1.5 FT",
+    "odds": 1.8,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329357.7159152
+  },
+  "sig_1788265925_flemil": {
+    "bet_id": 119012334,
+    "match": "Fleetwood Town U21 vs Millwall FC U21",
+    "market": "OVER 1.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329358.0314648
+  },
+  "sig_1788265932_hudque": {
+    "bet_id": 119012335,
+    "match": "Huddersfield Town U21 vs Queens Park Rangers U21",
+    "market": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329358.3845367
+  },
+  "sig_1788265941_hulswa": {
+    "bet_id": 119012336,
+    "match": "Hull City U21 vs Swansea City U21",
+    "market": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329358.7171447
+  },
+  "sig_1788265967_lanbei": {
+    "bet_id": 119012337,
+    "match": "Lanzhou Longyuan vs Beijing Guoan",
+    "market": "OVER 2.5 FT",
+    "odds": 1.67,
+    "stake": 2.0,
+    "status": "WON",
+    "uploaded_at": 1788329359.0353556
+  },
+  "sig_1788266507_dalsha": {
+    "bet_id": 119012338,
+    "match": "Dalian Young Boy vs Shanghai Shenhua",
+    "market": "OVER 1.5 FT",
+    "odds": 1.7,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329359.3664424
+  },
+  "sig_1788266820_shasha": {
+    "bet_id": 119012339,
+    "match": "Shandong Taishan vs Shanghai Port",
+    "market": "OVER 3.5 FT",
+    "odds": 1.57,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329359.7563157
+  },
+  "sig_1788267797_korrad": {
+    "bet_id": 119012340,
+    "match": "Korona II Kielce vs Radomiak Radom",
+    "market": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329360.0781312
+  },
+  "sig_1788268263_kyzfc ": {
+    "bet_id": 119012341,
+    "match": "Kyzylzhar Petropavlovsk [K] vs FC Astana [K]",
+    "market": "OVER 4.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329360.3801525
+  },
+  "sig_1788268754_aa can": {
+    "bet_id": 119012342,
+    "match": "AA Campineira GO U20 vs Canedo FC GO U20",
+    "market": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329360.6960642
+  },
+  "sig_1788268934_procon": {
+    "bet_id": 119012343,
+    "match": "Progresul Spartac vs Concordia Chiajna",
+    "market": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329361.0290842
+  },
+  "sig_1788269637_chawig": {
+    "bet_id": 119012344,
+    "match": "Charlton Athletic U21 vs Wigan Athletic U21",
+    "market": "OVER 4.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329361.334686
+  },
+  "sig_1788270153_gadupd": {
+    "bet_id": 119012345,
+    "match": "Gadafi FC vs UPDF Bombo",
+    "market": "OVER 3.5 FT",
+    "odds": 2.2,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329361.6465638
+  },
+  "sig_1788271078_podpog": {
+    "bet_id": 119012346,
+    "match": "Podhale Nowy Targ vs Pogoń Grodzisk Mazowiecki",
+    "market": "OVER 3.5 FT",
+    "odds": 2.22,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329361.9428751
+  },
+  "sig_1788271303_banant": {
+    "bet_id": 119012347,
+    "match": "Bandirmaspor vs Antalyaspor",
+    "market": "OVER 2.5 FT",
+    "odds": 2.1,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329362.2484894
+  },
+  "sig_1788271666_neclug": {
+    "bet_id": 119012349,
+    "match": "NEC Bugolobi vs Lugazi Municipal FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329362.5561454
+  },
+  "sig_1788272459_siazag": {
+    "bet_id": 119012351,
+    "match": "Siarka Tarnobrzeg vs Zagłębie Lubin",
+    "market": "OVER 3.5 FT",
+    "odds": 1.88,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329362.8577826
+  },
+  "sig_1788272858_umrmug": {
+    "bet_id": 119012352,
+    "match": "Umraniyespor vs Muglaspor",
+    "market": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329363.1729488
+  },
+  "sig_1788273067_chepia": {
+    "bet_id": 119012353,
+    "match": "Chemik Bydgoszcz vs Piast Gliwice",
+    "market": "OVER 3.5 FT",
+    "odds": 1.82,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329363.495714
+  },
+  "sig_1788273519_bosriv": {
+    "bet_id": 119012354,
+    "match": "Boston River II vs River Plate Montevideo II",
+    "market": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329363.840164
+  },
+  "sig_1788273537_bosriv": {
+    "bet_id": 119012355,
+    "match": "Boston River II vs River Plate Montevideo II",
+    "market": "OVER 3.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329364.1737478
+  },
+  "sig_1788273861_al-al-": {
+    "bet_id": 119012356,
+    "match": "Al-Sadd SC vs Al-Gharafa SC",
+    "market": "OVER 4.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329364.4801388
+  },
+  "sig_1788274127_ca ca ": {
+    "bet_id": 119012357,
+    "match": "CA San Miguel II vs CA Nueva Chicago II",
+    "market": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329364.8628774
+  },
+  "sig_1788274199_klupog": {
+    "bet_id": 119012358,
+    "match": "Kluczevia Stargard vs Pogoń Siedlce",
+    "market": "OVER 2.5 FT",
+    "odds": 2.22,
+    "stake": 6.0,
+    "status": "PENDING",
+    "uploaded_at": 1788329365.2107997
+  },
+  "sig_1788275089_samnd ": {
+    "bet_id": 119012359,
+    "match": "Sampion Celje vs ND Dravinja",
+    "market": "OVER 2.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329366.1006272
+  },
+  "sig_1788275383_hapbei": {
+    "bet_id": 119012360,
+    "match": "Hapoel Hod Hasharon vs Beitar Petah Tikva",
+    "market": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329366.6764493
+  },
+  "sig_1788275844_talzed": {
+    "bet_id": 119012361,
+    "match": "Tala'ea El Gaish vs ZED FC",
+    "market": "OVER 0.5 FT",
+    "odds": 1.5,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329367.2292078
+  },
+  "sig_1788276421_wispus": {
+    "bet_id": 119012362,
+    "match": "Wisła II Płock vs Puszcza Niepołomice",
+    "market": "OVER 1.5 FT",
+    "odds": 1.74,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329367.5496485
+  },
+  "sig_1788276543_fk dai": {
+    "bet_id": 119012363,
+    "match": "FK Minija vs Dainava Alytus",
+    "market": "OVER 2.5 FT",
+    "odds": 1.45,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329367.8559155
+  },
+  "sig_1788276769_sk int": {
+    "bet_id": 119012364,
+    "match": "SK Tomasov vs Inter Bratysława",
+    "market": "OVER 1.5 FT",
+    "odds": 1.54,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329368.1608186
+  },
+  "sig_1788276904_ca sac": {
+    "bet_id": 119012365,
+    "match": "CA Victoriano Arenas II vs Sacachispas FC II",
+    "market": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329368.4773436
+  },
+  "sig_1788277002_volps ": {
+    "bet_id": 119012366,
+    "match": "Volos NPS vs PS Kalamata",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329368.8158207
+  },
+  "sig_1788277248_prigd ": {
+    "bet_id": 119012367,
+    "match": "Primeiro de Agosto vs GD Interclube",
+    "market": "OVER 1.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329369.2852108
+  },
+  "sig_1788277832_odrwis": {
+    "bet_id": 119012368,
+    "match": "Odra Opole vs Wisła Kraków",
+    "market": "OVER 2.5 FT",
+    "odds": 1.41,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329369.6561656
+  },
+  "sig_1788278137_ca csd": {
+    "bet_id": 119012369,
+    "match": "CA Excursionistas II vs CSD Liniers II",
+    "market": "OVER 3.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329370.2124648
+  },
+  "sig_1788278658_harfc ": {
+    "bet_id": 119012370,
+    "match": "Harju Laagri U19 vs FC Tallin U19",
+    "market": "OVER 2.5 FT",
+    "odds": 1.8,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329370.5232584
+  },
+  "sig_1788278886_sepcfr": {
+    "bet_id": 119012371,
+    "match": "Sepsi OSK vs CFR Cluj",
+    "market": "OVER 2.5 FT",
+    "odds": 1.37,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329370.8644109
+  },
+  "sig_1788278919_beihap": {
+    "bet_id": 119012372,
+    "match": "Beitar Haifa Yaacov vs Hapoel Daliyat al-Karmel",
+    "market": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329371.164961
+  },
+  "sig_1788279156_kpvspo": {
+    "bet_id": 119012373,
+    "match": "KPV Kokkola Akatemia vs Sporting Kristina",
+    "market": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329371.4500341
+  },
+  "sig_1788279836_sinnam": {
+    "bet_id": 119012374,
+    "match": "Singida Black Stars vs Namungo FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329371.7498186
+  },
+  "sig_1788279939_ud cs ": {
+    "bet_id": 119012375,
+    "match": "UD Leiria U23 vs CS Maritimo U23",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329372.299559
+  },
+  "sig_1788279972_fc ylo": {
+    "bet_id": 119012377,
+    "match": "FC Haka Juniorit vs Ylojarvi United",
+    "market": "OVER 4.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329372.5944252
+  },
+  "sig_1788280039_fc est": {
+    "bet_id": 119012378,
+    "match": "FC Felgueiras U23 vs Estoril Praia U23",
+    "market": "OVER 1.5 FT",
+    "odds": 1.93,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329373.1370926
+  },
+  "sig_1788280366_gilrio": {
+    "bet_id": 119012379,
+    "match": "Gil Vicente U23 vs Rio Ave U23",
+    "market": "OVER 1.5 FT",
+    "odds": 2.12,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329373.4386735
+  },
+  "sig_1788280393_parcre": {
+    "bet_id": 119012380,
+    "match": "Parma vs Cremonese",
+    "market": "OVER 2.5 FT",
+    "odds": 1.67,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329373.7279909
+  },
+  "sig_1788280596_lskfk ": {
+    "bet_id": 119012381,
+    "match": "LSK Kvinner [K] vs FK Bodo/Glimt [K]",
+    "market": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329374.0256953
+  },
+  "sig_1788281134_al-al-": {
+    "bet_id": 119012382,
+    "match": "Al-Orobah FC vs Al-Zulfi FC",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329374.38545
+  },
+  "sig_1788281141_aussk ": {
+    "bet_id": 119012384,
+    "match": "Austria Wiedeń [K] vs SK Brann [K]",
+    "market": "OVER 2.5 FT",
+    "odds": 1.82,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329374.6652129
+  },
+  "sig_1788281167_estspo": {
+    "bet_id": 119012385,
+    "match": "Estrela Amadora U23 vs Sporting Lizbona U23",
+    "market": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329374.9615622
+  },
+  "sig_1788281265_kazal-": {
+    "bet_id": 119012386,
+    "match": "Kazma SC vs Al-Sahel SC",
+    "market": "OVER 1.5 FT",
+    "odds": 2.4,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329375.2550237
+  },
+  "sig_1788282019_norsf ": {
+    "bet_id": 119012387,
+    "match": "Nordstrand IF vs SF Grei",
+    "market": "OVER 1.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329375.5710185
+  },
+  "sig_1788283257_polsan": {
+    "bet_id": 119012388,
+    "match": "Polonia Środa Wielkopolska vs Sandecja Nowy Sącz",
+    "market": "OVER 4.5 FT",
+    "odds": 1.89,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329375.8861768
+  },
+  "sig_1788283289_bolank": {
+    "bet_id": 119012389,
+    "match": "Boluspor vs Ankara Keciorengucu",
+    "market": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329376.2276452
+  },
+  "sig_1788283458_tj sk ": {
+    "bet_id": 119012390,
+    "match": "Tj Viktoria Vestec vs SK Cesky Brod",
+    "market": "OVER 1.5 FT",
+    "odds": 1.52,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329376.8566406
+  },
+  "sig_1788283744_defca ": {
+    "bet_id": 119012391,
+    "match": "Defensores de Cambaceres II vs CA Claypole II",
+    "market": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329377.1611712
+  },
+  "sig_1788284291_telfk ": {
+    "bet_id": 119012392,
+    "match": "Teleoptik Zemun vs FK Vozdovac",
+    "market": "OVER 3.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329377.485812
+  },
+  "sig_1788284408_sv sc ": {
+    "bet_id": 119012393,
+    "match": "SV Lafnitz vs SC Kalsdorf",
+    "market": "OVER 3.5 FT",
+    "odds": 1.96,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329377.8076646
+  },
+  "sig_1788284579_fc kol": {
+    "bet_id": 119012394,
+    "match": "FC Nordsjaelland [K] vs Kolding IF [K]",
+    "market": "OVER 2.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329378.129468
+  },
+  "sig_1788284725_slocel": {
+    "bet_id": 119012396,
+    "match": "Sloga Doboj vs Celik Zenica",
+    "market": "OVER 0.5 FT",
+    "odds": 1.5,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329378.4480581
+  },
+  "sig_1788284907_al-al-": {
+    "bet_id": 119012397,
+    "match": "Al-Shamal SC vs Al-Rayyan SC",
+    "market": "OVER 3.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329378.750433
+  },
+  "sig_1788285133_leocen": {
+    "bet_id": 119012398,
+    "match": "Leones de Rosario II vs Central Ballester II",
+    "market": "OVER 4.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329379.313788
+  },
+  "sig_1788285411_stafc ": {
+    "bet_id": 119012399,
+    "match": "Stade Nyonnais vs FC Winterthur",
+    "market": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329379.656715
+  },
+  "sig_1788285661_mkslec": {
+    "bet_id": 119012400,
+    "match": "MKS Kluczbork\nGOL vs Lechia Gdańsk",
+    "market": "OVER 2.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329379.9779577
+  },
+  "sig_1788285767_hebfra": {
+    "bet_id": 119012401,
+    "match": "Hebar Pazardzhik vs Fratria Varna",
+    "market": "OVER 1.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329380.2844884
+  },
+  "sig_1788285815_helore": {
+    "bet_id": 119012402,
+    "match": "Helsingborgs IF vs Orebro SK",
+    "market": "OVER 1.5 FT",
+    "odds": 1.94,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329380.6008177
+  },
+  "sig_1788285966_neuyve": {
+    "bet_id": 119012403,
+    "match": "Neuchatel Xamax vs Yverdon-Sport FC",
+    "market": "OVER 2.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329380.9053824
+  },
+  "sig_1788286103_wigbru": {
+    "bet_id": 119012404,
+    "match": "Wigry Suwałki vs Bruk-Bet Termalica Nieciecza",
+    "market": "OVER 2.5 FT",
+    "odds": 1.38,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329381.255535
+  },
+  "sig_1788286530_wollas": {
+    "bet_id": 119012405,
+    "match": "Wolfsberger AC vs LASK Linz",
+    "market": "OVER 2.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329381.588995
+  },
+  "sig_1788286535_sv sc/": {
+    "bet_id": 119012406,
+    "match": "SV Horn vs SC/ESV Parndorf",
+    "market": "OVER 2.5 FT",
+    "odds": 2.4,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329382.1505866
+  },
+  "sig_1788286768_staeto": {
+    "bet_id": 119012407,
+    "match": "Stade Lausanne-Ouchy vs Etoile Carouge",
+    "market": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329382.4900353
+  },
+  "sig_1788286879_ca rac": {
+    "bet_id": 119012408,
+    "match": "CA Aldosivi II vs Racing Club Avellaneda II",
+    "market": "OVER 1.5 FT",
+    "odds": 1.8,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329382.7840915
+  },
+  "sig_1788286886_atlcol": {
+    "bet_id": 119012409,
+    "match": "Atletico Rafaela II vs Colon Santa Fe II",
+    "market": "OVER 1.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329383.0622003
+  },
+  "sig_1788286891_atlca ": {
+    "bet_id": 119012410,
+    "match": "Atletico Lanus II vs CA Belgrano II",
+    "market": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329383.396977
+  },
+  "sig_1788286927_achsv ": {
+    "bet_id": 119012411,
+    "match": "Achilles Veen vs SV Poortugaal",
+    "market": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329383.7184656
+  },
+  "sig_1788287013_apagre": {
+    "bet_id": 119012415,
+    "match": "APAFUT Caxias do Sul vs Gremio Esportivo Brasil",
+    "market": "OVER 1.5 FT",
+    "odds": 2.15,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329384.2613707
+  },
+  "sig_1788287048_colca ": {
+    "bet_id": 119012420,
+    "match": "Colon FC vs CA Fenix Montevideo",
+    "market": "OVER 1.5 FT",
+    "odds": 2.12,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329384.6550267
+  },
+  "sig_1788287156_afcvv ": {
+    "bet_id": 119012422,
+    "match": "AFC '34 vs VV Scherpenzeel",
+    "market": "OVER 1.5 FT",
+    "odds": 1.71,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329384.9684646
+  },
+  "sig_1788287290_al-al-": {
+    "bet_id": 119012423,
+    "match": "Al-Hilal Riyadh vs Al-Ahli Jeddah",
+    "market": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329385.277973
+  },
+  "sig_1788287344_wadel ": {
+    "bet_id": 119012424,
+    "match": "Wadi Degla FC vs El Qanah FC",
+    "market": "OVER 0.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329385.587576
+  },
+  "sig_1788287352_adoexc": {
+    "bet_id": 119012425,
+    "match": "ADO 20 Heemskerk vs Excelsior Maassluis",
+    "market": "OVER 2.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329386.1114578
+  },
+  "sig_1788287380_stapod": {
+    "bet_id": 119012426,
+    "match": "Stal Rzeszów vs Podbeskidzie Bielsko-Biała",
+    "market": "OVER 0.5 FT",
+    "odds": 1.66,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329386.4184217
+  },
+  "sig_1788287399_chifc ": {
+    "bet_id": 119012427,
+    "match": "Chindia Targoviste vs FC Voluntari",
+    "market": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329386.7363594
+  },
+  "sig_1788287704_albcer": {
+    "bet_id": 119012428,
+    "match": "Albion FC II vs Cerro Largo II",
+    "market": "OVER 1.5 FT",
+    "odds": 2.1,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329387.037969
+  },
+  "sig_1788287828_al-al-": {
+    "bet_id": 119012429,
+    "match": "Al-Tadhamon SC vs Al-Salmiya SC\nGOL",
+    "market": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329387.4030902
+  },
+  "sig_1788288027_kr vik": {
+    "bet_id": 119012430,
+    "match": "KR Reykjavik vs Vikingur Reykjavik",
+    "market": "OVER 2.5 FT",
+    "odds": 2.12,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329387.710162
+  },
+  "sig_1788288098_fc sc ": {
+    "bet_id": 119012431,
+    "match": "FC Rapperswil-Jona vs SC Kriens",
+    "market": "OVER 1.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329388.027029
+  },
+  "sig_1788288263_zsvbla": {
+    "bet_id": 119012433,
+    "match": "ZSV Sportlust '46 vs Blauw Geel '38",
+    "market": "OVER 3.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329388.3237019
+  },
+  "sig_1788288374_kruorl": {
+    "bet_id": 119012434,
+    "match": "Kruger United vs Orlando Pirates",
+    "market": "OVER 2.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329388.6267693
+  },
+  "sig_1788288791_motleg": {
+    "bet_id": 119012435,
+    "match": "Motor Lublin vs Legia Warszawa",
+    "market": "OVER 2.5 FT",
+    "odds": 1.38,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329388.92644
+  },
+  "sig_1788288916_kilst ": {
+    "bet_id": 119012436,
+    "match": "Kilbarrack United vs St Francis FC",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329389.462362
+  },
+  "sig_1788289163_colsig": {
+    "bet_id": 119012437,
+    "match": "Collex Bossy vs Signal FC Bernex-Confignon",
+    "market": "OVER 2.5 FT",
+    "odds": 1.71,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329389.754456
+  },
+  "sig_1788289473_al-al-": {
+    "bet_id": 119012438,
+    "match": "Al-Najma SC vs Al-Jabalain FC",
+    "market": "OVER 0.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329390.0761757
+  },
+  "sig_1788289538_sc fc ": {
+    "bet_id": 119012439,
+    "match": "SC Genemuiden vs FC Lisse",
+    "market": "OVER 1.5 FT",
+    "odds": 2.0,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329390.390353
+  },
+  "sig_1788289614_cr apa": {
+    "bet_id": 119012440,
+    "match": "CR Belavistense GO U20 vs Aparecida GO U20",
+    "market": "OVER 3.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329390.6853335
+  },
+  "sig_1788289698_shebol": {
+    "bet_id": 119012441,
+    "match": "Sheffield United vs Bolton Wanderers",
+    "market": "OVER 3.5 FT",
+    "odds": 1.38,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329390.987913
+  },
+  "sig_1788289705_swawat": {
+    "bet_id": 119012442,
+    "match": "Swansea City vs Watford FC",
+    "market": "OVER 2.5 FT",
+    "odds": 1.38,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329391.2959075
+  },
+  "sig_1788289716_wycshe": {
+    "bet_id": 119012443,
+    "match": "Wycombe Wanderers vs Sheffield Wednesday",
+    "market": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329391.6065223
+  },
+  "sig_1788289725_cheyor": {
+    "bet_id": 119012444,
+    "match": "Cheltenham Town vs York City",
+    "market": "OVER 3.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329391.9505925
+  },
+  "sig_1788289734_swipor": {
+    "bet_id": 119012445,
+    "match": "Swindon Town vs Port Vale",
+    "market": "OVER 3.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329392.3051434
+  },
+  "sig_1788289742_stolea": {
+    "bet_id": 119012446,
+    "match": "Stourbridge FC vs Leamington FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.69,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329392.65343
+  },
+  "sig_1788289784_gimriv": {
+    "bet_id": 119012447,
+    "match": "Gimnasia La Plata II vs River Plate II",
+    "market": "OVER 1.5 FT",
+    "odds": 2.2,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329392.9817603
+  },
+  "sig_1788289896_ssdss ": {
+    "bet_id": 119012448,
+    "match": "SSD Citta di Campobasso vs SS Scafatese",
+    "market": "OVER 1.5 FT",
+    "odds": 2.35,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329393.3278224
+  },
+  "sig_1788289988_prebri": {
+    "bet_id": 119012449,
+    "match": "Preston North End vs Bristol City",
+    "market": "OVER 2.5 FT",
+    "odds": 1.53,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329393.6351128
+  },
+  "sig_1788290139_fc bsc": {
+    "bet_id": 119012450,
+    "match": "FC Zurich vs BSC Young Boys",
+    "market": "OVER 4.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329393.9644086
+  },
+  "sig_1788290180_ca fer": {
+    "bet_id": 119012452,
+    "match": "CA Banfield [K] vs Ferro Carril Oeste [K]",
+    "market": "OVER 0.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329394.3169258
+  },
+  "sig_1788290192_itario": {
+    "bet_id": 119012453,
+    "match": "Itaucu EC GO U20 vs Rioverdense GO",
+    "market": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329394.9670107
+  },
+  "sig_1788290453_ascque": {
+    "bet_id": 119012454,
+    "match": "Ascot United Lfc vs Queens Park Rangers [K]",
+    "market": "OVER 1.5 FT",
+    "odds": 2.05,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329395.2754838
+  },
+  "sig_1788290478_waymon": {
+    "bet_id": 119012455,
+    "match": "Wayside Celtic FC vs Montpelier FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329395.581032
+  },
+  "sig_1788290485_crucar": {
+    "bet_id": 119012456,
+    "match": "Crusaders FC vs Carrick Rangers",
+    "market": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329395.8920062
+  },
+  "sig_1788290567_broley": {
+    "bet_id": 119012457,
+    "match": "Bromley FC vs Leyton Orient",
+    "market": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329396.1976748
+  },
+  "sig_1788290582_accgri": {
+    "bet_id": 119012458,
+    "match": "Accrington Stanley vs Grimsby Town",
+    "market": "OVER 3.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329396.50292
+  },
+  "sig_1788290596_chefc ": {
+    "bet_id": 119012459,
+    "match": "Chesterfield FC vs FC Gillingham",
+    "market": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329396.8099566
+  },
+  "sig_1788290604_fc shr": {
+    "bet_id": 119012460,
+    "match": "FC Rochdale vs Shrewsbury Town",
+    "market": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329397.116926
+  },
+  "sig_1788290618_trarot": {
+    "bet_id": 119012461,
+    "match": "Tranmere Rovers vs Rotherham United",
+    "market": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329397.4291043
+  },
+  "sig_1788290677_univel": {
+    "bet_id": 119012462,
+    "match": "Union Santa Fe II vs Velez Sarsfield II",
+    "market": "OVER 0.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329398.0915287
+  },
+  "sig_1788290699_hebbor": {
+    "bet_id": 119012465,
+    "match": "HEBC Hamburg vs Borussia Dortmund",
+    "market": "OVER 2.5 FT",
+    "odds": 1.86,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329398.6846793
+  },
+  "sig_1788290942_crefc ": {
+    "bet_id": 119012467,
+    "match": "Crewe Alexandra vs FC Walsall",
+    "market": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329398.9828768
+  },
+  "sig_1788291097_sscaz ": {
+    "bet_id": 119012468,
+    "match": "SSC Bari vs AZ Picerno",
+    "market": "OVER 1.5 FT",
+    "odds": 1.47,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329399.2857013
+  },
+  "sig_1788291103_fc lei": {
+    "bet_id": 119012469,
+    "match": "FC Penafiel U23 vs Leixoes SC U23",
+    "market": "OVER 1.5 FT",
+    "odds": 1.56,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329399.7034009
+  },
+  "sig_1788291160_strcel": {
+    "bet_id": 119012470,
+    "match": "Stranraer FC vs Celtic Glasgow B U21",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329400.2916443
+  },
+  "sig_1788291238_weswol": {
+    "bet_id": 119012471,
+    "match": "West Ham vs Wolverhampton",
+    "market": "OVER 4.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329400.6225255
+  },
+  "sig_1788291270_bricol": {
+    "bet_id": 119012472,
+    "match": "Bristol Rovers vs Colchester United",
+    "market": "OVER 2.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329400.9601367
+  },
+  "sig_1788291296_fleold": {
+    "bet_id": 119012473,
+    "match": "Fleetwood Town vs Oldham Athletic",
+    "market": "OVER 2.5 FT",
+    "odds": 2.2,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329401.3152976
+  },
+  "sig_1788291302_norcra": {
+    "bet_id": 119012474,
+    "match": "Northampton Town vs Crawley Town",
+    "market": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329401.738983
+  },
+  "sig_1788291434_unipet": {
+    "bet_id": 119012475,
+    "match": "Universitatea Cluj vs Petrolul Ploiesti",
+    "market": "OVER 1.5 FT",
+    "odds": 2.1,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329402.381621
+  },
+  "sig_1788291598_stonor": {
+    "bet_id": 119012476,
+    "match": "Stoke City vs Norwich City",
+    "market": "OVER 2.5 FT",
+    "odds": 1.84,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329403.0356958
+  },
+  "sig_1788291611_leiply": {
+    "bet_id": 119012477,
+    "match": "Leicester City vs Plymouth Argyle",
+    "market": "OVER 3.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329403.3643515
+  },
+  "sig_1788291829_abaind": {
+    "bet_id": 119012478,
+    "match": "Abadia GO U20 vs Independente Rio Verde GO U20",
+    "market": "OVER 0.5 FT",
+    "odds": 2.2,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329403.6781163
+  },
+  "sig_1788292318_birsou": {
+    "bet_id": 119012479,
+    "match": "Birmingham City vs Southampton",
+    "market": "OVER 2.5 FT",
+    "odds": 1.77,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329404.0012286
+  },
+  "sig_1788292340_donnot": {
+    "bet_id": 119012480,
+    "match": "Doncaster Rovers vs Notts County",
+    "market": "OVER 2.5 FT",
+    "odds": 1.93,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329404.2938979
+  },
+  "sig_1788292346_hudoxf": {
+    "bet_id": 119012481,
+    "match": "Huddersfield Town vs Oxford United",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329404.6214867
+  },
+  "sig_1788292359_petste": {
+    "bet_id": 119012482,
+    "match": "Peterborough United vs Stevenage FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329404.9321344
+  },
+  "sig_1788292402_exebar": {
+    "bet_id": 119012483,
+    "match": "Exeter City vs Barnet FC",
+    "market": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329405.270039
+  },
+  "sig_1788292431_salnew": {
+    "bet_id": 119012484,
+    "match": "Salford City vs Newport County",
+    "market": "OVER 1.5 FT",
+    "odds": 1.93,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329405.6171162
+  },
+  "sig_1788292450_halhar": {
+    "bet_id": 119012485,
+    "match": "Halifax Town vs Hartlepool United",
+    "market": "OVER 1.5 FT",
+    "odds": 2.03,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329405.9892557
+  },
+  "sig_1788292829_tolkil": {
+    "bet_id": 119012486,
+    "match": "Tolka Rovers vs Killester Donnycarney FC",
+    "market": "OVER 0.5 FT",
+    "odds": 2.4,
+    "stake": 4.0,
+    "status": "WON",
+    "uploaded_at": 1788329406.335427
+  },
+  "sig_1788293045_zribsk": {
+    "bet_id": 119012487,
+    "match": "Zrinjski Mostar vs BSK Banja Luka",
+    "market": "OVER 3.5 FT",
+    "odds": 2.2,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329406.683892
+  },
+  "sig_1788293085_tormon": {
+    "bet_id": 119012488,
+    "match": "Torino vs Monza",
+    "market": "OVER 2.5 FT",
+    "odds": 2.17,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329406.9813192
+  },
+  "sig_1788293101_potss ": {
+    "bet_id": 119012489,
+    "match": "Potenza Calcio vs SS Monopoli",
+    "market": "OVER 1.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329407.2793472
+  },
+  "sig_1788293220_bracam": {
+    "bet_id": 119012490,
+    "match": "Bradford City vs Cambridge United",
+    "market": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329407.5950258
+  },
+  "sig_1788293499_porder": {
+    "bet_id": 119012491,
+    "match": "Portsmouth FC vs Derby County",
+    "market": "OVER 2.5 FT",
+    "odds": 1.59,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329407.8936298
+  },
+  "sig_1788294246_rubspo": {
+    "bet_id": 119012492,
+    "match": "Rubio Nu Asuncion vs Sportivo San Lorenzo",
+    "market": "OVER 3.5 FT",
+    "odds": 1.5,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329408.2059724
+  },
+  "sig_1788294290_ravfor": {
+    "bet_id": 119012493,
+    "match": "Ravenna FC vs Forli FC",
+    "market": "OVER 1.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329408.522049
+  },
+  "sig_1788296661_orsdep": {
+    "bet_id": 119012494,
+    "match": "Orsomarso SC [K] vs Deportivo Cali [K]",
+    "market": "OVER 1.5 FT",
+    "odds": 2.2,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329409.0759697
+  },
+  "sig_1788296857_envuni": {
+    "bet_id": 119012495,
+    "match": "Envigado FC vs Union Magdalena",
+    "market": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 4.0,
+    "status": "LOST",
+    "uploaded_at": 1788329409.3833892
+  },
+  "sig_1788297701_monca ": {
+    "bet_id": 119012496,
+    "match": "Montevideo Wanderers vs CA Cerro",
+    "market": "OVER 1.5 FT",
+    "odds": 2.07,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329409.72683
+  },
+  "sig_1788298263_lobcd ": {
+    "bet_id": 119012497,
+    "match": "Lobos UPNFM II vs CD Estrella Roja II",
+    "market": "OVER 1.5 FT",
+    "odds": 2.2,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329410.0435336
+  },
+  "sig_1788298427_atlfbc": {
+    "bet_id": 119012498,
+    "match": "Atletico Grau vs FBC Melgar",
+    "market": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329410.3374183
+  },
+  "sig_1788298579_reaatl": {
+    "bet_id": 119012499,
+    "match": "Real CD Espana II vs Atletico Indepediente II",
+    "market": "OVER 3.5 FT",
+    "odds": 2.1,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329410.6337714
+  },
+  "sig_1788299429_cs spo": {
+    "bet_id": 119012500,
+    "match": "CS 2 de Mayo vs Sportivo Luqueno",
+    "market": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329410.913962
+  },
+  "sig_1788301172_delcd ": {
+    "bet_id": 119012501,
+    "match": "Delfin SC vs CD Tecnico Universitario",
+    "market": "OVER 1.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329411.2267823
+  },
+  "sig_1788301249_ce ce ": {
+    "bet_id": 119012502,
+    "match": "CE Aimore RS vs CE Gramadense RS",
+    "market": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329412.6821182
+  },
+  "sig_1788302969_barboc": {
+    "bet_id": 119012503,
+    "match": "Barranquilla FC vs Boca Juniors de Cali",
+    "market": "OVER 2.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329413.0469708
+  },
+  "sig_1788303333_fc for": {
+    "bet_id": 119012504,
+    "match": "FC Supra du Quebec vs Forge FC",
+    "market": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329413.3669927
+  },
+  "sig_1788304400_colbru": {
+    "bet_id": 119012505,
+    "match": "Colchagua CD vs Brujas de Salamanca",
+    "market": "OVER 0.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329413.9094148
+  },
+  "sig_1788304837_uniclu": {
+    "bet_id": 119012506,
+    "match": "Universitario de Vinto vs Club Aurora",
+    "market": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329414.2308145
+  },
+  "sig_1788305696_riotri": {
+    "bet_id": 119012507,
+    "match": "Rio Verde vs Trindade AC GO",
+    "market": "OVER 1.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329415.0433228
+  },
+  "sig_1788305883_ge pas": {
+    "bet_id": 119012508,
+    "match": "GE Bage RS vs Passo Fundo",
+    "market": "OVER 1.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329415.358599
+  },
+  "sig_1788306191_univer": {
+    "bet_id": 119012509,
+    "match": "Uniao Frederiquense de Futebol RS vs Veranopolis RS",
+    "market": "OVER 1.5 FT",
+    "odds": 1.35,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329415.8981307
+  },
+  "sig_1788306485_ec ce ": {
+    "bet_id": 119012510,
+    "match": "EC Guarani RS vs CE Lajeadense RS",
+    "market": "OVER 1.5 FT",
+    "odds": 1.75,
+    "stake": 6.0,
+    "status": "LOST",
+    "uploaded_at": 1788329416.2169838
+  },
+  "sig_1788306764_lonjuv": {
+    "bet_id": 119012511,
+    "match": "Londrina PR vs Juventude RS",
+    "market": "OVER 0.5 FT",
+    "odds": 1.85,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329416.7954621
+  },
+  "sig_1788307397_intnew": {
+    "bet_id": 119012513,
+    "match": "Inter Miami II vs New York City FC II",
+    "market": "OVER 3.5 FT",
+    "odds": 1.65,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329417.1497223
+  },
+  "sig_1788308598_mondan": {
+    "bet_id": 119012514,
+    "match": "Montevideo City Torque vs Danubio FC",
+    "market": "OVER 0.5 FT",
+    "odds": 1.5,
+    "stake": 2.0,
+    "status": "WON",
+    "uploaded_at": 1788329417.4448166
+  },
+  "sig_1788309286_atlcru": {
+    "bet_id": 119012516,
+    "match": "Atletico Mineiro vs Cruzeiro EC\nGOL",
+    "market": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329417.753051
+  },
+  "sig_1788310756_nauatl": {
+    "bet_id": 119012527,
+    "match": "Nauas EC U23 vs Atletico Acreano U23",
+    "market": "OVER 2.5 FT",
+    "odds": 1.4,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329418.0730724
+  },
+  "sig_1788312437_forcd ": {
+    "bet_id": 119012528,
+    "match": "Fortaleza FC vs CD Once Caldas",
+    "market": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329418.374579
+  },
+  "sig_1788312455_cd cd ": {
+    "bet_id": 119012529,
+    "match": "CD Marte Soyapango vs CD Once Municipal",
+    "market": "OVER 2.5 FT",
+    "odds": 1.8,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329418.6682043
+  },
+  "sig_1788317127_soscen": {
+    "bet_id": 119012530,
+    "match": "SOSA FC vs Central Coast Honiara",
+    "market": "OVER 2.5 FT",
+    "odds": 2.1,
+    "stake": 6.0,
+    "status": "WON",
+    "uploaded_at": 1788329419.2500136
+  }
+}
