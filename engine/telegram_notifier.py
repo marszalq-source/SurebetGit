@@ -543,12 +543,10 @@ class TelegramNotifier:
 
                     elif text_lower.startswith(("/ba", "/betanalytix")):
                         parts = text.split()
-                        if len(parts) >= 3 and parts[1].lower() == "login":
-                            em = parts[2].strip()
-                            pw = parts[3].strip() if len(parts) >= 4 else ""
-                            if not pw:
-                                self.send_message("⚠️ <b>Użycie:</b> <code>/ba login email haslo</code>", chat_id=cid)
-                                continue
+                        email_idx = next((i for i, p in enumerate(parts) if "@" in p and "." in p), None)
+                        if email_idx is not None and len(parts) > email_idx + 1:
+                            em = parts[email_idx].strip()
+                            pw = parts[email_idx + 1].strip()
                             self.send_message("⏳ <i>Logowanie do Bet-Analytix...</i>", chat_id=cid)
                             res = self.ba_sync.login(em, pw)
                             if res.get("success"):
@@ -562,7 +560,7 @@ class TelegramNotifier:
                                     f"✅ <b>Zalogowano do Bet-Analytix!</b>\n\n"
                                     f"👤 Konto: <code>{em}</code>\n"
                                     f"📁 Wykryte bankrolle:\n{b_txt or '• Brak bankrolli'}\n"
-                                    f"🎯 Aktywny bankroll: <b>{self.ba_sync.config.get('bankroll_name')}</b>\n\n"
+                                    f"🎯 Aktywny bankroll: <b>{self.ba_sync.config.get('bankroll_name')}</b> (ID: <code>{self.ba_sync.config.get('bankroll_id')}</code>)\n\n"
                                     f"🚀 <i>Wszystkie nowe alerty ze skanera będą automatycznie dodawane i rozliczane na Twoim koncie!</i>",
                                     chat_id=cid
                                 )

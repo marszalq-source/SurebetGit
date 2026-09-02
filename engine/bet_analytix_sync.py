@@ -31,13 +31,13 @@ class BetAnalytixSync:
     def load_config(self) -> Dict[str, Any]:
         default_cfg = {
             "enabled": True,
-            "email": "",
-            "password": "",
-            "bankroll_id": None,
-            "bankroll_name": "",
+            "email": "marszalqwot@gmail.com",
+            "password": "Lukasz504!",
+            "bankroll_id": 1921642,
+            "bankroll_name": "OverRadar Live",
             "stake_unit_value": 2.0,
             "use_units_as_stake": False,
-            "bookmaker_id": None,
+            "bookmaker_id": 362,
             "auto_settle": True
         }
         if os.path.exists(CONFIG_FILE):
@@ -97,12 +97,14 @@ class BetAnalytixSync:
     def _get_headers(self, with_auth: bool = True) -> Dict[str, str]:
         headers = {
             "Content-Type": "application/json",
+            "app": "appBax",
+            "sid": "152120",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Origin": "https://app.bet-analytix.com",
             "Referer": "https://app.bet-analytix.com/"
         }
         if with_auth:
-            token = self.session.get("token") or self.session.get("access_token")
+            token = self.session.get("accessToken") or self.session.get("token")
             if token:
                 headers["Authorization"] = f"Bearer {token}"
         return headers
@@ -120,7 +122,7 @@ class BetAnalytixSync:
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                if "token" in data or "access_token" in data:
+                if "accessToken" in data or "token" in data:
                     self.save_session(data)
                     self.config["email"] = em
                     self.config["password"] = pw
@@ -147,7 +149,7 @@ class BetAnalytixSync:
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
-                if "token" in data:
+                if "accessToken" in data:
                     self.session.update(data)
                     self.save_session(self.session)
                     return True
@@ -156,16 +158,16 @@ class BetAnalytixSync:
         return False
 
     def get_bankrolls(self) -> List[Dict[str, Any]]:
-        url = f"{API_BASE}/bankrolls"
+        url = f"{API_BASE}/bankrolls/paginated?page=1"
         req = urllib.request.Request(url, headers=self._get_headers(with_auth=True), method="GET")
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                bankrolls = data if isinstance(data, list) else data.get("bankrolls", [])
-                if bankrolls and not self.config.get("bankroll_id"):
-                    first_b = bankrolls[0]
-                    self.config["bankroll_id"] = first_b.get("id") or first_b.get("id_bankroll")
-                    self.config["bankroll_name"] = first_b.get("name", "Główny Bankroll")
+                res = json.loads(resp.read().decode('utf-8'))
+                bankrolls = res.get("data", []) if isinstance(res, dict) else res
+                if bankrolls:
+                    target_b = next((b for b in bankrolls if "overradar" in str(b.get("name", "")).lower()), bankrolls[0])
+                    self.config["bankroll_id"] = target_b.get("id")
+                    self.config["bankroll_name"] = target_b.get("name", "OverRadar Live")
                     self.save_config()
                 return bankrolls
         except urllib.error.HTTPError as e:
@@ -177,13 +179,13 @@ class BetAnalytixSync:
         return []
 
     def get_status(self) -> Dict[str, Any]:
-        has_token = bool(self.session.get("token") or self.session.get("access_token"))
-        b_name = self.config.get("bankroll_name", "Nie wybrano")
-        b_id = self.config.get("bankroll_id")
+        has_token = bool(self.session.get("accessToken") or self.session.get("token"))
+        b_name = self.config.get("bankroll_name", "OverRadar Live")
+        b_id = self.config.get("bankroll_id", 1921642)
         return {
             "enabled": self.config.get("enabled", True),
             "authenticated": has_token,
-            "email": self.config.get("email", ""),
+            "email": self.config.get("email", "marszalqwot@gmail.com"),
             "bankroll_id": b_id,
             "bankroll_name": b_name,
             "total_synced_bets": len(self.bets_map)
@@ -197,18 +199,11 @@ class BetAnalytixSync:
         if not self.config.get("enabled", True):
             return None
 
-        if not self.session.get("token") and not self.session.get("access_token"):
+        if not self.session.get("accessToken") and not self.session.get("token"):
             if not self.login():
                 return None
 
-        bankroll_id = self.config.get("bankroll_id")
-        if not bankroll_id:
-            bankrolls = self.get_bankrolls()
-            if bankrolls:
-                bankroll_id = bankrolls[0].get("id") or bankrolls[0].get("id_bankroll")
-            else:
-                return None
-
+        bankroll_id = self.config.get("bankroll_id") or 1921642
         home = match.get("home_team", "").strip()
         away = match.get("away_team", "").strip()
         match_key = f"{home.lower()} vs {away.lower()}"
@@ -237,6 +232,8 @@ class BetAnalytixSync:
         else:
             stake_val = round(units * float(self.config.get("stake_unit_value", 2.0)), 2)
 
+        label_txt = f"{home} vs {away} - {badge}"
+
         bet_data = {
             "bankroll": bankroll_id,
             "date": date_str,
@@ -245,11 +242,12 @@ class BetAnalytixSync:
             "stake": stake_val,
             "selections": [
                 {
-                    "match": f"{home} vs {away}",
+                    "label": label_txt,
                     "odds": odds,
                     "sport": 1,
-                    "selection": badge,
-                    "competition": league
+                    "status": 0,
+                    "bookmaker": self.config.get("bookmaker_id", 362),
+                    "competition": None
                 }
             ]
         }
@@ -265,7 +263,8 @@ class BetAnalytixSync:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 res = json.loads(resp.read().decode('utf-8'))
-                bet_id = res.get("id") or (res.get("data", {}).get("id") if isinstance(res.get("data"), dict) else None)
+                bet_item = res[0] if isinstance(res, list) and len(res) > 0 else (res if isinstance(res, dict) else {})
+                bet_id = bet_item.get("id")
                 if bet_id:
                     with self.lock:
                         self.bets_map[match_key] = {
@@ -278,8 +277,8 @@ class BetAnalytixSync:
                             "created_at": time.time()
                         }
                         self.save_bets_map()
-                    print(f"[Bet-Analytix] ✅ Dodano zakład #{bet_id}: {home} vs {away} ({badge} @ {odds:.2f})")
-                    return res
+                    print(f"[Bet-Analytix] ✅ Dodano zakład #{bet_id} na OverRadar Live: {label_txt} (@ {odds:.2f})")
+                    return bet_item
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 if self.refresh_token() or self.login():
@@ -316,6 +315,7 @@ class BetAnalytixSync:
         else:
             return False
 
+        # Pobierz bieżący stan zakładu i zaktualizuj status
         url = f"{API_BASE}/bet/{bet_id}"
         payload = json.dumps({"status": status_code}).encode('utf-8')
         req = urllib.request.Request(
@@ -331,7 +331,7 @@ class BetAnalytixSync:
                     self.bets_map[match_key]["status"] = outcome
                     self.bets_map[match_key]["settled_at"] = time.time()
                     self.save_bets_map()
-                print(f"[Bet-Analytix] 🎯 Rozliczono zakład #{bet_id} jako: {outcome}")
+                print(f"[Bet-Analytix] 🎯 Rozliczono zakład #{bet_id} na OverRadar Live jako: {outcome}")
                 return True
         except urllib.error.HTTPError as e:
             if e.code == 401:
