@@ -203,7 +203,7 @@ class BetAnalytixSync:
             if not self.login():
                 return None
 
-        bankroll_id = self.config.get("bankroll_id") or 1921642
+        bankroll_seq_id = int(self.config.get("id_bankroll", 1))
         home = match.get("home_team", "").strip()
         away = match.get("away_team", "").strip()
         match_key = f"{home.lower()} vs {away.lower()}"
@@ -230,7 +230,7 @@ class BetAnalytixSync:
         if self.config.get("use_units_as_stake", False):
             stake_val = float(units)
         else:
-            stake_val = round(units * float(self.config.get("stake_unit_value", 2.0)), 2)
+            stake_val = round(units * float(self.config.get("stake_unit_value", 10.0)), 2)
 
         label_txt = f"{home} vs {away} - {badge}"
 
@@ -238,10 +238,10 @@ class BetAnalytixSync:
             "percentage": int(self.config.get("tax_rate_percent", 12)),
             "base": self.config.get("commission_base", "grossGain"),
             "applyOnLoss": False
-        } if self.config.get("deduct_tax", True) else None
+        } if self.config.get("deduct_tax", False) else None
 
         bet_data = {
-            "bankroll": bankroll_id,
+            "bankroll": bankroll_seq_id,
             "date": date_str,
             "time": time_str,
             "type": 1,
@@ -285,7 +285,7 @@ class BetAnalytixSync:
                             "created_at": time.time()
                         }
                         self.save_bets_map()
-                    print(f"[Bet-Analytix] ✅ Dodano zakład #{bet_id} na OverRadar Live: {label_txt} (@ {odds:.2f})")
+                    print(f"[Bet-Analytix] [OK] Dodano zaklad #{bet_id} na OverRadar Live: {label_txt} (@ {odds:.2f})")
                     return bet_item
         except urllib.error.HTTPError as e:
             if e.code == 401:
@@ -339,7 +339,7 @@ class BetAnalytixSync:
                     self.bets_map[match_key]["status"] = outcome
                     self.bets_map[match_key]["settled_at"] = time.time()
                     self.save_bets_map()
-                print(f"[Bet-Analytix] 🎯 Rozliczono zakład #{bet_id} na OverRadar Live jako: {outcome}")
+                print(f"[Bet-Analytix] [SETTLE] Rozliczono zaklad #{bet_id} na OverRadar Live jako: {outcome}")
                 return True
         except urllib.error.HTTPError as e:
             if e.code == 401:
