@@ -13,7 +13,7 @@ ACTIVE_HOURS_START = 16   # Od 16:00 po południu
 ACTIVE_HOURS_END = 6      # Do 06:00 rano
 
 # Minimalne progi Indeksu Groźności (Danger Index):
-MIN_DANGER_INDEX_1H = 60  # 1. połowa (Złote Okno 16'-30' ma 91.4% WR)
+MIN_DANGER_INDEX_1H = 65  # 1. połowa (Złote Okno 14'-32' ma 92.3% WR)
 MIN_DANGER_INDEX_2H = 85  # 2. połowa i przerwa (HT/2H) - wymagany ekstremalny napór min. 85%
 
 # Domyślne kryteria dla strategii bramkowych:

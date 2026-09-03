@@ -124,6 +124,20 @@ class GoalTriggersEngine:
                 'top_recommendation': f'Zbyt niski napór {"2H" if is_second_half else "1H"} (Danger: {danger_index}%, wymagane: min. {min_required_danger}%)'
             }
 
+        # BEZWZGLĘDNA BLOKADA STREFY CISZY W 1. POŁOWIE (33' - 45' min):
+        # Analiza 221 meczów wykazała, że po 32. minucie w 1H tempo drastycznie spada przed przerwą (54% WR, strata -16.66 J).
+        # Wszystkie zyski (+114 J i 92.3% WR) generowane są w Złotym Oknie 14' - 32' min.
+        if half == '1H' and minute > 32:
+            return {
+                'apm': apm,
+                'danger_index': danger_index,
+                'danger_rating': d_rat,
+                'signals': [],
+                'has_signals': False,
+                'primary_signal': None,
+                'top_recommendation': 'Strefa ciszy przed przerwą 1H (Złote Okno aktywne do 32. minuty)'
+            }
+
         # BEZWZGLĘDNA BLOKADA KOŃCÓWKI MECZU: Żadnych nowych sygnałów od 76. minuty (eliminacja loterii w końcówce)
         if minute >= 76 or half in ('FT', 'AET', 'PEN') or 'koniec' in str(match_data.get('stage_text', '')).lower():
             return {
@@ -164,7 +178,11 @@ class GoalTriggersEngine:
                 m_match = re.search(r'OVER\s+(\d+(?:\.\d+)?)', combined_txt)
                 if m_match:
                     l_val = float(m_match.group(1))
-                    # ŻELAZNA ZASADA: Maksymalna linia to OVER 4.5 FT (żadnych 5.5+, 6.5+ FT)
+                    # ŻELAZNA ZASADA: Eliminacja rynku OVER 3.5 FT (analiza 221 meczów: 58% WR, strata -0.15 J).
+                    # Dopuszczamy wyłącznie linie o potężnym Yieldzie: 0.5, 1.5, 2.5 oraz 4.5.
+                    if l_val == 3.5:
+                        continue
+                    # Maksymalna linia to OVER 4.5 FT (żadnych 5.5+, 6.5+ FT)
                     if total_goals < l_val <= 4.5:
                         available_over_ft.append((l_val, m))
             elif 'OVER' in combined_txt and ('HT' in combined_txt or '1. POŁ' in combined_txt or '1.POŁ' in combined_txt or '1H' in combined_txt):
