@@ -424,8 +424,8 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
 
 def run_http_server(port=5050, api_inst=None):
     CustomHTTPHandler.api_instance = api_inst
-    server = ThreadingHTTPServer(('127.0.0.1', port), CustomHTTPHandler)
-    print(f"  [Server] 🌐 Serwer Live Scanner uruchomiony na: http://127.0.0.1:{port}")
+    server = ThreadingHTTPServer(('0.0.0.0', port), CustomHTTPHandler)
+    print(f"  [Server] 🌐 Serwer Live Scanner uruchomiony na: http://0.0.0.0:{port}")
     server.serve_forever()
 
 
