@@ -1,17 +1,21 @@
-﻿FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
 
 WORKDIR /app
 
-# Zainstaluj zaleznosci Pythona
+# Instalacja zaleznosci Pythona
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Skopiuj pliki projektu
+# Instalacja przegladarki Chromium dla silnika STS Playwright
+RUN playwright install chromium
+
+# Skopiowanie kodu aplikacji
 COPY . .
 
-# Zmienna portu dla Render.com
+# Konfiguracja srodowiska dla serwera (Render / VPS)
+ENV PYTHONUNBUFFERED=1
 ENV PORT=10000
-EXPOSE 10000
+EXPOSE 8080 10000
 
-# Uruchomienie skanera w trybie headless server
-CMD ["python", "sts_live_scanner.py", "--server"]
+# Uruchomienie glownego demona 24/7
+CMD ["python", "bot_daemon.py"]
