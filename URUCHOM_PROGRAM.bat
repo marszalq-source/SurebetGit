@@ -1,5 +1,6 @@
-﻿@echo off
-title STS LIVE GOAL SCANNER
+@echo off
+cd /d "%~dp0"
+title OverRadar Live - STS Goal Scanner
 chcp 65001 >nul
 echo ========================================================
 echo   ⚽ URUCHAMIANIE STS LIVE GOAL SCANNER ⚽
