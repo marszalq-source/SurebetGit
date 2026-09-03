@@ -437,7 +437,7 @@ def main():
     print("=" * 65)
 
     api = LiveApi()
-    port = 5050
+    port = int(os.environ.get("PORT", 5050))
 
     # Start lokalnego serwera w tle
     server_thread = threading.Thread(target=run_http_server, args=(port, api), daemon=True)
