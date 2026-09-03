@@ -1254,20 +1254,39 @@ class TelegramNotifier:
         if self.config.get("live_update_mode", True) and existing_key and existing_key in self.active_match_cards:
             card = self.active_match_cards[existing_key]
             dev_msgs = card.get("device_messages", {})
-            # Aktualizacja danych w pamięci
+
+            # ŻELAZNA ZASADA: ZABLOKOWANIE REKOMENDACJI (BRAK SKAKANIA / FLAPPINGU)
+            # Raz podany typ (np. OVER 1.5 FT) jest nienaruszalny aż do rozliczenia meczu.
+            frozen_badge = card.get("badge", badge)
+            frozen_unit_tag = card.get("unit_tag", unit_tag)
+            init_odds = card.get("initial_odds", odds_val)
+
+            # Aktualizacja dynamicznych statystyk meczu w pamięci
             card["last_seen_minute"] = minute
             card["last_seen_score"] = score
             card["last_seen_time"] = now
             card["last_odds"] = odds_val
             card["danger"] = danger
             card["apm"] = apm
-            
+
+            # Konstrukcja wiadomości ze stałą rekomendacją i aktualnym czasem/wynikiem
+            update_msg = (
+                f"<b>ALERT</b> <i>({header_time})</i>\n\n"
+                f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
+                f"🏆 <b>Liga:</b> {league}\n"
+                f"⏱️ <b>Czas:</b> {time_display}\n\n"
+                f"🎯 <b>Rekomendacja:</b> <code>{frozen_badge}</code>\n"
+                f"💰 <b>Sugerowana Stawka:</b> <code>{frozen_unit_tag}</code>\n"
+                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                f"🔥 <b>{danger}%</b> (APM: {apm})"
+            )
+
             # Throttle: edytuj wiadomość na Telegramie tylko jeśli minęło >= 45s lub zmienił się wynik
             score_changed = (score != card.get("initial_score"))
             time_since_edit = now - card.get("last_edit_time", 0)
-            if card.get("last_text") != msg and (score_changed or time_since_edit >= 45):
-                self.edit_message_all(dev_msgs, msg)
-                card["last_text"] = msg
+            if card.get("last_text") != update_msg and (score_changed or time_since_edit >= 45):
+                self.edit_message_all(dev_msgs, update_msg)
+                card["last_text"] = update_msg
                 card["last_edit_time"] = now
                 self._save_cards()
             return True
