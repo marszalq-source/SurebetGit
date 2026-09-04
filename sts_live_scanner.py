@@ -410,12 +410,17 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
         elif parsed.path == '/api/debug':
             try:
                 from engine.sts_live_engine import STSLiveEngine
-                engine = STSLiveEngine()
-                matches = engine.get_live_matches()
+                from engine.flashscore_engine import FlashscoreEngine
+                sts = STSLiveEngine()
+                fs = FlashscoreEngine()
+                sts_m = sts.fetch_live_matches(include_esports=False)
+                fs_m = fs.get_live_soccer_matches()
                 self._send_json({
                     'status': 'ok',
-                    'matches_count': len(matches),
-                    'matches_sample': matches[:3] if matches else [],
+                    'sts_matches_count': len(sts_m),
+                    'fs_matches_count': len(fs_m),
+                    'sts_sample': [f"{m.get('home_team')} vs {m.get('away_team')}" for m in sts_m[:3]],
+                    'fs_sample': [f"{m.get('home_team')} vs {m.get('away_team')}" for m in fs_m[:3]],
                 })
             except Exception as e:
                 import traceback
