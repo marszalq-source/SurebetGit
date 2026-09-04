@@ -407,6 +407,21 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
             self._send_json({'history': result})
             return
 
+        elif parsed.path == '/api/debug':
+            try:
+                from engine.sts_live_engine import STSLiveEngine
+                engine = STSLiveEngine()
+                matches = engine.get_live_matches()
+                self._send_json({
+                    'status': 'ok',
+                    'matches_count': len(matches),
+                    'matches_sample': matches[:3] if matches else [],
+                })
+            except Exception as e:
+                import traceback
+                self._send_json({'status': 'error', 'error': str(e), 'trace': traceback.format_exc()})
+            return
+
 
         super().do_GET()
 
