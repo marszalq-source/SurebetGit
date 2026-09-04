@@ -6,15 +6,23 @@ Konfiguracja programu STS Live Goal Scanner (STS + Flashscore)
 SCAN_INTERVAL_SECONDS = 15       # Częstotliwość odświeżania na żywo
 AUTO_REFRESH_ENABLED = True      # Automatyczne odświeżanie
 
-# Złote Okno Godzinowe (16:00 - 06:00)
-# W godzinach 16:00 - 06:00 generowane są sygnały dla najlepszych lig europejskich i południowoamerykańskich
-ACTIVE_HOURS_ENABLED = True
-ACTIVE_HOURS_START = 16   # Od 16:00 po południu
-ACTIVE_HOURS_END = 6      # Do 06:00 rano
+# Tryb 24/7 (Skaner aktywny przez całą dobę bez przerw)
+ACTIVE_HOURS_ENABLED = False     # False = praca non-stop 24h/dobę
+ACTIVE_HOURS_START = 0
+ACTIVE_HOURS_END = 24
 
-# Minimalne progi Indeksu Groźności (Danger Index):
-MIN_DANGER_INDEX_1H = 65  # 1. połowa (Złote Okno 14'-32' ma 92.3% WR)
-MIN_DANGER_INDEX_2H = 85  # 2. połowa i przerwa (HT/2H) - wymagany ekstremalny napór min. 85%
+# Pancerne progi Indeksu Groźności (Danger Index):
+MIN_DANGER_INDEX_1H = 85  # 1. połowa (min. 85% - potężny napór)
+MIN_DANGER_INDEX_2H = 90  # 2. połowa i przerwa (HT/2H) - min. 90% (ekstremalny napór)
+
+# Wymóg strzałów celnych (Shots on Target):
+MIN_SOT_1H = 3            # 1. połowa: min. 3 celne strzały
+MIN_SOT_2H = 4            # 2. połowa: min. 4 celne strzały
+
+# Selekcja gwiazdek i rynków:
+MIN_STARS = 4             # Tylko pewniaki: 4⭐ i 5⭐ (odcięcie słabych 2⭐ i 3⭐)
+ALLOWED_OVER_LINES = [0.5, 1.5, 2.5]  # Tylko bezpieczne linie meczowe FT: 0.5, 1.5, 2.5 FT
+SIGNAL_RATE_LIMIT_MINUTES = 50        # Limit sygnałów: ok. 1 sygnał na godzinę (min. 50-60 min odstępu)
 
 # Domyślne kryteria dla strategii bramkowych:
 TRIGGERS_CONFIG = {

@@ -86,12 +86,14 @@ class GoalTriggersEngine:
 
         d_rat = "EKSTREMALNY" if danger_index >= 75 else ("WYSOKI" if danger_index >= 55 else ("ŚREDNI" if danger_index >= 35 else "NISKI"))
 
-        # 1. WERYFIKACJA ZŁOTEGO OKNA GODZINOWEGO (16:00 - 06:00)
-        # Analiza 175 rozliczonych meczów wykazała, że godziny 16:00 - 06:00 przynoszą najwyższy zysk (+77 J),
-        # podczas gdy godziny poranne i wczesnopopołudniowe generują niepotrzebne straty na niszowych ligach.
+        # 1. Sprawdzenie Złotego Okna (jeśli aktywne):
         try:
             import datetime
-            from sts_live_config import ACTIVE_HOURS_ENABLED, ACTIVE_HOURS_START, ACTIVE_HOURS_END, MIN_DANGER_INDEX_2H, MIN_DANGER_INDEX_1H
+            from sts_live_config import (
+                ACTIVE_HOURS_ENABLED, ACTIVE_HOURS_START, ACTIVE_HOURS_END,
+                MIN_DANGER_INDEX_2H, MIN_DANGER_INDEX_1H,
+                MIN_SOT_1H, MIN_SOT_2H, MIN_STARS, ALLOWED_OVER_LINES
+            )
             now_hour = datetime.datetime.now().hour
             if ACTIVE_HOURS_ENABLED:
                 is_active_hour = (now_hour >= ACTIVE_HOURS_START or now_hour < ACTIVE_HOURS_END)
@@ -103,14 +105,17 @@ class GoalTriggersEngine:
                         'signals': [],
                         'has_signals': False,
                         'primary_signal': None,
-                        'top_recommendation': f'Przerwa w typowaniu (Złote Okno aktywne: {ACTIVE_HOURS_START}:00 - {ACTIVE_HOURS_END:02d}:00)'
+                        'top_recommendation': f'Przerwa w typowaniu ({ACTIVE_HOURS_START}:00 - {ACTIVE_HOURS_END:02d}:00)'
                     }
         except Exception:
-            MIN_DANGER_INDEX_2H = 85
-            MIN_DANGER_INDEX_1H = 60
+            MIN_DANGER_INDEX_2H = 90
+            MIN_DANGER_INDEX_1H = 85
+            MIN_SOT_1H = 3
+            MIN_SOT_2H = 4
+            MIN_STARS = 4
+            ALLOWED_OVER_LINES = [0.5, 1.5, 2.5]
 
-        # 2. ZASTRZENIE FILTRÓW DLA 2. POŁOWY (46'+) ORAZ PRZERWY (HT)
-        # W 2. połowie wymagany Danger Index min. 85%, aby odciąć mecze szarpane, faule, zmiany i grę na czas.
+        # 2. PANCERNE PROGI INDEKSU GROŹNOŚCI (DANGER INDEX): 1H min. 85%, 2H min. 90%
         is_second_half = (half in ('HT', '2H') or minute >= 45)
         min_required_danger = MIN_DANGER_INDEX_2H if is_second_half else MIN_DANGER_INDEX_1H
         if danger_index < min_required_danger:
@@ -124,9 +129,21 @@ class GoalTriggersEngine:
                 'top_recommendation': f'Zbyt niski napór {"2H" if is_second_half else "1H"} (Danger: {danger_index}%, wymagane: min. {min_required_danger}%)'
             }
 
+        # 3. WYMÓG STRZAŁÓW CELNYCH (SHOTS ON TARGET): 1H min. 3, 2H min. 4
+        min_required_sot = MIN_SOT_2H if is_second_half else MIN_SOT_1H
+        if sot < min_required_sot:
+            return {
+                'apm': apm,
+                'danger_index': danger_index,
+                'danger_rating': d_rat,
+                'signals': [],
+                'has_signals': False,
+                'primary_signal': None,
+                'top_recommendation': f'Zbyt mało strzałów celnych (SoT: {sot}, wymagane: min. {min_required_sot})'
+            }
+
         # BEZWZGLĘDNA BLOKADA STREFY CISZY W 1. POŁOWIE (33' - 45' min):
-        # Analiza 221 meczów wykazała, że po 32. minucie w 1H tempo drastycznie spada przed przerwą (54% WR, strata -16.66 J).
-        # Wszystkie zyski (+114 J i 92.3% WR) generowane są w Złotym Oknie 14' - 32' min.
+        # Wszystkie zyski generowane są w Złotym Oknie 14' - 32' min.
         if half == '1H' and minute > 32:
             return {
                 'apm': apm,
@@ -178,12 +195,8 @@ class GoalTriggersEngine:
                 m_match = re.search(r'OVER\s+(\d+(?:\.\d+)?)', combined_txt)
                 if m_match:
                     l_val = float(m_match.group(1))
-                    # ŻELAZNA ZASADA: Eliminacja rynku OVER 3.5 FT (analiza 221 meczów: 58% WR, strata -0.15 J).
-                    # Dopuszczamy wyłącznie linie o potężnym Yieldzie: 0.5, 1.5, 2.5 oraz 4.5.
-                    if l_val == 3.5:
-                        continue
-                    # Maksymalna linia to OVER 4.5 FT (żadnych 5.5+, 6.5+ FT)
-                    if total_goals < l_val <= 4.5:
+                    # ŻELAZNA ZASADA: Dopuszczamy wyłącznie bezpieczne linie FT: 0.5, 1.5, 2.5 FT
+                    if l_val in (0.5, 1.5, 2.5) and total_goals < l_val:
                         available_over_ft.append((l_val, m))
             elif 'OVER' in combined_txt and ('HT' in combined_txt or '1. POŁ' in combined_txt or '1.POŁ' in combined_txt or '1H' in combined_txt):
                 m_match = re.search(r'OVER\s+(\d+(?:\.\d+)?)', combined_txt)
@@ -224,10 +237,51 @@ class GoalTriggersEngine:
         signals = []
 
         # =========================================================================
-        # --- A. STRATEGIA 1: OVER 0.5 HT -> CAŁKOWICIE WYŁĄCZONA (RYNEK STRATNY) ---
+        # --- A. STRATEGIA 1: OVER 0.5 / 1.5 FT W 1. POŁOWIE (ZŁOTE OKNO 14'-32' MIN, WYNIK 0:0) ---
         # =========================================================================
-        # Rynek Over 0.5 HT został usunięty na podstawie analizy statystycznej (40% WR, jedyny rynek na minusie).
-        # Mecz w 1. połowie z potencjałem kwalifikuje się od razu do bezpiecznego rynku OVER 1.5 FT.
+        if (half == '1H' and 14 <= minute <= 32 and total_goals == 0 and lowest_over_ft and
+                not is_anti_goal_league and not is_sterile_possession):
+            if sot >= 3 and danger_index >= 85:
+                # Wybierz optymalną bezpieczną linię meczową FT: 0.5 FT lub 1.5 FT
+                target_over = None
+                for l_val, m_obj in available_over_ft:
+                    if l_val in (0.5, 1.5) and 1.35 <= float(m_obj.get('odds', 0)) <= 2.35:
+                        target_over = (l_val, m_obj)
+                        break
+                if not target_over and available_over_ft:
+                    target_over = available_over_ft[0]
+
+                if target_over:
+                    t_line, t_obj = target_over
+                    odds_val = float(t_obj.get('odds', 0))
+                    confidence = 2
+                    reasons = [f"Potężny napór 1H (Danger: {danger_index}%)", f"{sot} strzałów celnych"]
+                    if apm >= 0.90:
+                        confidence += 1
+                        reasons.append(f"APM: {apm:.2f}")
+                    if sot >= 4:
+                        confidence += 1
+                    if shots_total >= 8:
+                        confidence += 1
+                        reasons.append(f"{shots_total} strzałów")
+                    if xg_total >= 0.90:
+                        confidence += 1
+                        reasons.append(f"xG: {xg_total:.2f}")
+
+                    rem_mins_ft = max(1, 90 - minute)
+                    ev = self._calculate_expected_value(xg_total, danger_index, apm, sot, minute, rem_mins_ft, odds_val)
+                    if confidence >= 3 and 1.35 <= odds_val <= 2.45:
+                        stars_count = min(5, max(4, confidence))
+                        signals.append({
+                            'type': 'OVER_1H_TO_FT',
+                            'title': f"🎯 ALARM: OVER {t_line} FT",
+                            'badge': f"OVER {t_line} FT",
+                            'color': '#00E676',
+                            'odds': odds_val,
+                            'stars': stars_count,
+                            'ev': round(ev, 3),
+                            'desc': f"Złote Okno 1H ({minute}'). Wynik 0:0 pod ciągłym ostrzałem bramki. " + ", ".join(reasons)
+                        })
 
         # =========================================================================
         # --- B. STRATEGIA 2: OVER 1.5 HT (ZŁOTE OKNO 14'-34' MIN, WYNIK 1:0/0:1) ---
@@ -468,6 +522,15 @@ class GoalTriggersEngine:
                         'ev': round(ev, 3),
                         'desc': f"Świetne okno na kolejną bramkę ({minute}'). " + ", ".join(reasons)
                     })
+
+        # =========================================================================
+        # ŻELAZNA FILTRACJA PEWNIAKÓW 4⭐ I 5⭐ ORAZ RYNKÓW 0.5 / 1.5 / 2.5 FT
+        # =========================================================================
+        # 1. Tylko sygnały 4⭐ i 5⭐ (odrzucenie 2⭐ i 3⭐)
+        signals = [s for s in signals if s.get('stars', 0) >= 4]
+        # 2. Tylko rynki meczowe FT: OVER 0.5 FT, OVER 1.5 FT, OVER 2.5 FT
+        allowed_badges = {'OVER 0.5 FT', 'OVER 1.5 FT', 'OVER 2.5 FT'}
+        signals = [s for s in signals if any(ab in s.get('badge', '') for ab in allowed_badges)]
 
         # =========================================================================
         # GWARANCJA CZYSTOŚCI INTERFEJSU: 1 MECZ = 1 NAJLEPSZY SYGNAŁ (TOP VALUE)

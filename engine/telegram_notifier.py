@@ -1185,6 +1185,17 @@ class TelegramNotifier:
             # Osiągnięto limit 3 otwartych pozycji - wstrzymujemy nowe sygnały do rozstrzygnięcia
             return False
 
+        # Weryfikacja limitu czasu pomiędzy nowymi sygnałami: około 1 na godzinę (min. 50 minut odstępu)
+        try:
+            from sts_live_config import SIGNAL_RATE_LIMIT_MINUTES
+            rate_limit_sec = SIGNAL_RATE_LIMIT_MINUTES * 60
+        except Exception:
+            rate_limit_sec = 3000
+        last_sig_ts = getattr(self, '_last_emitted_signal_time', 0)
+        if not existing_key and (time.time() - last_sig_ts < rate_limit_sec):
+            # Jeszcze nie minęło 50 minut od ostatniego wysłanego typu (max 1 sygnał na godzinę)
+            return False
+
         # Mapowanie jednostek i sugerowanych stawek:
         # 5 gwiazdek (Super-Lock / Top EV) -> 3J (6.00 zł)
         # 4 gwiazdki (Wysoka pewność) -> 2J (4.00 zł)
@@ -1369,6 +1380,7 @@ class TelegramNotifier:
             except Exception:
                 pass
             self._save_cards()
+            self._last_emitted_signal_time = now
             return True
         return False
 

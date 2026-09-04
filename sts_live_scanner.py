@@ -2,8 +2,18 @@ import os
 import sys
 import io
 
-# Zabezpieczenie kodowania Windows CMD/PowerShell
-if sys.stdout and hasattr(sys.stdout, 'buffer'):
+# Zabezpieczenie dla pythonw.exe (brak konsoli stdout/stderr) oraz kodowania UTF-8
+if sys.stdout is None or sys.stderr is None:
+    try:
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scanner_service.log")
+        log_fp = open(log_file, "a", encoding="utf-8", buffering=1)
+        if sys.stdout is None:
+            sys.stdout = log_fp
+        if sys.stderr is None:
+            sys.stderr = log_fp
+    except Exception:
+        pass
+elif hasattr(sys.stdout, 'buffer'):
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     except Exception:
