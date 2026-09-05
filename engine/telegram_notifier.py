@@ -1281,6 +1281,14 @@ class TelegramNotifier:
         finally:
             if lock: lock.release()
 
+    def _matches_card(self, card_home: str, card_away: str, target_home: str, target_away: str, key: str) -> bool:
+        """Weryfikuje czy dany mecz z feedu (STS/Flashscore) odpowiada aktywnej karcie."""
+        from engine.live_matcher import LiveMatcher
+        if LiveMatcher.is_same_fixture(card_home, card_away, target_home, target_away):
+            return True
+        found_k = self._find_existing_card_key(target_home, target_away)
+        return found_k == key
+
     def _is_match_already_settled(self, home: str, away: str) -> bool:
         """Sprawdza czy dany mecz został już dzisiaj definitywnie rozliczony (WIN / LOSS / VOID)."""
         from engine.live_matcher import LiveMatcher
@@ -1584,13 +1592,37 @@ class TelegramNotifier:
         except Exception:
             pass
 
-    def check_and_update_match_status(self, match: Dict[str, Any]) -> bool:
+    def _log_watchdog_alert(self, card: Dict[str, Any], age_sec: float, alert_type: str):
+        """Zapisuje alert watchdoga rozliczeń do settlement_telemetry.jsonl."""
+        try:
+            telemetry_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settlement_telemetry.jsonl")
+            record = {
+                "timestamp": time.time(),
+                "datetime": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "type": "WATCHDOG_ALERT",
+                "alert_type": alert_type,
+                "home": card.get("home_team", ""),
+                "away": card.get("away_team", ""),
+                "badge": card.get("badge", ""),
+                "age_sec": round(age_sec, 1),
+                "state": card.get("status", "PENDING"),
+                "last_seen_minute": card.get("last_seen_minute"),
+                "initial_minute": card.get("initial_minute"),
+                "initial_score": card.get("initial_score"),
+                "last_seen_score": card.get("last_seen_score")
+            }
+            with open(telemetry_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def check_and_update_match_status(self, match: Dict[str, Any], card_key: Optional[str] = None) -> bool:
         if not self.config.get("enabled", False):
             return False
 
         home = match.get('home_team', '')
         away = match.get('away_team', '')
-        existing_key = self._find_existing_card_key(home, away)
+        existing_key = card_key or self._find_existing_card_key(home, away)
         if not existing_key or existing_key not in self.active_match_cards:
             return False
 
@@ -1679,6 +1711,7 @@ class TelegramNotifier:
 
         if is_won:
             card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
             profit_units = round(units * (init_odds - 1.0), 2)
 
@@ -1728,10 +1761,16 @@ class TelegramNotifier:
             card["settlement_score"] = current_score
 
             t_edit_start = time.time()
-            self.edit_message_all(dev_msgs, win_msg)
+            edit_ok = self.edit_message_all(dev_msgs, win_msg)
             t_edit_end = time.time()
-            card["telegram_updated"] = True
-            card["telegram_updated_at"] = t_edit_end
+            if edit_ok:
+                card["status"] = "TELEGRAM_UPDATED"
+                card["telegram_updated"] = True
+                card["telegram_updated_at"] = t_edit_end
+            else:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                return False
             self._log_settlement_telemetry(card, "WON", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
@@ -1762,6 +1801,7 @@ class TelegramNotifier:
         st_lower = str(stage_text).lower()
         if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
             card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
             if is_golden:
                 void_msg = (
                     f"🟡 <b>GOLDEN (Over 1.5 HT)</b> <i>({stage_text})</i>\n\n"
@@ -1798,10 +1838,16 @@ class TelegramNotifier:
             card["settlement_score"] = current_score
 
             t_edit_start = time.time()
-            self.edit_message_all(dev_msgs, void_msg)
+            edit_ok = self.edit_message_all(dev_msgs, void_msg)
             t_edit_end = time.time()
-            card["telegram_updated"] = True
-            card["telegram_updated_at"] = t_edit_end
+            if edit_ok:
+                card["status"] = "TELEGRAM_UPDATED"
+                card["telegram_updated"] = True
+                card["telegram_updated_at"] = t_edit_end
+            else:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                return False
             self._log_settlement_telemetry(card, "VOID", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
@@ -1838,19 +1884,19 @@ class TelegramNotifier:
                     if curr_tot < target_goals:
                         is_period_finished = True
         elif target_period == 'FT':
-            if is_live or half in ('1H', 'HT', '2H') or (isinstance(minute, int) and 0 < minute < 88):
+            if is_live or half in ('1H', 'HT', '2H'):
                 is_ft_over = False
             else:
                 is_ft_over = (
-                    (half == 'FT' or 'koniec' in st_low or 'ended' in st_low or status_code in ('3', '8', '9'))
+                    (half == 'FT' or 'koniec' in st_low or 'ended' in st_low or status_code in ('3', '8', '9', '10', '11'))
                     and not is_live
-                    and (minute >= 88 or 'koniec' in st_low or status_code in ('3', '8', '9'))
                 )
             if is_ft_over and curr_tot < target_goals:
                 is_period_finished = True
 
         if is_period_finished:
             card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
             loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
 
@@ -1895,10 +1941,16 @@ class TelegramNotifier:
             card["settlement_score"] = current_score
 
             t_edit_start = time.time()
-            self.edit_message_all(dev_msgs, loss_msg)
+            edit_ok = self.edit_message_all(dev_msgs, loss_msg)
             t_edit_end = time.time()
-            card["telegram_updated"] = True
-            card["telegram_updated_at"] = t_edit_end
+            if edit_ok:
+                card["status"] = "TELEGRAM_UPDATED"
+                card["telegram_updated"] = True
+                card["telegram_updated_at"] = t_edit_end
+            else:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                return False
             self._log_settlement_telemetry(card, "LOST", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
@@ -1992,34 +2044,38 @@ class TelegramNotifier:
                     continue
 
                 # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore)
-                from engine.live_matcher import LiveMatcher
-                live_m = next((m for m in live_matches if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
+                live_m = next((m for m in live_matches if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)), None)
                 if live_m:
                     card['last_seen_time'] = now
-                    card['last_seen_minute'] = live_m.get('minute', card.get('last_seen_minute', 0))
+                    live_min = live_m.get('minute', 0)
+                    if isinstance(live_min, int) and live_min > 0:
+                        card['last_seen_minute'] = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), live_min)
                     card['last_seen_score'] = live_m.get('score_str', card.get('last_seen_score', '0:0'))
                     card['last_seen_half'] = live_m.get('half', card.get('last_seen_half', '1H'))
                     card['last_seen_stage'] = live_m.get('stage_text', f"{live_m.get('minute', 0)}'")
                     if live_m.get('sts_url'):
                         card['sts_url'] = live_m['sts_url']
 
-                    if self.check_and_update_match_status(live_m):
+                    if self.check_and_update_match_status(live_m, card_key=key):
                         settled_count += 1
                     continue
 
                 # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS)
-                fin_m = next((m for m in finished_list if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
+                fin_m = next((m for m in finished_list if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)), None)
                 if fin_m:
+                    if "ft_detected_at" not in card:
+                        card["ft_detected_at"] = now
+                        card["status"] = "FT_DETECTED"
                     fin_m_copy = dict(fin_m)
                     fin_m_copy['home_team'] = card_home
                     fin_m_copy['away_team'] = card_away
-                    if self.check_and_update_match_status(fin_m_copy):
+                    if self.check_and_update_match_status(fin_m_copy, card_key=key):
                         settled_count += 1
                     continue
 
                 # 3. Mecz zniknął z oferty STS Live (zakończył się)
                 card_age = now - card.get('created_at', now)
-                last_minute = card.get('last_seen_minute', 0)
+                last_minute = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0))
                 if not last_minute:
                     m_min = re.search(r'\((\d+)\'\)', card.get('last_text', ''))
                     if m_min:
@@ -2030,27 +2086,30 @@ class TelegramNotifier:
                 is_finished_event = False
                 time_since_seen = now - card.get('last_seen_time', card.get('created_at', now))
                 if target_period == '1H':
-                    # 1H kończy się tylko gdy minęła 45. minuta i mecz zniknął z 1H na min. 4 minuty
-                    if last_minute >= 45 and time_since_seen > 240:
+                    # 1H kończy się tylko gdy minęła 45. minuta i mecz zniknął z 1H na min. 3 minuty
+                    if last_minute >= 45 and time_since_seen > 180:
                         is_finished_event = True
                     elif card_age > 3600: # Ponad 60 minut od sygnału z 1. połowy
                         is_finished_event = True
                 elif target_period == 'FT':
-                    # Mecz kończy się gdy osiągnął min. 90. minutę i zniknął z STS Live na >180s, LUB gdy upłynął realistyczny czas trwania
-                    init_m = card.get('initial_minute', last_minute or 0)
-                    rem_mins = max(10, 95 - (init_m if isinstance(init_m, int) else 45))
-                    if isinstance(init_m, int) and init_m < 45:
+                    # Mecz kończy się gdy osiągnął min. 88. minutę i zniknął z oferty na >120s,
+                    # LUB gdy upłynął realistyczny czas trwania meczu
+                    rem_mins = max(5, 95 - last_minute)
+                    if last_minute < 45:
                         rem_mins += 15 # dolicz przerwę HT
-                    max_expected_seconds = max(1800, (rem_mins + 15) * 60)
+                    max_expected_seconds = max(900, (rem_mins + 10) * 60)
 
-                    if last_minute >= 90 and time_since_seen > 180:
+                    if last_minute >= 88 and time_since_seen > 120:
                         is_finished_event = True
-                    elif time_since_seen > 300 and card_age >= max_expected_seconds:
+                    elif time_since_seen > 180 and card_age >= max_expected_seconds:
                         is_finished_event = True
-                    elif card_age > 7200: # Zapasowy limit 120 minut
+                    elif card_age > 5400: # Zapasowy limit 90 minut od sygnału
                         is_finished_event = True
 
                 if is_finished_event:
+                    if "ft_detected_at" not in card:
+                        card["ft_detected_at"] = now
+                        card["status"] = "FT_DETECTED"
                     synthetic_finished = {
                         'home_team': card_home,
                         'away_team': card_away,
@@ -2063,8 +2122,36 @@ class TelegramNotifier:
                         'stage_text': 'Koniec meczu',
                         'is_live': False
                     }
-                    if self.check_and_update_match_status(synthetic_finished):
+                    if self.check_and_update_match_status(synthetic_finished, card_key=key):
                         settled_count += 1
+
+            # === SETTLEMENT WATCHDOG AUDIT ===
+            for key, card in list(self.active_match_cards.items()):
+                c_home = card.get('home_team', '')
+                c_away = card.get('away_team', '')
+                ft_det_at = card.get('ft_detected_at')
+                card_status = card.get('status', 'PENDING')
+
+                # Check 1: FT wykryte, ale nierozliczone w ciągu 10s (SETTLEMENT_DELAYED)
+                if ft_det_at and not card.get('settled') and card_status not in ('SETTLED', 'TELEGRAM_UPDATED'):
+                    delay = now - ft_det_at
+                    if delay > 10.0 and not card.get('_logged_delayed'):
+                        print(f"[SETTLEMENT_DELAYED] {c_home} vs {c_away} | stan: {card_status} | opóźnienie: {delay:.1f}s")
+                        card['_logged_delayed'] = True
+
+                    # Check 2: FT wykryte, ale nadal nierozliczone po 30s (🚨 WATCHDOG ALERT)
+                    if delay > 30.0 and not card.get('_logged_watchdog_ft'):
+                        print(f"🚨 SETTLEMENT WATCHDOG: match={c_home} vs {c_away}, status=FT, age={delay:.1f}s, state={card_status}")
+                        card['_logged_watchdog_ft'] = True
+                        self._log_watchdog_alert(card, delay, "UNSETTLED_FT_DELAY")
+
+                # Check 3: Mecz wisi w pamięci bez rozliczenia ponad 2 godziny (> 7200s)
+                c_created = card.get('created_at', now)
+                c_age = now - c_created
+                if c_age > 7200.0 and not card.get('_logged_watchdog_age'):
+                    print(f"🚨 SETTLEMENT WATCHDOG: match={c_home} vs {c_away} przekroczył 2h bez rozliczenia (age={c_age:.0f}s, state={card_status})")
+                    card['_logged_watchdog_age'] = True
+                    self._log_watchdog_alert(card, c_age, "MATCH_AGE_OVER_2H")
 
             return settled_count
         finally:

@@ -34,7 +34,9 @@ def calculate_percentile(data: List[float], p: float) -> float:
     return round(sorted_data[f] + d * (sorted_data[c] - sorted_data[f]), 2)
 
 def generate_performance_report() -> str:
-    records = load_telemetry()
+    raw_records = load_telemetry()
+    watchdog_alerts = [r for r in raw_records if r.get('type') == 'WATCHDOG_ALERT']
+    records = [r for r in raw_records if r.get('type') != 'WATCHDOG_ALERT']
     n_settled = len(records)
     
     if n_settled == 0:
@@ -102,6 +104,13 @@ def generate_performance_report() -> str:
     
     trans_lines = "\n".join([f"  • {k}: {v}" for k, v in sorted(transitions.items(), key=lambda x: -x[1])[:6]])
 
+    watchdog_section = f"   • Watchdog alerts:       {len(watchdog_alerts)}\n"
+    if watchdog_alerts:
+        alert_lines = "\n".join([f"  • {a.get('datetime')} [{a.get('alert_type')}]: {a.get('home')} vs {a.get('away')} (age={a.get('age_sec')}s, state={a.get('state')})" for a in watchdog_alerts[-5:]])
+        watchdog_detail = f"\nOstatnie alerty Watchdog:\n{alert_lines}\n"
+    else:
+        watchdog_detail = ""
+
     report = (
         f"Fast Settlement Performance (N={n_settled})\n"
         "─────────────────────────────────────────────\n"
@@ -125,9 +134,11 @@ def generate_performance_report() -> str:
         "5. Niezawodność i spójność:\n"
         f"   • Duplicates:            {duplicates}\n"
         f"   • Missed settlements:    {missed_settlements}\n"
+        f"{watchdog_section}"
         "\n"
         "Zaobserwowane przejścia statusu (Flashscore):\n"
         f"{trans_lines}\n"
+        f"{watchdog_detail}"
     )
     return report
 

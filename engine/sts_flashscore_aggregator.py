@@ -94,6 +94,12 @@ class STSFlashscoreAggregator:
                         except Exception as ex:
                             print(f"[FastSettlement] Błąd pobierania live Flashscore: {ex}")
 
+                        sts_live = []
+                        try:
+                            sts_live = self.sts_engine.fetch_live_matches(include_esports=False)
+                        except Exception:
+                            pass
+
                         fs_finished = []
                         try:
                             fs_finished = self.fs_engine.get_finished_results(days_back=1)
@@ -103,7 +109,7 @@ class STSFlashscoreAggregator:
                         t_fetch_end = time.time()
                         fetch_dur = round(t_fetch_end - t_fetch_start, 3)
 
-                        all_matches = fs_live_today + fs_finished
+                        all_matches = fs_live_today + sts_live + fs_finished
                         if all_matches:
                             for m in all_matches:
                                 m['_feed_fetched_at'] = t_fetch_end
