@@ -2264,8 +2264,9 @@
     "badge": "OVER 1.5 FT",
     "odds": 1.55,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788640135.3633175
+    "status": "LOST",
+    "created_at": 1788640135.3633175,
+    "settled_at": 1788645607.7764044
   },
   "cd eldense vs rcd mallorca": {
     "bet_id": 119277174,
@@ -2310,8 +2311,9 @@
     "badge": "OVER 1.5 FT",
     "odds": 1.7,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788644053.3767905
+    "status": "LOST",
+    "created_at": 1788644053.3767905,
+    "settled_at": 1788645699.5221612
   },
   "morrinhos fc go vs goianesia go": {
     "bet_id": 119281610,
@@ -2321,5 +2323,23 @@
     "stake": 20.0,
     "status": "PENDING",
     "created_at": 1788644391.7903907
+  },
+  "cd universitario penonome ii vs independiente la chorrera ii": {
+    "bet_id": 119282946,
+    "match": "CD Universitario Penonome II vs Independiente La Chorrera II",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788645688.6504574
+  },
+  "everton vina del mar vs universidad catolica santiago": {
+    "bet_id": 119283108,
+    "match": "Everton Vina del Mar vs Universidad Catolica Santiago",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788645931.7113698
   }
 }
