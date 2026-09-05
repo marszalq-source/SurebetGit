@@ -2294,5 +2294,23 @@
     "stake": 20.0,
     "status": "PENDING",
     "created_at": 1788642151.4465973
+  },
+  "ce bento goncalves rs vs ec pelotas rs": {
+    "bet_id": 119281253,
+    "match": "CE Bento Goncalves RS vs EC Pelotas RS",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788644043.8176785
+  },
+  "deportes linares vs colchagua cd": {
+    "bet_id": 119281267,
+    "match": "Deportes Linares vs Colchagua CD",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788644053.3767905
   }
 }

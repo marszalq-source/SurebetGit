@@ -83,7 +83,9 @@ class STSFlashscoreAggregator:
 
                     # Rozliczaj tylko jeśli są aktywne pozycje w RAM
                     if active_cards_count > 0 or has_pending_bets:
+                        t_cycle_start = time.time()
                         fs_live_today = []
+                        t_fetch_start = time.time()
                         try:
                             fs_live_today = self.fs_engine.get_live_soccer_matches(include_all_today=True)
                         except Exception as ex:
@@ -95,8 +97,16 @@ class STSFlashscoreAggregator:
                         except Exception as ex:
                             print(f"[FastSettlement] Błąd pobierania zakończonych Flashscore: {ex}")
 
+                        t_fetch_end = time.time()
+                        fetch_dur = round(t_fetch_end - t_fetch_start, 3)
+
                         all_matches = fs_live_today + fs_finished
                         if all_matches:
+                            for m in all_matches:
+                                m['_feed_fetched_at'] = t_fetch_end
+                                m['_cycle_start_at'] = t_cycle_start
+                                m['_fetch_duration_sec'] = fetch_dur
+
                             all_live = [m for m in all_matches if m.get('is_live')]
                             all_fin = [m for m in all_matches if not m.get('is_live')]
 

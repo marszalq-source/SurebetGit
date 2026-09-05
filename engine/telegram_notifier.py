@@ -1526,6 +1526,35 @@ class TelegramNotifier:
             return True
         return False
 
+    def _log_settlement_telemetry(self, card: Dict[str, Any], outcome: str, current_score: str, match: Dict[str, Any], detected_at: float, settled_at: float, t_edit_start: float, telegram_updated_at: float):
+        """Zapisuje precyzyjną telemetrię opóźnień (end-to-end latency) do pliku settlement_telemetry.jsonl."""
+        try:
+            telemetry_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settlement_telemetry.jsonl")
+            cycle_start = match.get('_cycle_start_at', detected_at)
+            feed_fetch_sec = match.get('_fetch_duration_sec', 0.0)
+
+            e2e_latency_sec = round(telegram_updated_at - cycle_start, 3)
+            detect_to_settle_ms = round((settled_at - detected_at) * 1000, 1)
+            telegram_edit_ms = round((telegram_updated_at - t_edit_start) * 1000, 1)
+
+            record = {
+                "timestamp": telegram_updated_at,
+                "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(telegram_updated_at)),
+                "home": card.get("home_team", ""),
+                "away": card.get("away_team", ""),
+                "badge": card.get("badge", ""),
+                "outcome": outcome,
+                "settlement_score": current_score,
+                "feed_fetch_sec": feed_fetch_sec,
+                "detect_to_settle_ms": detect_to_settle_ms,
+                "telegram_edit_ms": telegram_edit_ms,
+                "e2e_latency_sec": e2e_latency_sec,
+                "cycle_latency_sec": round(telegram_updated_at - detected_at, 3)
+            }
+            with open(telemetry_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def check_and_update_match_status(self, match: Dict[str, Any]) -> bool:
         if not self.config.get("enabled", False):
@@ -1569,6 +1598,7 @@ class TelegramNotifier:
         if '3' in unit_tag: units = 3
         elif '2' in unit_tag: units = 2
         now = time.time()
+        detected_at = match.get('_feed_fetched_at') or now
 
         if half == 'HT' or 'przerw' in str(stage_text).lower() or str(stage_text).strip() == '13':
             time_display = "Przerwa"
@@ -1669,9 +1699,12 @@ class TelegramNotifier:
             card["outcome"] = "WON"
             card["settlement_score"] = current_score
 
+            t_edit_start = time.time()
             self.edit_message_all(dev_msgs, win_msg)
+            t_edit_end = time.time()
             card["telegram_updated"] = True
-            card["telegram_updated_at"] = time.time()
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "WON", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
@@ -1736,9 +1769,12 @@ class TelegramNotifier:
             card["outcome"] = "VOID"
             card["settlement_score"] = current_score
 
+            t_edit_start = time.time()
             self.edit_message_all(dev_msgs, void_msg)
+            t_edit_end = time.time()
             card["telegram_updated"] = True
-            card["telegram_updated_at"] = time.time()
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "VOID", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
@@ -1830,9 +1866,12 @@ class TelegramNotifier:
             card["outcome"] = "LOST"
             card["settlement_score"] = current_score
 
+            t_edit_start = time.time()
             self.edit_message_all(dev_msgs, loss_msg)
+            t_edit_end = time.time()
             card["telegram_updated"] = True
-            card["telegram_updated_at"] = time.time()
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "LOST", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
 
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
