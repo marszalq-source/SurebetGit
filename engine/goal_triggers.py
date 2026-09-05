@@ -661,6 +661,62 @@ class GoalTriggersEngine:
         signals = filtered_signals
 
         # =========================================================================
+        # ŻELAZNA FILTRACJA MATEMATYCZNA: PEWNIAKI 4⭐ / 5⭐, LINIE 0.5-2.5 FT
+        # =========================================================================
+        filtered_signals = []
+        for s in signals:
+            odds_v = float(s.get('odds', 0.0))
+            badge_str = str(s.get('badge', '')).upper()
+
+            # 1. Bezwzględny warunek minimalnego kursu: min. 1.38 dla Over 1.5 FT (+1 gol), min. 1.50 dla wyższych
+            is_safe_plus_one = ('OVER 1.5 FT' in badge_str and total_goals == 1) or ('OVER 0.5 FT' in badge_str and total_goals == 0)
+            req_floor = 1.38 if is_safe_plus_one else MIN_ODDS
+            if odds_v < req_floor or odds_v > MAX_ODDS:
+                continue
+
+            # 2. Tylko linie meczowe FT: 0.5 FT, 1.5 FT, 2.5 FT
+            if not any(ab in badge_str for ab in ('OVER 0.5 FT', 'OVER 1.5 FT', 'OVER 2.5 FT')):
+                continue
+
+            # 3. Żelazny warunek Indeksu Groźności (min. 85% w 1H, min. 90% w HT/2H) oraz min. 3 strzały celne
+            req_danger = MIN_DANGER_INDEX_2H if is_second_half else MIN_DANGER_INDEX_1H
+            if danger_index < req_danger or sot < 3:
+                continue
+
+            # 4. Transparentny, matematyczny system oceny jakości i gwiazdek:
+            score_pts = 0
+            if sot >= 5: score_pts += 2
+            elif sot >= 3: score_pts += 1
+
+            if apm >= 1.05: score_pts += 2
+            elif apm >= 0.90: score_pts += 1
+
+            if xg_total >= 1.20: score_pts += 2
+            elif xg_total >= 0.85: score_pts += 1
+
+            ev_val = float(s.get('ev', 0.0))
+            if ev_val >= 0.08: score_pts += 2
+            elif ev_val >= 0.01: score_pts += 1
+
+            # Definicja progów:
+            # 5⭐ (Super-Lock, 3J): score >= 5, EV >= +0.05, Kurs >= 1.60
+            # 4⭐ (Wysoka pewność, 2J):
+            #   - Dla bezpiecznych linii +1 gol (Over 1.5 FT przy 1 bramce): score >= 3, EV >= +0.01, Kurs >= 1.38
+            #   - Dla linii standardowych: score >= 3, EV >= +0.02, Kurs >= 1.55
+            req_min_odds_4star = 1.38 if is_safe_plus_one else 1.55
+
+            if score_pts >= 5 and ev_val >= 0.05 and odds_v >= 1.60:
+                s['stars'] = 5
+                filtered_signals.append(s)
+            elif score_pts >= 3 and ev_val >= 0.01 and odds_v >= req_min_odds_4star:
+                s['stars'] = 4
+                filtered_signals.append(s)
+            else:
+                continue
+
+        signals = filtered_signals
+
+        # =========================================================================
         # GWARANCJA CZYSTOŚCI INTERFEJSU: 1 MECZ = 1 NAJLEPSZY SYGNAŁ (TOP VALUE)
         # =========================================================================
         if len(signals) > 1:
