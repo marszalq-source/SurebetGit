@@ -2215,8 +2215,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.76,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788634014.730031
+    "status": "LOST",
+    "created_at": 1788634014.730031,
+    "settled_at": 1788640085.7074118
   },
   "kvv thes sport vs royal knokke": {
     "bet_id": 119273030,
@@ -2243,7 +2244,45 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.48,
     "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788637631.0553315,
+    "settled_at": 1788640294.1851735
+  },
+  "pacatuba ec ce vs calouros do ar fc": {
+    "bet_id": 119277044,
+    "match": "Pacatuba EC CE vs Calouros do Ar FC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.47,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788640129.5685635,
+    "settled_at": 1788640259.0062482
+  },
+  "trindade ac go vs goiania go": {
+    "bet_id": 119277048,
+    "match": "Trindade AC GO vs Goiania GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
     "status": "PENDING",
-    "created_at": 1788637631.0553315
+    "created_at": 1788640135.3633175
+  },
+  "cd eldense vs rcd mallorca": {
+    "bet_id": 119277174,
+    "match": "CD Eldense vs RCD Mallorca",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.66,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788640281.3161483
+  },
+  "sporting lizbona vs nacional madeira": {
+    "bet_id": 119277259,
+    "match": "Sporting Lizbona vs Nacional Madeira",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788640389.9465034
   }
 }
