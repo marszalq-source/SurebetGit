@@ -1549,12 +1549,19 @@ class TelegramNotifier:
                 "badge": card.get("badge", ""),
                 "outcome": outcome,
                 "settlement_score": current_score,
+                "last_live_seen_at": time.strftime('%H:%M:%S', time.localtime(last_live_ts)) if last_live_ts else None,
+                "last_live_minute": card.get("last_seen_minute"),
+                "detected_at": detected_at,
+                "settled_at": settled_at,
+                "telegram_updated_at": telegram_updated_at,
+                "poll_interval_sec": match.get('_poll_interval_sec', 5.0),
+                "cycle_wait_sec": match.get('_cycle_wait_sec', 5.0),
                 "feed_fetch_sec": feed_fetch_sec,
                 "detect_to_settle_ms": detect_to_settle_ms,
                 "telegram_edit_ms": telegram_edit_ms,
                 "e2e_latency_sec": e2e_latency_sec,
-                "cycle_latency_sec": round(telegram_updated_at - detected_at, 3),
-                "lag_from_last_live_sec": lag_live_sec,
+                "detected_to_telegram_sec": round(telegram_updated_at - detected_at, 3),
+                "last_live_to_telegram_sec": lag_live_sec,
                 "kickoff_time": time.strftime('%H:%M:%S', time.localtime(kickoff_ts)) if kickoff_ts else None
             }
             with open(telemetry_file, "a", encoding="utf-8") as f:

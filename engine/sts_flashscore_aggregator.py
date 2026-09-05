@@ -70,6 +70,7 @@ class STSFlashscoreAggregator:
             """
             SETTLEMENT_INTERVAL = 5
             time.sleep(2)
+            t_last_cycle_end = time.time()
 
             while True:
                 try:
@@ -84,6 +85,8 @@ class STSFlashscoreAggregator:
                     # Rozliczaj tylko jeśli są aktywne pozycje w RAM
                     if active_cards_count > 0 or has_pending_bets:
                         t_cycle_start = time.time()
+                        cycle_wait_sec = round(t_cycle_start - t_last_cycle_end, 2) if t_last_cycle_end else float(SETTLEMENT_INTERVAL)
+
                         fs_live_today = []
                         t_fetch_start = time.time()
                         try:
@@ -106,6 +109,8 @@ class STSFlashscoreAggregator:
                                 m['_feed_fetched_at'] = t_fetch_end
                                 m['_cycle_start_at'] = t_cycle_start
                                 m['_fetch_duration_sec'] = fetch_dur
+                                m['_poll_interval_sec'] = SETTLEMENT_INTERVAL
+                                m['_cycle_wait_sec'] = cycle_wait_sec
 
                             all_live = [m for m in all_matches if m.get('is_live')]
                             all_fin = [m for m in all_matches if not m.get('is_live')]
@@ -125,6 +130,7 @@ class STSFlashscoreAggregator:
                     print(f"[FastSettlement Loop] Wyjątek: {loop_ex}")
 
                 time.sleep(SETTLEMENT_INTERVAL)
+                t_last_cycle_end = time.time()
 
         t_settle = threading.Thread(target=_settlement_worker, daemon=True, name="FastSettlementWorker")
         t_settle.start()
