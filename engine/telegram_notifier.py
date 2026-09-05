@@ -1141,6 +1141,10 @@ class TelegramNotifier:
                         p_arg = parts[1].strip()
                         if p_arg in ("1d", "dzis", "dzisiaj", "today", "1"):
                             period = "1d"
+                        elif p_arg in ("yesterday", "wczoraj", "wcz"):
+                            period = "yesterday"
+                        elif p_arg in ("24h", "24", "1day"):
+                            period = "24h"
                         elif p_arg in ("7d", "tydzien", "tydzień", "week", "7"):
                             period = "7d"
                         elif p_arg in ("30d", "miesiac", "miesiąc", "month", "30"):

@@ -2330,8 +2330,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.75,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788645688.6504574
+    "status": "WON",
+    "created_at": 1788645688.6504574,
+    "settled_at": 1788646597.2395592
   },
   "everton vina del mar vs universidad catolica santiago": {
     "bet_id": 119283108,
@@ -2339,7 +2340,17 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.45,
     "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788645931.7113698,
+    "settled_at": 1788646175.613804
+  },
+  "deportes quindio vs cd real santander": {
+    "bet_id": 119283534,
+    "match": "Deportes Quindio vs CD Real Santander",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
     "status": "PENDING",
-    "created_at": 1788645931.7113698
+    "created_at": 1788646458.9422102
   }
 }

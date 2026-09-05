@@ -208,13 +208,25 @@ class StatsEngine:
         
         # Filtrowanie czasowe
         cutoff_sec = None
+        end_sec = None
         period_label = "Wszystkie sygnały (Cały czas)"
         
         if period in ('1d', 'today', 'dzis', 'dzisiaj'):
-            # Od początku dzisiejszego dnia
+            # Od początku dzisiejszego dnia (od 00:00 dzisiaj)
             today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
             cutoff_sec = today_start
             period_label = f"Dzisiaj ({time.strftime('%d.%m.%Y')})"
+        elif period in ('yesterday', 'wczoraj', 'wcz'):
+            # Cały wczorajszy dzień (od 00:00 do 23:59 wczoraj)
+            today_dt = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            yesterday_dt = today_dt - datetime.timedelta(days=1)
+            cutoff_sec = yesterday_dt.timestamp()
+            end_sec = today_dt.timestamp()
+            period_label = f"Wczoraj ({yesterday_dt.strftime('%d.%m.%Y')})"
+        elif period in ('24h', '1day', '24'):
+            # Ostatnie 24 godziny płynnie
+            cutoff_sec = now - 86400
+            period_label = "Ostatnie 24 godziny"
         elif period in ('7d', 'week', 'tydzien'):
             cutoff_sec = now - (7 * 86400)
             period_label = "Ostatnie 7 dni"
@@ -231,8 +243,11 @@ class StatsEngine:
         filtered = []
         for item in history:
             ts = item.get('timestamp', 0)
-            if cutoff_sec is None or ts >= cutoff_sec:
-                filtered.append(item)
+            if cutoff_sec is not None and ts < cutoff_sec:
+                continue
+            if end_sec is not None and ts >= end_sec:
+                continue
+            filtered.append(item)
 
         total_count = len(filtered)
         won_count = sum(1 for i in filtered if i.get('status') == 'WON')
@@ -350,7 +365,11 @@ class StatsEngine:
     def get_inline_keyboard(self, current_period: str = '30d') -> dict:
         buttons = [
             [
-                {"text": ("▶ " if current_period in ('1d', 'today') else "") + "📊 Dzisiaj", "callback_data": "stats_1d"},
+                {"text": ("▶ " if current_period in ('1d', 'today', 'dzis', 'dzisiaj') else "") + "📊 Dzisiaj", "callback_data": "stats_1d"},
+                {"text": ("▶ " if current_period in ('yesterday', 'wczoraj', 'wcz') else "") + "📅 Wczoraj", "callback_data": "stats_yesterday"}
+            ],
+            [
+                {"text": ("▶ " if current_period in ('24h', '1day', '24') else "") + "⏱️ Ostatnie 24h", "callback_data": "stats_24h"},
                 {"text": ("▶ " if current_period in ('7d', 'week') else "") + "📅 7 Dni", "callback_data": "stats_7d"}
             ],
             [
