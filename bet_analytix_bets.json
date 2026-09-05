@@ -2352,5 +2352,14 @@
     "stake": 20.0,
     "status": "PENDING",
     "created_at": 1788646458.9422102
+  },
+  "cibao cf vs ca vega real": {
+    "bet_id": 119283734,
+    "match": "Cibao CF vs CA Vega Real",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788646729.7976766
   }
 }

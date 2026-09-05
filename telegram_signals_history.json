@@ -5498,5 +5498,27 @@
     "profit_units": 0.0,
     "profit_pln": 0.0,
     "resolved_at": ""
+  },
+  {
+    "id": "sig_1788646729_cibca ",
+    "created_at": "2026-09-06 00:18:49",
+    "timestamp": 1788646729.5572762,
+    "date": "2026-09-06",
+    "home_team": "Cibao CF",
+    "away_team": "CA Vega Real",
+    "match_title": "Cibao CF vs CA Vega Real",
+    "league": "Dominikana, Liga Dominicana",
+    "minute": 19,
+    "score_initial": "0:0",
+    "score_final": "0:0",
+    "market": "OVER 1.5 FT",
+    "odds": 1.5,
+    "unit_tag": "2J",
+    "units": 2,
+    "stake_pln": 4.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]

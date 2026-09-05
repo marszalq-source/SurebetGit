@@ -211,9 +211,9 @@ class BetAnalytixSync:
         if match_key in self.bets_map and self.bets_map[match_key].get("status") == "PENDING":
             return self.bets_map[match_key]
 
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        date_str = now_utc.strftime("%Y-%m-%d")
-        time_str = now_utc.strftime("%H:%M")
+        now_local = datetime.datetime.now()
+        date_str = now_local.strftime("%Y-%m-%d")
+        time_str = now_local.strftime("%H:%M")
 
         odds = float(signal.get("odds", 1.80))
         stars = int(signal.get("stars", 2))
@@ -336,7 +336,11 @@ class BetAnalytixSync:
         except Exception as e:
             print(f"[Bet-Analytix] Ostrzeżenie przy pobieraniu szczegółów zakładu #{bet_id}: {e}")
 
-        dt = datetime.datetime.fromtimestamp(bet_obj.get("date", time.time()), datetime.timezone.utc)
+        raw_date = bet_obj.get("date")
+        if isinstance(raw_date, (int, float)):
+            dt = datetime.datetime.fromtimestamp(raw_date)
+        else:
+            dt = datetime.datetime.now()
         date_str = dt.strftime("%Y-%m-%d")
         time_str = dt.strftime("%H:%M")
         stake_str = str(bet_obj.get("stake") or bet_info.get("stake", "30.00"))
