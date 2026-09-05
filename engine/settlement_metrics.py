@@ -91,38 +91,43 @@ def generate_performance_report() -> str:
     med_est = statistics.median(est_lats) if est_lats else med_latency
     p95_est = calculate_percentile(est_lats, 95) if est_lats else p95_latency
 
+    windows = [float(r['uncertainty_window_sec']) for r in records if r.get('uncertainty_window_sec') is not None and float(r['uncertainty_window_sec']) > 0]
+    med_window = statistics.median(windows) if windows else 0.0
+    p95_window = calculate_percentile(windows, 95) if windows else 0.0
+
     transitions = {}
     for r in records:
         t_type = r.get('transition_type', 'N/A')
         transitions[t_type] = transitions.get(t_type, 0) + 1
     
-    trans_lines = "\n".join([f"  • {k}: {v}" for k, v in sorted(transitions.items(), key=lambda x: -x[1])[:5]])
+    trans_lines = "\n".join([f"  • {k}: {v}" for k, v in sorted(transitions.items(), key=lambda x: -x[1])[:6]])
 
     report = (
-        "Fast Settlement Performance\n"
-        "────────────────────────────\n"
-        f"N settled:              {n_settled}\n"
-        f"\n"
-        f"Latency Bounds (Uncertainty Window):\n"
-        f"Min (detection → TG):    Median {med_min:.1f} s | P95 {p95_min:.1f} s\n"
-        f"Max (last live → TG):    Median {med_max:.1f} s | P95 {p95_max:.1f} s\n"
-        f"Est (midpoint):          Median {med_est:.1f} s | P95 {p95_est:.1f} s\n"
-        f"\n"
-        f"E2E Polling Cycle:\n"
-        f"Median:                  {med_latency:.1f} s\n"
-        f"P90:                     {p90_latency:.1f} s\n"
-        f"P95:                     {p95_latency:.1f} s\n"
-        f"Max:                     {max_latency:.1f} s\n"
-        f"\n"
-        f"Telegram update API:\n"
-        f"Median:                  {tg_med:.1f} s\n"
-        f"P95:                     {tg_p95:.1f} s\n"
-        f"\n"
-        f"Transitions observed:\n"
+        f"Fast Settlement Performance (N={n_settled})\n"
+        "─────────────────────────────────────────────\n"
+        "1. Reakcja systemu po detekcji (t_detected → t_telegram):\n"
+        f"   • Median latency_min:    {med_min:.2f} s\n"
+        f"   • P95 latency_min:       {p95_min:.2f} s\n"
+        "\n"
+        "2. Konserwatywne opóźnienie użytkownika (t_last_live → t_telegram):\n"
+        f"   • Median latency_max:    {med_max:.2f} s\n"
+        f"   • P95 latency_max:       {p95_max:.2f} s\n"
+        f"   • Est midpoint:          {med_est:.2f} s\n"
+        "\n"
+        "3. Fizyczne okno niepewności pollingu (Δt = t_detected - t_last_live):\n"
+        f"   • Median window:         {med_window:.2f} s\n"
+        f"   • P95 window:            {p95_window:.2f} s\n"
+        "\n"
+        "4. Stabilność API Telegrama:\n"
+        f"   • Median edit:           {tg_med:.2f} s\n"
+        f"   • P95 edit:              {tg_p95:.2f} s\n"
+        "\n"
+        "5. Niezawodność i spójność:\n"
+        f"   • Duplicates:            {duplicates}\n"
+        f"   • Missed settlements:    {missed_settlements}\n"
+        "\n"
+        "Zaobserwowane przejścia statusu (Flashscore):\n"
         f"{trans_lines}\n"
-        f"\n"
-        f"Duplicates:                {duplicates}\n"
-        f"Missed settlements:        {missed_settlements}\n"
     )
     return report
 
