@@ -1539,7 +1539,17 @@ class TelegramNotifier:
 
             kickoff_ts = match.get('kickoff_ts') or card.get('kickoff_ts')
             last_live_ts = card.get('last_seen_time')
-            lag_live_sec = round(telegram_updated_at - last_live_ts, 1) if (last_live_ts and last_live_ts > 0) else None
+
+            # Przedział niepewności detekcji (Uncertainty Bounds):
+            # FT nastąpiło w oknie: [last_live_ts, detected_at]
+            latency_min_sec = round(telegram_updated_at - detected_at, 3)
+            latency_max_sec = round(telegram_updated_at - last_live_ts, 3) if (last_live_ts and last_live_ts > 0) else latency_min_sec
+            latency_est_sec = round(telegram_updated_at - (last_live_ts + detected_at) / 2.0, 3) if (last_live_ts and last_live_ts > 0) else latency_min_sec
+            uncertainty_window_sec = round(detected_at - last_live_ts, 3) if (last_live_ts and last_live_ts > 0) else 0.0
+
+            prev_stage = card.get('last_seen_stage') or f"{card.get('last_seen_minute', '')}'"
+            curr_stage = match.get('stage_text') or match.get('half') or 'FT'
+            transition_type = f"{prev_stage} -> {curr_stage}"
 
             record = {
                 "timestamp": telegram_updated_at,
@@ -1561,7 +1571,12 @@ class TelegramNotifier:
                 "telegram_edit_ms": telegram_edit_ms,
                 "e2e_latency_sec": e2e_latency_sec,
                 "detected_to_telegram_sec": round(telegram_updated_at - detected_at, 3),
-                "last_live_to_telegram_sec": lag_live_sec,
+                "last_live_to_telegram_sec": latency_max_sec,
+                "latency_min_sec": latency_min_sec,
+                "latency_max_sec": latency_max_sec,
+                "latency_est_sec": latency_est_sec,
+                "uncertainty_window_sec": uncertainty_window_sec,
+                "transition_type": transition_type,
                 "kickoff_time": time.strftime('%H:%M:%S', time.localtime(kickoff_ts)) if kickoff_ts else None
             }
             with open(telemetry_file, "a", encoding="utf-8") as f:
@@ -1984,6 +1999,7 @@ class TelegramNotifier:
                     card['last_seen_minute'] = live_m.get('minute', card.get('last_seen_minute', 0))
                     card['last_seen_score'] = live_m.get('score_str', card.get('last_seen_score', '0:0'))
                     card['last_seen_half'] = live_m.get('half', card.get('last_seen_half', '1H'))
+                    card['last_seen_stage'] = live_m.get('stage_text', f"{live_m.get('minute', 0)}'")
                     if live_m.get('sts_url'):
                         card['sts_url'] = live_m['sts_url']
 

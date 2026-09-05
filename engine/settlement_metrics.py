@@ -80,30 +80,47 @@ def generate_performance_report() -> str:
         except Exception:
             pass
             
-    lags = [float(r['lag_from_last_live_sec']) for r in records if r.get('lag_from_last_live_sec') is not None]
-    lag_line = ""
-    if lags:
-        med_lag = statistics.median(lags)
-        p95_lag = calculate_percentile(lags, 95)
-        lag_line = (
-            f"\nLag from Last Live:\n"
-            f"Median:                  {med_lag:.1f} s\n"
-            f"P95:                     {p95_lag:.1f} s\n"
-        )
+    min_lats = [float(r['latency_min_sec']) for r in records if r.get('latency_min_sec') is not None]
+    max_lats = [float(r['latency_max_sec']) for r in records if r.get('latency_max_sec') is not None]
+    est_lats = [float(r['latency_est_sec']) for r in records if r.get('latency_est_sec') is not None]
+
+    med_min = statistics.median(min_lats) if min_lats else med_latency
+    p95_min = calculate_percentile(min_lats, 95) if min_lats else p95_latency
+    med_max = statistics.median(max_lats) if max_lats else med_latency
+    p95_max = calculate_percentile(max_lats, 95) if max_lats else p95_latency
+    med_est = statistics.median(est_lats) if est_lats else med_latency
+    p95_est = calculate_percentile(est_lats, 95) if est_lats else p95_latency
+
+    transitions = {}
+    for r in records:
+        t_type = r.get('transition_type', 'N/A')
+        transitions[t_type] = transitions.get(t_type, 0) + 1
+    
+    trans_lines = "\n".join([f"  • {k}: {v}" for k, v in sorted(transitions.items(), key=lambda x: -x[1])[:5]])
 
     report = (
         "Fast Settlement Performance\n"
         "────────────────────────────\n"
         f"N settled:              {n_settled}\n"
-        f"Median latency:          {med_latency:.1f} s\n"
-        f"P90 latency:             {p90_latency:.1f} s\n"
-        f"P95 latency:             {p95_latency:.1f} s\n"
-        f"Max latency:             {max_latency:.1f} s\n"
-        "\n"
-        "Telegram update:\n"
+        f"\n"
+        f"Latency Bounds (Uncertainty Window):\n"
+        f"Min (detection → TG):    Median {med_min:.1f} s | P95 {p95_min:.1f} s\n"
+        f"Max (last live → TG):    Median {med_max:.1f} s | P95 {p95_max:.1f} s\n"
+        f"Est (midpoint):          Median {med_est:.1f} s | P95 {p95_est:.1f} s\n"
+        f"\n"
+        f"E2E Polling Cycle:\n"
+        f"Median:                  {med_latency:.1f} s\n"
+        f"P90:                     {p90_latency:.1f} s\n"
+        f"P95:                     {p95_latency:.1f} s\n"
+        f"Max:                     {max_latency:.1f} s\n"
+        f"\n"
+        f"Telegram update API:\n"
         f"Median:                  {tg_med:.1f} s\n"
         f"P95:                     {tg_p95:.1f} s\n"
-        f"{lag_line}"
+        f"\n"
+        f"Transitions observed:\n"
+        f"{trans_lines}\n"
+        f"\n"
         f"Duplicates:                {duplicates}\n"
         f"Missed settlements:        {missed_settlements}\n"
     )
