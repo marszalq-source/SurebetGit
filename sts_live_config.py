@@ -11,18 +11,89 @@ ACTIVE_HOURS_ENABLED = False     # False = praca non-stop 24h/dobę
 ACTIVE_HOURS_START = 0
 ACTIVE_HOURS_END = 24
 
-# Pancerne progi Indeksu Groźności (Danger Index):
-MIN_DANGER_INDEX_1H = 85  # 1. połowa (min. 85% - potężny napór)
-MIN_DANGER_INDEX_2H = 90  # 2. połowa i przerwa (HT/2H) - min. 90% (ekstremalny napór)
+# Pancerne progi Indeksu Groźności (Danger Index - 10-minutowe okno kroczące):
+MIN_DANGER_INDEX_1H = 85  # 1. połowa (min. 85% w oknie 10-min)
+MIN_DANGER_INDEX_2H = 90  # 2. połowa i przerwa (HT/2H) (min. 90% w oknie 10-min)
 
 # Wymóg strzałów celnych (Shots on Target):
-MIN_SOT_1H = 3            # 1. połowa: min. 3 celne strzały
-MIN_SOT_2H = 4            # 2. połowa: min. 4 celne strzały
+MIN_SOT_1H = 3            # min. 3 celne strzały w meczu (lub min. 1 w ost. 10 min)
+MIN_SOT_2H = 3            # min. 3 celne strzały w meczu (lub min. 1 w ost. 10 min)
+
+# Żelazny warunek kursu (Value Bet floor):
+MIN_ODDS = 1.38           # Twardy próg kursowy (min. 1.38 dla Over 1.5 FT, sweet spot 1.45 - 2.35)
+MAX_ODDS = 2.45           # Maksymalny rozsądny kurs
 
 # Selekcja gwiazdek i rynków:
-MIN_STARS = 4             # Tylko pewniaki: 4⭐ i 5⭐ (odcięcie słabych 2⭐ i 3⭐)
-ALLOWED_OVER_LINES = [0.5, 1.5, 2.5]  # Tylko bezpieczne linie meczowe FT: 0.5, 1.5, 2.5 FT
-SIGNAL_RATE_LIMIT_MINUTES = 50        # Limit sygnałów: ok. 1 sygnał na godzinę (min. 50-60 min odstępu)
+MIN_STARS = 4             # Tylko pewniaki 4⭐ i 5⭐
+ALLOWED_OVER_LINES = [0.5, 1.5, 2.5]  # Dozwolone linie meczowe FT (0.5, 1.5, 2.5 FT)
+
+# Flaga białej listy lig (True = przepuszczane tylko renomowane, profesjonalne ligi)
+ENABLE_LEAGUE_WHITELIST = True
+
+# -------------------------------------------------------------------------
+# BIAŁA LISTA LIG (LEAGUE WHITELIST) - Filtr profesjonalnych lig
+# -------------------------------------------------------------------------
+LEAGUE_WHITELIST = [
+    # Polska
+    'ekstraklasa', '1. liga', '2. liga', 'puchar polski', 'superpuchar polski',
+
+    # Anglia
+    'premier league', 'championship', 'league one', 'league two', 'fa cup', 'efl cup', 'efl trophy', 'community shield',
+
+    # Hiszpania
+    'la liga', 'laliga', 'segunda division', 'laliga 2', 'copa del rey', 'supercopa de espana',
+
+    # Włochy
+    'serie a', 'serie b', 'serie c', 'coppa italia', 'supercoppa italiana',
+
+    # Niemcy
+    'bundesliga', '2. bundesliga', '3. liga', 'dfb pokal', 'supercup',
+
+    # Francja
+    'ligue 1', 'ligue 2', 'national', 'coupe de france', 'trophee des champions',
+
+    # Holandia & Belgia
+    'eredivisie', 'eerste divisie', 'knvb beker', 'jupiler pro league', 'challenger pro league', 'croky cup',
+
+    # Portugalia
+    'primeira liga', 'liga portugal', 'liga portugal 2', 'taca de portugal', 'taca da liga',
+
+    # Szkocja
+    'premiership', 'scottish premiership', 'scottish championship', 'scottish cup', 'league cup',
+
+    # Skandynawia
+    'superliga', '1. division', 'dbu pokalen', 'allsvenskan', 'superettan', 'svenska cupen',
+    'eliteserien', 'obos-ligaen', 'nm cupen', 'veikkausliiga',
+
+    # Kraje Alpejskie & Środkowa Europa
+    'bundesliga austria', '2. liga austria', 'ofb cup', 'super league', 'challenge league',
+    'chance liga', 'fortuna liga', 'fnl', 'mol cup', 'hnl', '1. hnl', 'superliga serbia',
+    'superliga rumunia', 'liga 1 rumunia', 'nb i', 'nb 1', 'premier league ukraine', 'premier league ukraina', 'persha liga',
+
+    # Turcja & Grecja
+    'super lig', '1. lig', 'turkiye kupasi', 'super league greece', 'kypello elladas',
+
+    # Puchary Europejskie & Światowe (UEFA / FIFA)
+    'champions league', 'liga mistrzów', 'europa league', 'liga europy',
+    'conference league', 'liga konferencji', 'uefa', 'nations league', 'liga narodów',
+    'world cup', 'mistrzostwa świata', 'euro', 'copa america', 'afc champions league',
+    'towarzyskie', 'friendly', 'club friendly',
+
+    # Ameryka Północna & Południowa (Wysoka płynność)
+    'mls', 'usl championship', 'liga mx', 'copa libertadores', 'copa sudamericana',
+    'brasileirao', 'serie a brazil', 'serie b brazil', 'copa do brasil',
+    'liga profesional argentina', 'copa de la liga profesional', 'copa argentina',
+    'primera a kolumbia', 'primera division chile', 'liga pro ekwador',
+
+    # Azja & Australia (Główne ligi)
+    'a-league', 'j1 league', 'j2 league', 'k league 1', 'k league 2',
+    'saudi pro league', 'qatar stars league', 'uae pro league'
+]
+
+# CZARNA LISTA KATEGORII (tylko rozgrywki wirtualne, esport i niestandardowe formaty)
+LEAGUE_BLACKLIST_KEYWORDS = [
+    'esport', 'cyber', 'virtual', 'futsal', 'simulated', 'short football', '7x7', '8x8', 'vr', 'penalty shoot'
+]
 
 # Domyślne kryteria dla strategii bramkowych:
 TRIGGERS_CONFIG = {

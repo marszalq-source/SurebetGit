@@ -205,9 +205,13 @@ class FlashscoreEngine:
                     if b.startswith('AA÷'):
                         fields = self._parse_feed_fields(b)
                         match_id = fields.get('AA', '')
-                        if not match_id or match_id in seen_ids:
+                        # OCHRONA: Ignoruj mecze trwające na żywo (AB==2) lub w przerwie HT (AC==13)
+                        status_ab = str(fields.get('AB', ''))
+                        status_ac = str(fields.get('AC', ''))
+                        if status_ab == '2' or status_ac in ('1', '2', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'):
                             continue
-                        seen_ids.add(match_id)
+                        if status_ab != '3' and status_ac not in ('3', '8', '9', '10', '11'):
+                            continue
 
                         home_team = fields.get('AE', '').strip()
                         away_team = fields.get('AF', '').strip()

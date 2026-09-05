@@ -3,7 +3,7 @@ ScriptDir = FSO.GetParentFolderName(WScript.ScriptFullName)
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = ScriptDir
 
-PythonExe = "C:\Users\Technolog\AppData\Local\Programs\Python\Python38\pythonw.exe"
+PythonExe = "C:\Users\Technolog\AppData\Local\Programs\Python\Python38\python.exe"
 ScriptPath = ScriptDir & "\tray_launcher.py"
 
 Cmd = Chr(34) & PythonExe & Chr(34) & " " & Chr(34) & ScriptPath & Chr(34)

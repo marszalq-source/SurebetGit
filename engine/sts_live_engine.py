@@ -463,7 +463,7 @@ class _STSLiveWorker:
     def _load_live_page(self, include_esports: bool = False):
         try:
             target_url = STS_LIVE_SOCCER_URL if not include_esports else 'https://www.sts.pl/live'
-            self._page.goto(target_url, timeout=15000, wait_until='domcontentloaded')
+            self._page.goto(target_url, timeout=25000, wait_until='domcontentloaded')
             self._page.wait_for_timeout(800)
             try:
                 btn = self._page.query_selector('button:has-text("Akceptuj wszystkie"), button:has-text("Zaakceptuj")')
@@ -513,7 +513,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_subpage_live_markets(self, match_url: str, timeout=15.0) -> List[Dict[str, Any]]:
+    def get_subpage_live_markets(self, match_url: str, timeout=3.5) -> List[Dict[str, Any]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_SUBPAGE_MARKETS', (match_url,), q))
         try:
@@ -524,7 +524,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_beesports_matches(self, timeout=8.0) -> List[Dict[str, Any]]:
+    def get_beesports_matches(self, timeout=3.5) -> List[Dict[str, Any]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_BEESPORTS_MATCHES', (), q))
         try:

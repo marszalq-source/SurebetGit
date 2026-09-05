@@ -1,15 +1,35 @@
 import os
 import sys
 
+# Ensure process runs in script directory
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 # Log all exceptions and prints to a log file
 log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tray_launcher.log")
-log_fp = open(log_file, "a", encoding="utf-8", buffering=1)
-sys.stdout = log_fp
-sys.stderr = log_fp
+log_fp = open(log_file, "a", encoding="utf-8")
+class FlushLogger:
+    def __init__(self, fp):
+        self.fp = fp
+    def write(self, msg):
+        self.fp.write(msg)
+        self.fp.flush()
+    def flush(self):
+        self.fp.flush()
+sys.stdout = FlushLogger(log_fp)
+sys.stderr = FlushLogger(log_fp)
 
 print(f"\n--- TRAY LAUNCHER START: {sys.executable} at {os.getcwd()} ---")
 
 try:
+    if sys.platform == 'win32':
+        import ctypes
+        _MUTEX_NAME = "Global\\OverRadarLiveScanner_SingleInstance_Mutex"
+        _kernel32 = ctypes.windll.kernel32
+        _mutex = _kernel32.CreateMutexW(None, False, _MUTEX_NAME)
+        if _kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            print("OverRadar Live instance is ALREADY RUNNING. Exiting duplicate process.")
+            sys.exit(0)
+
     import threading
     import webbrowser
     from PIL import Image, ImageDraw
@@ -47,12 +67,20 @@ try:
         global api_instance, server_thread
         if server_thread and server_thread.is_alive():
             return
-        print("Initializing LiveApi...")
-        api_instance = LiveApi()
-        print("Starting HTTP Server thread on port 5050...")
-        server_thread = threading.Thread(target=run_http_server, args=(5050, api_instance), daemon=True)
+        
+        def _server_worker():
+            global api_instance
+            try:
+                print("Initializing LiveApi in background worker...")
+                api_instance = LiveApi()
+                print("LiveApi initialized. Running HTTP server on port 5050...")
+                run_http_server(5050, api_instance)
+            except Exception as e:
+                print(f"Error in server worker: {e}")
+
+        server_thread = threading.Thread(target=_server_worker, daemon=True, name="TrayServerThread")
         server_thread.start()
-        print("HTTP Server thread started.")
+        print("TrayServerThread launched.")
 
     def on_open_panel(icon, item):
         print("Opening panel:", SERVER_URL)
@@ -80,7 +108,6 @@ try:
 
     def main():
         print("Entering main()...")
-        start_inprocess_server()
         
         menu = pystray.Menu(
             item('⚽ OverRadar Live (Działa w tle)', lambda icon, item: None, enabled=False),
@@ -100,8 +127,17 @@ try:
             menu
         )
         
-        print("Running pystray icon...")
-        icon.run()
+        def _setup_app(icon):
+            icon.visible = True
+            print("Pystray icon visible. Launching server worker...")
+            try:
+                icon.notify("OverRadar Live działa w tle i monitoruje mecze na żywo!", "OverRadar Live – STS Scanner")
+            except Exception:
+                pass
+            start_inprocess_server()
+
+        print("Running pystray icon with setup callback...")
+        icon.run(setup=_setup_app)
 
     if __name__ == "__main__":
         main()

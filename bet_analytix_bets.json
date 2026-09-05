@@ -288,13 +288,14 @@
     "created_at": 1788275089.4253929
   },
   "hapoel hod hasharon vs beitar petah tikva": {
-    "bet_id": 119073646,
+    "bet_id": 119149425,
     "match": "Hapoel Hod Hasharon vs Beitar Petah Tikva",
     "badge": "OVER 2.5 FT",
-    "odds": 1.9,
+    "odds": 1.81,
     "stake": 30.0,
     "status": "LOST",
-    "created_at": 1788275383.4670134
+    "created_at": 1788524037.2776496,
+    "settled_at": 1788527035.7710998
   },
   "tala'ea el gaish vs zed fc": {
     "bet_id": 119073647,
@@ -1978,5 +1979,214 @@
     "stake": 30.0,
     "status": "WON",
     "created_at": 1788403490.5311108
+  },
+  "ih hafnarfjordur vs kfr hella/hvolsvollur": {
+    "bet_id": 119117969,
+    "match": "IH Hafnarfjordur vs KFR Hella/Hvolsvollur",
+    "badge": "over 2.5 ft",
+    "odds": 1.37,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "kf hafnir vs vaengir jupiters": {
+    "bet_id": 119117200,
+    "match": "KF Hafnir vs Vaengir Jupiters",
+    "badge": "over 4.5 ft",
+    "odds": 1.55,
+    "stake": 30.0,
+    "status": "LOST",
+    "settled_at": 1788510092.9840877
+  },
+  "cagliari vs hellas verona": {
+    "bet_id": 119116994,
+    "match": "Cagliari vs Hellas Verona",
+    "badge": "over 1.5 ft",
+    "odds": 1.4,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "rsc anderlecht vs kv kortrijk": {
+    "bet_id": 119116065,
+    "match": "RSC Anderlecht vs KV Kortrijk",
+    "badge": "over 1.5 ft",
+    "odds": 1.45,
+    "stake": 30.0,
+    "status": "LOST",
+    "settled_at": 1788510092.9840877
+  },
+  "fc rouen vs valenciennes fc": {
+    "bet_id": 119115164,
+    "match": "FC Rouen vs Valenciennes FC",
+    "badge": "over 2.5 ft",
+    "odds": 2.22,
+    "stake": 30.0,
+    "status": "LOST",
+    "settled_at": 1788510092.9840877
+  },
+  "al-kahrabaa sc vs al-gharraf sc": {
+    "bet_id": 119114754,
+    "match": "Al-Kahrabaa SC vs Al-Gharraf SC",
+    "badge": "over 0.5 ft",
+    "odds": 1.77,
+    "stake": 30.0,
+    "status": "LOST",
+    "settled_at": 1788510092.9840877
+  },
+  "albion fc vs ca progreso": {
+    "bet_id": 119112770,
+    "match": "Albion FC vs CA Progreso",
+    "badge": "over 1.5 ft",
+    "odds": 1.8,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "śląsk wrocław vs pogoń szczecin": {
+    "bet_id": 119112668,
+    "match": "Śląsk Wrocław vs Pogoń Szczecin",
+    "badge": "over 2.5 ft",
+    "odds": 1.52,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "ca huracan ii vs ca central cordoba ii": {
+    "bet_id": 119110572,
+    "match": "CA Huracan II vs CA Central Cordoba II",
+    "badge": "over 4.5 ft",
+    "odds": 1.5,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "hoogee espoo vs lopa lohja": {
+    "bet_id": 119109038,
+    "match": "HooGee Espoo vs LoPa Lohja",
+    "badge": "over 2.5 ft",
+    "odds": 1.78,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "justo jose de urquiza ii vs club leandro niceforo alem ii": {
+    "bet_id": 119107908,
+    "match": "Justo Jose de Urquiza II vs Club Leandro Niceforo Alem II",
+    "badge": "over 2.5 ft",
+    "odds": 1.6,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "sc shikun hamizrah vs hapoel segev shalom": {
+    "bet_id": 119107419,
+    "match": "SC Shikun Hamizrah vs Hapoel Segev Shalom",
+    "badge": "over 1.5 ft",
+    "odds": 2.25,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "al-mosul sc vs al‑zawraa sc": {
+    "bet_id": 119106946,
+    "match": "Al-Mosul SC vs Al‑Zawraa SC",
+    "badge": "over 2.5 ft",
+    "odds": 2.0,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "hongkong u20 vs katar u20": {
+    "bet_id": 119105826,
+    "match": "Hongkong U20 vs Katar U20",
+    "badge": "over 4.5 ft",
+    "odds": 1.53,
+    "stake": 30.0,
+    "status": "LOST",
+    "settled_at": 1788510092.9840877
+  },
+  "oman u20 vs arabia saudyjska u20": {
+    "bet_id": 119105833,
+    "match": "Oman U20 vs Arabia Saudyjska U20",
+    "badge": "over 4.5 ft",
+    "odds": 2.1,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "lokomotiv gorna oryahovitsa vs dobrudzha dobrich": {
+    "bet_id": 119105838,
+    "match": "Lokomotiv Gorna Oryahovitsa vs Dobrudzha Dobrich",
+    "badge": "over 1.5 ft",
+    "odds": 1.4,
+    "stake": 30.0,
+    "status": "WON",
+    "settled_at": 1788510092.9840877
+  },
+  "parramatta fc eagles vs prospect united": {
+    "bet_id": 119145486,
+    "match": "Parramatta FC Eagles vs Prospect United",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 30.0,
+    "status": "PENDING",
+    "created_at": 1788518375.811578
+  },
+  "lions fc [k] vs eastern suburbs fc [k]": {
+    "bet_id": 119145650,
+    "match": "Lions FC [K] vs Eastern Suburbs FC [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.9,
+    "stake": 30.0,
+    "status": "PENDING",
+    "created_at": 1788518654.3186772
+  },
+  "salisbury inter [k] vs west adelaide [k]": {
+    "bet_id": 119146308,
+    "match": "Salisbury Inter [K] vs West Adelaide [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.71,
+    "stake": 30.0,
+    "status": "LOST",
+    "created_at": 1788519719.8834863,
+    "settled_at": 1788523105.3350158
+  },
+  "maccabi ironi amishav petah tikva vs hapoel bnei lod u19": {
+    "bet_id": 119146352,
+    "match": "Maccabi Ironi Amishav Petah Tikva vs Hapoel Bnei Lod U19",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.69,
+    "stake": 30.0,
+    "status": "WON",
+    "created_at": 1788519820.9840488,
+    "settled_at": 1788520299.750034
+  },
+  "sc salgueiros vs ad machico": {
+    "bet_id": 119146716,
+    "match": "SC Salgueiros vs AD Machico",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 30.0,
+    "status": "PENDING",
+    "created_at": 1788520386.0186157
+  },
+  "blue eagles vs renown sc": {
+    "bet_id": 119146981,
+    "match": "Blue Eagles vs Renown SC",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.21,
+    "stake": 30.0,
+    "status": "PENDING",
+    "created_at": 1788520749.1606476
+  },
+  "hapoel bnei ein mahel vs sc bney mmba hagolan galil": {
+    "bet_id": 119148966,
+    "match": "Hapoel Bnei Ein Mahel vs SC Bney Mmba Hagolan Galil",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.62,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788523451.4271686
   }
 }

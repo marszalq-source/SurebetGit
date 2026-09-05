@@ -323,12 +323,79 @@ class BetAnalytixSync:
         else:
             return False
 
-        # Pobierz bieżący stan zakładu i zaktualizuj status
+        # Pobierz bieżący stan zakładu i skonstruuj pełny payload wymagany przez Bet-Analytix API
+        bet_obj = {}
+        try:
+            get_req = urllib.request.Request(f"{API_BASE}/bet/{bet_id}", headers=self._get_headers(with_auth=True), method="GET")
+            with urllib.request.urlopen(get_req, timeout=8) as get_resp:
+                bet_obj = json.loads(get_resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                if self.refresh_token() or self.login():
+                    return self.settle_bet(match, outcome)
+        except Exception as e:
+            print(f"[Bet-Analytix] Ostrzeżenie przy pobieraniu szczegółów zakładu #{bet_id}: {e}")
+
+        dt = datetime.datetime.fromtimestamp(bet_obj.get("date", time.time()), datetime.timezone.utc)
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
+        stake_str = str(bet_obj.get("stake") or bet_info.get("stake", "30.00"))
+        try:
+            odds_str = f"{float(bet_obj.get('odds') or bet_info.get('odds', 1.80)):.3f}"
+        except Exception:
+            odds_str = "1.800"
+        lbl = bet_obj.get("label") or bet_info.get("label") or f"{home} vs {away} - {bet_info.get('badge', 'OVER')}"
+
+        payload_dict = {
+            "bankroll": int(self.config.get("id_bankroll", 1)),
+            "date": date_str,
+            "time": time_str,
+            "selections": [
+                {
+                    "id": bet_id,
+                    "isExpanded": True,
+                    "label": lbl,
+                    "odds": odds_str,
+                    "sport": 1,
+                    "status": str(status_code),
+                    "showDetails": False,
+                    "category": None,
+                    "competition": None,
+                    "betType": None,
+                    "closing": None,
+                    "estimatedProbability": None
+                }
+            ],
+            "type": 1,
+            "systemCombination": [],
+            "stakes": {
+                "single": stake_str
+            },
+            "overallLabel": lbl,
+            "bookmaker": str(self.config.get("bookmaker_id", "2")),
+            "tipster": None,
+            "category": None,
+            "commission": {
+                "amount": None,
+                "percentage": None,
+                "base": None,
+                "applyOnLoss": False
+            },
+            "bonus": None,
+            "live": False,
+            "freebet": False,
+            "cashout": None,
+            "eachway": None,
+            "masked": False,
+            "note": None,
+            "stake": stake_str,
+            "id": bet_id
+        }
+
         url = f"{API_BASE}/bet/{bet_id}"
-        payload = json.dumps({"status": status_code}).encode('utf-8')
         req = urllib.request.Request(
             url,
-            data=payload,
+            data=json.dumps(payload_dict).encode('utf-8'),
             headers=self._get_headers(with_auth=True),
             method="PUT"
         )

@@ -66,13 +66,13 @@ class BetsAPIEngine:
     def update_live_matches_list(self) -> List[Dict[str, Any]]:
         """Pobiera aktualną listę meczów na żywo z BetsAPI In-Play przez lekki HTTP."""
         now = time.time()
-        if self._matches_cache and (now - self._matches_cache_time) < self._cache_ttl:
+        if (now - self._matches_cache_time) < self._cache_ttl:
             return self._matches_cache
 
         try:
             url = 'https://betsapi.com/cip/soccer'
             req = urllib.request.Request(url, headers=self._headers)
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=4) as resp:
                 html = resp.read().decode('utf-8', errors='ignore')
 
             raw_matches = re.findall(r'href="(/soccer/r/(\d+)/([^"]+))"', html)
@@ -92,12 +92,23 @@ class BetsAPIEngine:
             self._matches_cache = matches
             self._matches_cache_time = now
         except Exception as e:
-            print(f"[BetsAPIEngine] Błąd pobierania listy meczów: {e}")
+            # Odczekaj 5 minut (300s) przed ponowną próbą, zapobiegając blokowaniu pętli live
+            self._matches_cache = []
+            self._matches_cache_time = now + 300 - self._cache_ttl
+            if not getattr(self, '_logged_error_once', False):
+                print(f"[BetsAPIEngine] Błąd połączenia z BetsAPI (kolejna próba za 5 min): {e}")
+                self._logged_error_once = True
 
         return self._matches_cache
 
     def find_match_url(self, home_team: str, away_team: str) -> Optional[str]:
         """Dopasowuje drużyny do linku meczu na BetsAPI."""
+        now = time.time()
+        if (now - self._matches_cache_time) >= self._cache_ttl:
+            self.update_live_matches_list()
+
+        if not self._matches_cache:
+            return None
         h_words = [w for w in self._normalize_name(home_team).split() if len(w) >= 3]
         a_words = [w for w in self._normalize_name(away_team).split() if len(w) >= 3]
 

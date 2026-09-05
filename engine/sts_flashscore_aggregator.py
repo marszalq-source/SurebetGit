@@ -470,6 +470,16 @@ class STSFlashscoreAggregator:
             except Exception as ex:
                 print(f"[Aggregator] Błąd post-scan auto_settle: {ex}")
 
+            # Czyszczenie pamięci RAM z meczów nieobecnych w feedzie live (ochrona 24/7)
+            try:
+                active_keys = {
+                    str(m.get('flashscore_id') or m.get('id') or f"{m.get('home_team')}_{m.get('away_team')}").strip().lower()
+                    for m in processed_matches
+                }
+                self.triggers.cleanup_unseen_matches(active_keys)
+            except Exception as ex:
+                pass
+
             scan_duration = round(time.time() - start_time, 2)
             self.cached_results = processed_matches
             self.last_scan_time = time.time()

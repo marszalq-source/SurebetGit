@@ -1,7 +1,7 @@
 {
   "pairing_pin": "7777",
   "require_pin": false,
-  "bot_username": "skaner_skinow_cs2_bot",
+  "bot_username": "OverRadarLive_bot",
   "subscribers": [
     {
       "chat_id": "8773792302",

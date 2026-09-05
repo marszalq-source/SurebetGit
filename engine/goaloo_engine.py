@@ -67,7 +67,7 @@ class GoalooEngine:
     def update_live_matches_list(self) -> List[Dict[str, Any]]:
         """Pobiera aktualną listę meczów na żywo z Goaloo feed (bf_us1.js) przez szybki HTTP."""
         now = time.time()
-        if self._matches_cache and (now - self._matches_cache_time) < self._cache_ttl:
+        if (now - self._matches_cache_time) < self._cache_ttl:
             return self._matches_cache
 
         try:
@@ -100,12 +100,18 @@ class GoalooEngine:
             self._matches_cache = matches
             self._matches_cache_time = now
         except Exception as e:
-            print(f"[GoalooEngine] Błąd pobierania listy meczów: {e}")
+            self._matches_cache = []
+            self._matches_cache_time = now + 300 - self._cache_ttl
+            if not getattr(self, '_logged_error_once', False):
+                print(f"[GoalooEngine] Błąd połączenia z Goaloo (kolejna próba za 5 min): {e}")
+                self._logged_error_once = True
 
         return self._matches_cache
 
     def find_match_id(self, home_team: str, away_team: str) -> Optional[str]:
         """Dopasowuje drużyny do ID meczu na Goaloo."""
+        if not self._matches_cache:
+            return None
         h_words = [w for w in self._normalize_name(home_team).split() if len(w) >= 3]
         a_words = [w for w in self._normalize_name(away_team).split() if len(w) >= 3]
 
@@ -146,7 +152,7 @@ class GoalooEngine:
             if now - entry['time'] < self._stats_ttl:
                 return entry['stats']
 
-        if not self._matches_cache:
+        if (now - self._matches_cache_time) >= self._cache_ttl:
             self.update_live_matches_list()
 
         match_id = self.find_match_id(home_team, away_team)
