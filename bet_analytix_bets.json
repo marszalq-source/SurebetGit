@@ -2312,5 +2312,14 @@
     "stake": 20.0,
     "status": "PENDING",
     "created_at": 1788644053.3767905
+  },
+  "morrinhos fc go vs goianesia go": {
+    "bet_id": 119281610,
+    "match": "Morrinhos FC GO vs Goianesia GO",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788644391.7903907
   }
 }

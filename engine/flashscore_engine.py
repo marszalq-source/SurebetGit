@@ -164,6 +164,7 @@ class FlashscoreEngine:
                         'stage_text': clean_stage,
                         'ht_score': f"{ht_home_score}:{ht_away_score}" if (ht_home_score is not None and ht_away_score is not None) else None,
                         'is_live': is_live,
+                        'kickoff_ts': int(ad_val) if (ad_val and ad_val.isdigit()) else None,
                         'url': f"https://www.flashscore.pl/mecz/{match_id}/"
                     })
 
@@ -260,6 +261,7 @@ class FlashscoreEngine:
                             'stage_text': 'Koniec',
                             'is_live': False,
                             'status_code': '3',
+                            'kickoff_ts': int(fields.get('AD')) if (fields.get('AD', '').isdigit()) else None,
                             'url': f"https://www.flashscore.pl/mecz/{match_id}/"
                         })
             except Exception as e:

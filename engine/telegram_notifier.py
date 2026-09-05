@@ -1537,6 +1537,10 @@ class TelegramNotifier:
             detect_to_settle_ms = round((settled_at - detected_at) * 1000, 1)
             telegram_edit_ms = round((telegram_updated_at - t_edit_start) * 1000, 1)
 
+            kickoff_ts = match.get('kickoff_ts') or card.get('kickoff_ts')
+            last_live_ts = card.get('last_seen_time')
+            lag_live_sec = round(telegram_updated_at - last_live_ts, 1) if (last_live_ts and last_live_ts > 0) else None
+
             record = {
                 "timestamp": telegram_updated_at,
                 "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(telegram_updated_at)),
@@ -1549,7 +1553,9 @@ class TelegramNotifier:
                 "detect_to_settle_ms": detect_to_settle_ms,
                 "telegram_edit_ms": telegram_edit_ms,
                 "e2e_latency_sec": e2e_latency_sec,
-                "cycle_latency_sec": round(telegram_updated_at - detected_at, 3)
+                "cycle_latency_sec": round(telegram_updated_at - detected_at, 3),
+                "lag_from_last_live_sec": lag_live_sec,
+                "kickoff_time": time.strftime('%H:%M:%S', time.localtime(kickoff_ts)) if kickoff_ts else None
             }
             with open(telemetry_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")

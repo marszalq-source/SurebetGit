@@ -80,6 +80,17 @@ def generate_performance_report() -> str:
         except Exception:
             pass
             
+    lags = [float(r['lag_from_last_live_sec']) for r in records if r.get('lag_from_last_live_sec') is not None]
+    lag_line = ""
+    if lags:
+        med_lag = statistics.median(lags)
+        p95_lag = calculate_percentile(lags, 95)
+        lag_line = (
+            f"\nLag from Last Live:\n"
+            f"Median:                  {med_lag:.1f} s\n"
+            f"P95:                     {p95_lag:.1f} s\n"
+        )
+
     report = (
         "Fast Settlement Performance\n"
         "────────────────────────────\n"
@@ -92,6 +103,7 @@ def generate_performance_report() -> str:
         "Telegram update:\n"
         f"Median:                  {tg_med:.1f} s\n"
         f"P95:                     {tg_p95:.1f} s\n"
+        f"{lag_line}"
         f"Duplicates:                {duplicates}\n"
         f"Missed settlements:        {missed_settlements}\n"
     )
