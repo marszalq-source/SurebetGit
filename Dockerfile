@@ -12,10 +12,10 @@ RUN playwright install chromium
 # Skopiowanie kodu aplikacji
 COPY . .
 
-# Konfiguracja srodowiska dla serwera (Render / VPS)
+# Konfiguracja srodowiska dla serwera Render
 ENV PYTHONUNBUFFERED=1
 ENV PORT=10000
-EXPOSE 8080 10000
+EXPOSE 10000
 
-# Uruchomienie glownego demona 24/7
-CMD ["python", "bot_daemon.py"]
+# Uruchomienie wlasciwego skanera w trybie serwera
+CMD ["python", "sts_live_scanner.py", "--server"]

@@ -2,8 +2,18 @@ import os
 import sys
 import io
 
-# Zabezpieczenie kodowania Windows CMD/PowerShell
-if sys.stdout and hasattr(sys.stdout, 'buffer'):
+# Zabezpieczenie dla pythonw.exe (brak konsoli stdout/stderr) oraz kodowania UTF-8
+if sys.stdout is None or sys.stderr is None:
+    try:
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scanner_service.log")
+        log_fp = open(log_file, "a", encoding="utf-8", buffering=1)
+        if sys.stdout is None:
+            sys.stdout = log_fp
+        if sys.stderr is None:
+            sys.stderr = log_fp
+    except Exception:
+        pass
+elif hasattr(sys.stdout, 'buffer'):
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     except Exception:
@@ -405,6 +415,26 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
         elif parsed.path == '/api/stats/history':
             result = self.api_instance.get_signal_history()
             self._send_json({'history': result})
+            return
+
+        elif parsed.path == '/api/debug':
+            try:
+                from engine.sts_live_engine import STSLiveEngine
+                from engine.flashscore_engine import FlashscoreEngine
+                sts = STSLiveEngine()
+                fs = FlashscoreEngine()
+                sts_m = sts.fetch_live_matches(include_esports=False)
+                fs_m = fs.get_live_soccer_matches()
+                self._send_json({
+                    'status': 'ok',
+                    'sts_matches_count': len(sts_m),
+                    'fs_matches_count': len(fs_m),
+                    'sts_sample': [f"{m.get('home_team')} vs {m.get('away_team')}" for m in sts_m[:3]],
+                    'fs_sample': [f"{m.get('home_team')} vs {m.get('away_team')}" for m in fs_m[:3]],
+                })
+            except Exception as e:
+                import traceback
+                self._send_json({'status': 'error', 'error': str(e), 'trace': traceback.format_exc()})
             return
 
 

@@ -1,5 +1,6 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 scratch/
 .system_generated/
 *.log
+bet_analytix_session.json

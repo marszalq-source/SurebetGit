@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "bot_token": "8905274355:AAH1w0s-qlc_6WOVRilkiXfz1ceGR638ENE",
+  "bot_token": "7809889127:AAG4z85U-NnDRmeItSSztJcQ8I6E0VcRfHE",
   "chat_id": "-1004480240058",
   "min_stars": 4,
   "notify_signals": true,
@@ -9,5 +9,23 @@
   "sniper_mode": true,
   "max_active_cards": 3,
   "free_channel_id": "-1003953802945",
-  "vip_channel_id": "-1004480240058"
+  "vip_channel_id": "-1004480240058",
+  "_free_picks_tracker": {
+    "2026-09-02": [
+      "baia de pemba_vs_ferroviario lichinga",
+      "hnk vukovar_vs_dinamo zagrzeb 2"
+    ],
+    "2026-09-03": [
+      "monjas gol_vs_sansare",
+      "deportes quindio_vs_llaneros"
+    ],
+    "2026-09-04": [
+      "parramatta eagles_vs_prospect united",
+      "lions_vs_eastern suburbs"
+    ],
+    "2026-09-05": [
+      "royal union tubize braine_vs_union rochefortoise",
+      "campo grande rj_vs_aa carapebus rj"
+    ]
+  }
 }
