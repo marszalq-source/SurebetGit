@@ -2273,8 +2273,9 @@
     "badge": "OVER 0.5 FT",
     "odds": 1.66,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788640281.3161483
+    "status": "LOST",
+    "created_at": 1788640281.3161483,
+    "settled_at": 1788642127.473139
   },
   "sporting lizbona vs nacional madeira": {
     "bet_id": 119277259,
@@ -2284,5 +2285,14 @@
     "stake": 20.0,
     "status": "PENDING",
     "created_at": 1788640389.9465034
+  },
+  "santiago city fc vs cd concon national": {
+    "bet_id": 119279265,
+    "match": "Santiago City FC vs CD Concon National",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788642151.4465973
   }
 }

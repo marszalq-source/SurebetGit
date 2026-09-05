@@ -1478,6 +1478,9 @@ class TelegramNotifier:
             else:
                 target_goals = init_tot + 1
 
+            is_golden = bool(signal.get("is_golden") or "GOLDEN" in badge_u or "OVER_15_HT" in sig_type)
+            is_silver = bool(signal.get("is_silver") or "SILVER" in badge_u)
+
             self.active_match_cards[new_key] = {
                 "device_messages": dev_msgs,
                 "home_team": home,
@@ -1506,7 +1509,12 @@ class TelegramNotifier:
                 "danger": danger,
                 "apm": apm,
                 "initial_danger": danger,
-                "initial_apm": apm
+                "initial_apm": apm,
+                "is_golden": is_golden,
+                "is_silver": is_silver,
+                "signal_type": sig_type,
+                "status": "PENDING",
+                "settled": False
             }
             self.stats_engine.record_signal(match, signal, unit_tag)
             try:
@@ -1530,6 +1538,11 @@ class TelegramNotifier:
             return False
 
         card = self.active_match_cards[existing_key]
+
+        # Idempotencja: zabezpieczenie przed wielokrotnym rozliczeniem tej samej karty
+        if card.get("settling") or card.get("settled") or card.get("status") in ("SETTLED", "WON", "LOST", "VOID"):
+            return False
+
         dev_msgs = card.get("device_messages", {})
         if not dev_msgs and card.get("message_id"):
             dev_msgs = {str(self.config.get("chat_id")): card.get("message_id")}
@@ -1570,6 +1583,21 @@ class TelegramNotifier:
             else:
                 time_display = "23'" if half == '1H' else "68'"
 
+        is_golden = bool(
+            card.get('is_golden')
+            or ('GOLDEN' in str(badge).upper())
+            or ('1.5 HT' in str(badge).upper() and target_period == '1H')
+            or ('OVER_15_HT' in str(card.get('signal_type', '')).upper())
+        )
+        is_silver = bool(
+            card.get('is_silver')
+            or ('SILVER' in str(badge).upper())
+        )
+
+        ht_score_str = match.get('ht_score') or card.get('ht_score')
+        if not ht_score_str and target_period == '1H':
+            ht_score_str = current_score
+
         # 1. SCENARIUSZ: TYP WYGRANY (ZIELONY ZNACZEK OK ✅ 🟢)
         is_won = False
         if target_period == '1H':
@@ -1588,31 +1616,69 @@ class TelegramNotifier:
 
         danger = match.get('danger_index', card.get('danger', 50))
         apm = match.get('apm', card.get('apm', 0.8))
-
         init_m = card.get('initial_minute', card.get('last_seen_minute', minute))
         init_odds = card.get('initial_odds', card.get('last_odds', 1.70))
 
         if is_won:
+            card["settling"] = True
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
             profit_units = round(units * (init_odds - 1.0), 2)
-            win_msg = (
-                f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Trafiony Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J</b>"
-            )
+
+            if is_golden:
+                ht_disp = ht_score_str or current_score
+                ht_line = f"⏱️ <b>Wynik HT:</b> <b>{ht_disp}</b>"
+                if half in ('HT', '2H', 'FT') or not is_live:
+                    ht_line += " | <b>Koniec:</b> <b>45'</b>"
+                else:
+                    ht_line += f" | <b>Trafiono:</b> <b>{win_time}</b>"
+
+                win_msg = (
+                    f"🟢 <b>GOLDEN (Over 1.5 HT)</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"{ht_line}\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+            elif is_silver:
+                win_msg = (
+                    f"🥈 <b>SILVER ({badge})</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min</b> | <b>Trafiono:</b> <b>{win_time}</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+            else:
+                win_msg = (
+                    f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
+                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Trafiony Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+
+            # Stan: SETTLED -> TELEGRAM UPDATED
+            card["status"] = "SETTLED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "WON"
+            card["settlement_score"] = current_score
+
             self.edit_message_all(dev_msgs, win_msg)
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = time.time()
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=init_odds)
             try:
                 from engine.shadow_logger import ShadowLogger
-                ShadowLogger().update_settled_match(home, away, current_score)
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
             except Exception:
                 pass
             try:
@@ -1634,24 +1700,52 @@ class TelegramNotifier:
         # 2. SCENARIUSZ: MECZ ODWOŁANY / PRZERWANY (ZWROT STAWKI 🟡 🔄)
         st_lower = str(stage_text).lower()
         if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
-            void_msg = (
-                f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
-            )
+            card["settling"] = True
+            if is_golden:
+                void_msg = (
+                    f"🟡 <b>GOLDEN (Over 1.5 HT)</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+            elif is_silver:
+                void_msg = (
+                    f"🟡 <b>SILVER ({badge})</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+            else:
+                void_msg = (
+                    f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
+                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+
+            card["status"] = "SETTLED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "VOID"
+            card["settlement_score"] = current_score
+
             self.edit_message_all(dev_msgs, void_msg)
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = time.time()
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=init_odds)
             try:
                 from engine.shadow_logger import ShadowLogger
-                ShadowLogger().update_settled_match(home, away, current_score)
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
             except Exception:
                 pass
             try:
@@ -1666,7 +1760,6 @@ class TelegramNotifier:
         st_low = str(stage_text).lower()
 
         if target_period == '1H':
-            # 1H kończy się tylko w przerwie HT, w 2H lub po zakończeniu meczu
             is_1h_over = (half in ('HT', '2H', 'FT') or 'koniec' in st_low or (not is_live and minute >= 45))
             if is_1h_over:
                 if match.get('ht_score'):
@@ -1681,8 +1774,6 @@ class TelegramNotifier:
                     if curr_tot < target_goals:
                         is_period_finished = True
         elif target_period == 'FT':
-            # FT kończy się TYLKO I WYŁĄCZNIE po upływie 90+ minut i końcowym gwizdku sędziego
-            # OCHRONA ABSOLUTNA: Mecz trwający na żywo, w 1H, HT lub 2H, lub przed 88. minutą NIGDY nie jest przegrany!
             if is_live or half in ('1H', 'HT', '2H') or (isinstance(minute, int) and 0 < minute < 88):
                 is_ft_over = False
             else:
@@ -1695,28 +1786,60 @@ class TelegramNotifier:
                 is_period_finished = True
 
         if is_period_finished:
+            card["settling"] = True
             loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
-            orig_danger = card.get('initial_danger', card.get('danger', 85))
-            orig_apm = card.get('initial_apm', card.get('apm', 0.9))
-            loss_msg = (
-                f"❌ <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs początkowy STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})\n\n"
-                f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J</b>"
-            )
+
+            if is_golden:
+                ht_disp = ht_score_str or current_score
+                loss_msg = (
+                    f"🔴 <b>GOLDEN (Over 1.5 HT)</b> <i>(Rozliczenie: 45')</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Wynik HT:</b> <b>{ht_disp}</b> | <b>Koniec:</b> <b>45'</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+            elif is_silver:
+                loss_msg = (
+                    f"🔴 <b>SILVER ({badge})</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+            else:
+                orig_danger = card.get('initial_danger', card.get('danger', 85))
+                orig_apm = card.get('initial_apm', card.get('apm', 0.9))
+                loss_msg = (
+                    f"🔴 <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
+                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
+                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs początkowy STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})\n\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+
+            # Stan: SETTLED -> TELEGRAM UPDATED
+            card["status"] = "SETTLED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "LOST"
+            card["settlement_score"] = current_score
+
             self.edit_message_all(dev_msgs, loss_msg)
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = time.time()
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=init_odds)
             try:
                 from engine.shadow_logger import ShadowLogger
-                ShadowLogger().update_settled_match(home, away, current_score)
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
             except Exception:
                 pass
             try:
@@ -1794,6 +1917,8 @@ class TelegramNotifier:
                 if key not in self.active_match_cards:
                     continue
                 card = self.active_match_cards[key]
+                if card.get("settling") or card.get("settled"):
+                    continue
                 card_home = card.get('home_team', '')
                 card_away = card.get('away_team', '')
                 if not card_home or not card_away:

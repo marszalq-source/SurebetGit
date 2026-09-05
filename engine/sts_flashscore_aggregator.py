@@ -59,6 +59,66 @@ class STSFlashscoreAggregator:
         t = threading.Thread(target=_worker, daemon=True, name="AggregatorBackgroundScanner")
         t.start()
 
+        def _settlement_worker():
+            """
+            Niezależna, błyskawiczna pętla rozliczeń (SETTLEMENT_INTERVAL = 5s).
+            Sprawdza aktywne pozycje w pamięci RAM i natychmiast rozlicza:
+            1. Flashscore Live / HT / FT
+            2. Telegram Cards (In-Place Edit)
+            3. BetTracker (Dziennik Typera)
+            4. ShadowLogger (telegram_shadow_log.jsonl)
+            """
+            SETTLEMENT_INTERVAL = 5
+            time.sleep(2)
+
+            while True:
+                try:
+                    active_cards_count = len(getattr(self.telegram, 'active_match_cards', {}))
+                    has_pending_bets = False
+                    try:
+                        bets_data = self.tracker._load_data()
+                        has_pending_bets = any(b.get("status") == "PENDING" for b in bets_data.get("bets", []))
+                    except Exception:
+                        pass
+
+                    # Rozliczaj tylko jeśli są aktywne pozycje w RAM
+                    if active_cards_count > 0 or has_pending_bets:
+                        fs_live_today = []
+                        try:
+                            fs_live_today = self.fs_engine.get_live_soccer_matches(include_all_today=True)
+                        except Exception as ex:
+                            print(f"[FastSettlement] Błąd pobierania live Flashscore: {ex}")
+
+                        fs_finished = []
+                        try:
+                            fs_finished = self.fs_engine.get_finished_results(days_back=1)
+                        except Exception as ex:
+                            print(f"[FastSettlement] Błąd pobierania zakończonych Flashscore: {ex}")
+
+                        all_matches = fs_live_today + fs_finished
+                        if all_matches:
+                            all_live = [m for m in all_matches if m.get('is_live')]
+                            all_fin = [m for m in all_matches if not m.get('is_live')]
+
+                            settled_cards = self.telegram.auto_settle_active_cards(live_matches=all_live, finished_matches=all_fin)
+                            resolved_bets = self.tracker.auto_resolve_bets(all_matches)
+
+                            try:
+                                from .shadow_logger import ShadowLogger
+                                ShadowLogger().update_settled_matches_batch(fs_finished)
+                            except Exception as ex:
+                                print(f"[FastSettlement] Błąd ShadowLogger: {ex}")
+
+                            if settled_cards > 0 or (resolved_bets and len(resolved_bets) > 0):
+                                print(f"[FastSettlement] ⚡ Błyskawicznie rozliczono: {settled_cards} kart Telegram, {len(resolved_bets) if resolved_bets else 0} kuponów!")
+                except Exception as loop_ex:
+                    print(f"[FastSettlement Loop] Wyjątek: {loop_ex}")
+
+                time.sleep(SETTLEMENT_INTERVAL)
+
+        t_settle = threading.Thread(target=_settlement_worker, daemon=True, name="FastSettlementWorker")
+        t_settle.start()
+
     def scan_all(self, only_signals: bool = False, min_minute: int = 0, half_filter: str = "ALL", demo_mode: bool = False) -> Dict[str, Any]:
         """
         Zwraca natychmiastowo mecze z pamięci RAM (czas < 0.001s).
@@ -109,12 +169,9 @@ class STSFlashscoreAggregator:
             fs_all_matches = self.fs_engine.get_live_soccer_matches(include_all_today=True)
             fs_matches = [m for m in fs_all_matches if m.get('is_live')] if not demo_mode else fs_all_matches
             
-            # Pobierz pełną bazę zakończonych spotkań (do 3-4 dni wstecz dla pełnej ciągłości)
+            # Rozliczanie odseparowane: obsługiwane przez niezależny wątek FastSettlementWorker (co 5s).
+            # Nie blokujemy pętli skanera live pobieraniem historii 3 dni wstecz!
             fs_finished_all = []
-            try:
-                fs_finished_all = self.fs_engine.get_finished_results(days_back=3)
-            except Exception as e:
-                print(f"[Aggregator] Finished results fetch error: {e}")
 
             # 2. Pobierz mecze z STS (jeśli są)
             sts_matches = []
@@ -125,26 +182,15 @@ class STSFlashscoreAggregator:
             except Exception as e:
                 print(f"[Aggregator] STS fetch error: {e}")
 
-            # 3. Automatycznie rozlicz kupony w Dzienniku Typera oraz karty na Telegramie
-            all_today_matches = fs_all_matches + sts_matches + fs_finished_all
-            try:
-                self.tracker.auto_resolve_bets(all_today_matches)
-            except Exception as ex:
-                print(f"[Aggregator] Błąd auto-rozliczania kuponów: {ex}")
-
-            try:
-                all_live_now = [m for m in (fs_all_matches + sts_matches) if m.get('is_live')]
-                all_finished_now = [m for m in all_today_matches if not m.get('is_live')]
-                self.telegram.auto_settle_active_cards(live_matches=all_live_now, finished_matches=all_finished_now)
-            except Exception as ex:
-                print(f"[Aggregator] Błąd auto-rozliczania Telegram: {ex}")
-
-            # 3b. Automatycznie rozlicz wpisy w Shadow Trackerze (zarówno odrzucone, jak i zaakceptowane)
-            try:
-                from .shadow_logger import ShadowLogger
-                ShadowLogger().update_settled_matches_batch(fs_finished_all)
-            except Exception as ex:
-                print(f"[Aggregator] Błąd auto-rozliczania ShadowLogger: {ex}")
+            # 3. Zabezpieczenie auto-rozliczania kart (szybki fallback gdy są aktywne karty)
+            all_today_matches = fs_all_matches + sts_matches
+            if getattr(self.telegram, 'active_match_cards', None):
+                try:
+                    all_live_now = [m for m in all_today_matches if m.get('is_live')]
+                    all_finished_now = [m for m in all_today_matches if not m.get('is_live')]
+                    self.telegram.auto_settle_active_cards(live_matches=all_live_now, finished_matches=all_finished_now)
+                except Exception as ex:
+                    print(f"[Aggregator] Błąd auto-rozliczania Telegram: {ex}")
 
             # Ogranicz do max 40 najbardziej aktywnych meczów w jednym cyklu dla maksymalnej prędkości
             target_matches = fs_matches[:40]

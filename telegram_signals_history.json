@@ -5318,10 +5318,10 @@
     "unit_tag": "2J",
     "units": 2,
     "stake_pln": 4.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "LOST",
+    "profit_units": -2.0,
+    "profit_pln": -4.0,
+    "resolved_at": "2026-09-05 23:02:06"
   },
   {
     "id": "sig_1788640389_sponac",
@@ -5334,15 +5334,37 @@
     "league": "Portugalia, Primeira Liga",
     "minute": 45,
     "score_initial": "1:0",
-    "score_final": "1:0",
+    "score_final": "2:0",
     "market": "OVER 2.5 FT",
     "odds": 1.7,
     "unit_tag": "2J",
     "units": 2,
     "stake_pln": 4.0,
-    "status": "PENDING",
-    "profit_units": 0.0,
-    "profit_pln": 0.0,
-    "resolved_at": ""
+    "status": "LOST",
+    "profit_units": -2.0,
+    "profit_pln": -4.0,
+    "resolved_at": "2026-09-05 23:33:23"
+  },
+  {
+    "id": "sig_1788642151_sancd ",
+    "created_at": "2026-09-05 23:02:31",
+    "timestamp": 1788642151.0306304,
+    "date": "2026-09-05",
+    "home_team": "Santiago City FC",
+    "away_team": "CD Concon National",
+    "match_title": "Santiago City FC vs CD Concon National",
+    "league": "Chile, Segunda Division",
+    "minute": 70,
+    "score_initial": "2:0",
+    "score_final": "3:0",
+    "market": "OVER 2.5 FT",
+    "odds": 1.55,
+    "unit_tag": "2J",
+    "units": 2,
+    "stake_pln": 4.0,
+    "status": "WON",
+    "profit_units": 1.1,
+    "profit_pln": 2.2,
+    "resolved_at": "2026-09-05 23:33:24"
   }
 ]
