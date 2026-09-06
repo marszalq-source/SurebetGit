@@ -205,23 +205,29 @@ class _STSLiveWorker:
 
                                     // 3. DOKŁADNY WYNIK MECZU (Total Home : Total Away)
                                     let scoreH = 0, scoreA = 0;
+                                    let scoreFound = false;
                                     const genEl = a.querySelector('.one-ticket-live-score__general, [class*="general"], [class*="match-tile-score"]');
                                     if (genEl) {
                                         const digits = genEl.innerText.trim().split(/\\s+/).filter(d => /^\\d+$/.test(d));
-                                        if (digits.length >= 2) {
+                                        if (digits.length === 2) {
                                             scoreH = parseInt(digits[0], 10);
                                             scoreA = parseInt(digits[1], 10);
+                                            scoreFound = true;
                                         }
-                                    } else {
-                                        const scoreEls = a.querySelectorAll('.one-ticket-match-tile-score div, [class*="score"] div');
-                                        const digits = [];
-                                        scoreEls.forEach(el => {
-                                            const t = el.innerText.trim();
-                                            if (/^\\d+$/.test(t)) digits.push(parseInt(t, 10));
-                                        });
-                                        if (digits.length >= 2) {
-                                            scoreH = digits[digits.length - 2];
-                                            scoreA = digits[digits.length - 1];
+                                    }
+                                    if (!scoreFound) {
+                                        const matchTileScore = a.querySelector('.one-ticket-match-tile-score');
+                                        if (matchTileScore) {
+                                            const digits = [];
+                                            matchTileScore.querySelectorAll('div').forEach(el => {
+                                                const t = el.innerText.trim();
+                                                if (/^\\d+$/.test(t)) digits.push(parseInt(t, 10));
+                                            });
+                                            if (digits.length === 2) {
+                                                scoreH = digits[0];
+                                                scoreA = digits[1];
+                                                scoreFound = true;
+                                            }
                                         }
                                     }
 
@@ -915,13 +921,13 @@ class STSLiveEngine:
                 minute = 0
                 home_team = ""
                 away_team = ""
-                score_h = 0
-                score_a = 0
+                score_h = None
+                score_a = None
+                score_str = None
                 o1, oX, o2 = 2.20, 3.20, 3.10
 
                 j = i + 1
                 text_lines = []
-                score_lines = []
                 while j < min(n, i + 14):
                     l = lines[j]
                     if l == 'LIVE':
@@ -939,8 +945,15 @@ class STSLiveEngine:
                         oX = _parse_float(lines[j + 3])
                         o2 = _parse_float(lines[j + 5])
                         j += 5
-                    elif l.isdigit() and len(l) <= 2:
-                        score_lines.append(int(l))
+                    # Ścisły wzorzec wyniku meczu: np. "0:0", "1:2", "0 - 0" (NIGDY pojedyncze cyfry "1", "2", statystyki)
+                    elif re.match(r'^\d{1,2}\s*[:\-]\s*\d{1,2}$', l.strip()):
+                        parts = re.split(r'[:\-]', l.strip())
+                        try:
+                            score_h = int(parts[0].strip())
+                            score_a = int(parts[1].strip())
+                            score_str = f"{score_h}:{score_a}"
+                        except Exception:
+                            score_h, score_a, score_str = None, None, None
                     elif (len(l) > 2 and l not in ['Filtruj', 'Koniec', 'Start o', 'Zapisane', 'Akceptuj', 'Ustawienia', 'GOL', 'Wydarzenie trwa', 'Przejdź do wydarzenia', 'Zakończony', 'Przerwany', 'Odwołany', 'Po dogrywce', 'Po karnych']
                           and not self._is_league_line(l) and not _is_odds(l)):
                         text_lines.append(l)
@@ -954,10 +967,6 @@ class STSLiveEngine:
                 if len(text_lines) >= 2:
                     home_team = text_lines[0]
                     away_team = text_lines[1]
-                    if len(score_lines) >= 2:
-                        # Na STS ostatnie 2 cyfry to ZAWSZE aktualny wynik łączny meczu (Total Home : Total Away)
-                        score_h = score_lines[-2]
-                        score_a = score_lines[-1]
 
                     is_started = True
                     stage_lower = stage.lower()
@@ -967,6 +976,8 @@ class STSLiveEngine:
                         half_val = 'PRE'
                         m_time = re.search(r'(\d{1,2}:\d{2})', stage)
                         stage = f"Start o {m_time.group(1)}" if m_time else "Start wkrótce"
+                        if score_str is None:
+                            score_h, score_a, score_str = 0, 0, "0:0"
                     elif 'przerwa' in stage_lower or 'ht' in stage_lower:
                         minute = 45
                         half_val = 'HT'
@@ -979,11 +990,12 @@ class STSLiveEngine:
                             half_val = '1H'
                             if minute == 0: minute = 1
 
+                    goals_tot = (score_h + score_a) if (score_h is not None and score_a is not None) else 0
                     over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
-                        o1, oX, o2, score_h + score_a, minute
+                        o1, oX, o2, goals_tot, minute
                     )
                     live_markets = self.calculate_dynamic_live_markets(
-                        score_h, score_a, minute, half_val, o1, oX, o2
+                        score_h or 0, score_a or 0, minute, half_val, o1, oX, o2
                     )
 
                     matches.append({
@@ -991,7 +1003,7 @@ class STSLiveEngine:
                         'league': current_league,
                         'home_team': home_team,
                         'away_team': away_team,
-                        'score_str': f"{score_h}:{score_a}",
+                        'score_str': score_str,
                         'home_score': score_h,
                         'away_score': score_a,
                         'minute': minute,
@@ -1025,15 +1037,22 @@ class STSLiveEngine:
                 o2 = _parse_float(lines[i + 5])
 
                 home_team, away_team = "Gospodarz", "Gość"
-                score_h, score_a = 0, 0
+                score_h, score_a, score_str = None, None, None
                 minute = 0
 
                 prev_lines = [lines[j] for j in range(max(0, i - 6), i)]
                 
-                scores = [l for l in prev_lines if l.isdigit() and len(l) <= 2]
-                if len(scores) >= 2:
-                    score_h = int(scores[-2])
-                    score_a = int(scores[-1])
+                # Bezpieczne parsowanie wyniku wyłącznie z formatu X:Y (nigdy z pojedynczych cyfr)
+                for pl in prev_lines:
+                    m_sc = re.match(r'^\d{1,2}\s*[:\-]\s*\d{1,2}$', pl.strip())
+                    if m_sc:
+                        parts = re.split(r'[:\-]', pl.strip())
+                        try:
+                            score_h = int(parts[0].strip())
+                            score_a = int(parts[1].strip())
+                            score_str = f"{score_h}:{score_a}"
+                        except Exception:
+                            pass
 
                 for pl in prev_lines:
                     min_m = re.search(r'(\d+)(?:\+\d+)?\'', pl)
@@ -1054,8 +1073,9 @@ class STSLiveEngine:
                     home_team = text_cands[0]
 
                 if home_team != "Gospodarz" and away_team != "Gość":
+                    goals_tot = (score_h + score_a) if (score_h is not None and score_a is not None) else 0
                     over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
-                        o1, oX, o2, score_h + score_a, minute
+                        o1, oX, o2, goals_tot, minute
                     )
 
                     matches.append({
@@ -1063,7 +1083,7 @@ class STSLiveEngine:
                         'league': current_league,
                         'home_team': home_team,
                         'away_team': away_team,
-                        'score_str': f"{score_h}:{score_a}",
+                        'score_str': score_str,
                         'home_score': score_h,
                         'away_score': score_a,
                         'minute': minute,

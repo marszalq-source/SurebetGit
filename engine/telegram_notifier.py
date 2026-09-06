@@ -1329,18 +1329,20 @@ class TelegramNotifier:
         st_low = str(stage_text or '').lower()
         half_u = str(half or '').upper()
 
-        # 1. Definitywny koniec meczu (FT - ranga 40)
-        is_abandoned = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(status_code) in ('10', '11')
+        # 1. Definitywny koniec meczu (FT - ranga 40) lub stan terminalny VOID (przerwany/odwołany/przełożony)
+        # AC=4 (Postponed), AC=5 (Cancelled), AC=36 (Interrupted)
+        is_abandoned = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(status_code) in ('4', '5', '36')
         if is_abandoned:
             return ('FT', 40)
 
         # OCHRONA: Mecz piłkarski nie może zakończyć się FT przed 80. minutą (odrzucenie błędnych snapshotów/glitchy)
         is_premature_ft = (0 < minute < 80)
 
+        # AC=3 (FT), AC=8, AC=9, AC=10 (After Extra Time), AC=11 (After Penalties)
         if not is_premature_ft and (
-            half_u == 'FT' 
-            or str(status_code) in ('3', '8', '9')
-            or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.'])
+            half_u in ('FT', 'AET', 'AP')
+            or str(status_code) in ('3', '8', '9', '10', '11')
+            or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.', 'aet', 'ap'])
             or (not is_live and (minute >= 85 or 'koniec' in st_low or 'ended' in st_low))
         ):
             return ('FT', 40)
@@ -1810,9 +1812,19 @@ class TelegramNotifier:
             eff_minute = max(eff_minute, 90)
             card['highest_minute'] = eff_minute
 
-        # Monotoniczność bramek (gole w meczu nie mogą maleć ze starych snapshotów)
+        # Monotoniczność bramek i ochrona przed niezweryfikowanym skokiem wyniku (Score Jump Guard)
         prev_goals = card.get('highest_goals', card.get('initial_goals', 0))
-        if curr_tot < prev_goals:
+        is_canonical = bool(match.get('_canonical_verified', False))
+        is_unverified_jump = bool(match.get('_unverified_score_jump', False))
+        is_sts_only = bool(match.get('_sts_only', False))
+
+        # NAPRAWA 4 & 5: SCORE JUMP GUARD + HIGHEST_GOALS PROTECTION
+        # Jeżeli snapshot jest oznaczony jako niezweryfikowany skok wyniku (_unverified_score_jump):
+        # Odrzucamy skok bramek! highest_goals NIE rośnie, current_score jest przywracany.
+        if is_unverified_jump:
+            current_score = card.get('last_seen_score', card.get('initial_score', '0:0'))
+            curr_tot = prev_goals
+        elif curr_tot < prev_goals:
             current_score = card.get('last_seen_score', current_score)
             curr_tot = prev_goals
         else:
@@ -1850,19 +1862,30 @@ class TelegramNotifier:
 
         # 1. SCENARIUSZ: TYP WYGRANY (ZIELONY ZNACZEK OK ✅ 🟢)
         is_won = False
-        if target_period == '1H':
-            if curr_tot >= target_goals:
-                is_won = True
-            elif match.get('ht_score'):
-                try:
-                    ht_tot = sum(map(int, match['ht_score'].split(':')))
-                    if ht_tot >= target_goals:
-                        is_won = True
-                except Exception:
-                    pass
-        else:
-            if curr_tot >= target_goals:
-                is_won = True
+        # NAPRAWA 2 & 4: Early Settlement Guard
+        # Dla meczów na żywo wczesne rozliczenie wymaga zweryfikowanego snapshotu.
+        # Blokujemy wczesne rozliczenie na żywo dla:
+        # - niezweryfikowanego skoku wyniku (is_unverified_jump)
+        # - snapshotu STS-only na żywo bez walidacji drugiego źródła (is_sts_only i not is_canonical)
+        allow_live_early_settle = True
+        if is_live and eff_rank < 40:
+            if is_unverified_jump or (is_sts_only and not is_canonical):
+                allow_live_early_settle = False
+
+        if allow_live_early_settle or (not is_live) or (eff_rank >= 40):
+            if target_period == '1H':
+                if curr_tot >= target_goals:
+                    is_won = True
+                elif match.get('ht_score'):
+                    try:
+                        ht_tot = sum(map(int, match['ht_score'].split(':')))
+                        if ht_tot >= target_goals:
+                            is_won = True
+                    except Exception:
+                        pass
+            else:
+                if curr_tot >= target_goals:
+                    is_won = True
 
         danger = match.get('danger_index', card.get('danger', 50))
         apm = match.get('apm', card.get('apm', 0.8))
@@ -1960,8 +1983,9 @@ class TelegramNotifier:
             return True
 
         # 2. SCENARIUSZ: MECZ ODWOŁANY / PRZERWANY (ZWROT STAWKI 🟡 🔄)
+        # AC=4 (Postponed), AC=5 (Cancelled), AC=36 (Interrupted)
         st_lower = str(stage_text).lower()
-        if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
+        if str(status_code) in ('4', '5', '36') or any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
             card["settling"] = True
             card["status"] = "SETTLEMENT_ATTEMPT"
             init_s = card.get('initial_score', '')
@@ -2285,25 +2309,38 @@ class TelegramNotifier:
                         if live_m.get('sts_url'):
                             card['sts_url'] = live_m['sts_url']
 
-                        live_m_copy = dict(live_m)
-                        live_m_copy['home_team'] = card_home
-                        live_m_copy['away_team'] = card_away
-                        if self.check_and_update_match_status(live_m_copy, card_key=key):
-                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
-                                settled_count += 1
+                        # LIVE MATCHES: Nigdy nie przekazujemy bezpośrednio surowego live snapshotu do settlementu.
+                        # Rozliczanie na żywo wymaga przejścia przez reconciliation (ActiveCardsWatchdog).
+                        if live_m.get('_canonical_verified') and live_m.get('_reconciled'):
+                            live_m_copy = dict(live_m)
+                            live_m_copy['home_team'] = card_home
+                            live_m_copy['away_team'] = card_away
+                            if self.check_and_update_match_status(live_m_copy, card_key=key):
+                                if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                    settled_count += 1
                         continue
 
-                    # Jeśli mecz na żywo osiągnął status FT (koniec meczu na żywo)
+                    # Jeśli mecz na żywo osiągnął status FT (koniec meczu na żywo) lub stan VOID
                     elif l_rank >= 40:
-                        if "ft_detected_at" not in card:
-                            card["ft_detected_at"] = now
-                            card["status"] = "FT_DETECTED"
-                        live_m_copy = dict(live_m)
-                        live_m_copy['home_team'] = card_home
-                        live_m_copy['away_team'] = card_away
-                        if self.check_and_update_match_status(live_m_copy, card_key=key):
-                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
-                                settled_count += 1
+                        status_code_str = str(live_m.get('status_code', ''))
+                        is_confirmed_ft = (
+                            status_code_str in ('3', '8', '9', '10', '11')
+                            or live_m.get('half') in ('FT', 'AET', 'AP')
+                            or 'koniec' in str(live_m.get('stage_text', '')).lower()
+                            or 'ended' in str(live_m.get('stage_text', '')).lower()
+                            or status_code_str in ('4', '5', '36')
+                            or any(w in str(live_m.get('stage_text', '')).lower() for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc'])
+                        )
+                        if is_confirmed_ft:
+                            if "ft_detected_at" not in card:
+                                card["ft_detected_at"] = now
+                                card["status"] = "FT_DETECTED"
+                            live_m_copy = dict(live_m)
+                            live_m_copy['home_team'] = card_home
+                            live_m_copy['away_team'] = card_away
+                            if self.check_and_update_match_status(live_m_copy, card_key=key):
+                                if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                    settled_count += 1
                         continue
 
                 # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS) - gdy mecz zniknął z live
@@ -2317,15 +2354,33 @@ class TelegramNotifier:
                     f_min = int(fin_m.get('minute') or 90)
                     card_m = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0))
                     card_age = now - card.get('created_at', now)
+                    status_code_str = str(fin_m.get('status_code', ''))
 
-                    is_valid_settlement = True
-                    if card.get('target_period') == 'FT' and f_rank >= 40:
-                        # Odrzuć przedwczesne FT ze starych lub błędnych snapshotów przed 80'
-                        if f_min < 80 or (card_m < 80 and card_age < 3000):
-                            st_low = str(fin_m.get('stage_text', '')).lower()
-                            is_void = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(fin_m.get('status_code', '')) in ('10', '11')
-                            if not is_void:
-                                is_valid_settlement = False
+                    # FT wymaga wiarygodnego statusu końca meczu (AC=3, 8, 9, 10, 11) lub VOID (AC=4, 5, 36)
+                    is_valid_settlement = False
+                    if f_rank >= 40:
+                        is_confirmed_ft = (
+                            status_code_str in ('3', '8', '9', '10', '11')
+                            or fin_m.get('half') in ('FT', 'AET', 'AP')
+                            or 'koniec' in str(fin_m.get('stage_text', '')).lower()
+                            or 'ended' in str(fin_m.get('stage_text', '')).lower()
+                        )
+                        is_void_stage = (
+                            status_code_str in ('4', '5', '36')
+                            or any(w in str(fin_m.get('stage_text', '')).lower() for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc'])
+                        )
+                        if is_confirmed_ft:
+                            if card.get('target_period') == 'FT':
+                                if f_min >= 80 or card_m >= 80 or card_age >= 3000:
+                                    is_valid_settlement = True
+                                else:
+                                    # Przedwczesne FT odrzucone chyba że mecz przerwany/odwołany
+                                    if is_void_stage:
+                                        is_valid_settlement = True
+                            else:
+                                is_valid_settlement = True
+                        elif is_void_stage:
+                            is_valid_settlement = True
 
                     if is_valid_settlement:
                         if "ft_detected_at" not in card:
@@ -2339,58 +2394,9 @@ class TelegramNotifier:
                                 settled_count += 1
                         continue
 
-                # 3. Mecz zniknął z oferty STS Live (zakończył się)
-                card_age = now - card.get('created_at', now)
-                last_minute = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0))
-                if not last_minute:
-                    m_min = re.search(r'\((\d+)\'\)', card.get('last_text', ''))
-                    if m_min:
-                        last_minute = int(m_min.group(1))
-                target_period = card.get('target_period', 'FT')
-                last_score = card.get('last_seen_score', card.get('initial_score', '0:0'))
-
-                is_finished_event = False
-                time_since_seen = now - card.get('last_seen_time', card.get('created_at', now))
-                if target_period == '1H':
-                    # 1H kończy się tylko gdy minęła 45. minuta i mecz zniknął z 1H na min. 3 minuty
-                    if last_minute >= 45 and time_since_seen > 180:
-                        is_finished_event = True
-                    elif card_age > 3600: # Ponad 60 minut od sygnału z 1. połowy
-                        is_finished_event = True
-                elif target_period == 'FT':
-                    # Mecz kończy się gdy osiągnął min. 88. minutę i zniknął z oferty na >120s,
-                    # LUB gdy upłynął realistyczny czas trwania meczu
-                    rem_mins = max(5, 95 - last_minute)
-                    if last_minute < 45:
-                        rem_mins += 15 # dolicz przerwę HT
-                    max_expected_seconds = max(900, (rem_mins + 10) * 60)
-
-                    if last_minute >= 88 and time_since_seen > 120:
-                        is_finished_event = True
-                    elif time_since_seen > 180 and card_age >= max_expected_seconds:
-                        is_finished_event = True
-                    elif card_age > 5400: # Zapasowy limit 90 minut od sygnału
-                        is_finished_event = True
-
-                if is_finished_event:
-                    if "ft_detected_at" not in card:
-                        card["ft_detected_at"] = now
-                        card["status"] = "FT_DETECTED"
-                    synthetic_finished = {
-                        'home_team': card_home,
-                        'away_team': card_away,
-                        'league': card.get('league', 'Piłka Nożna'),
-                        'score_str': last_score,
-                        'home_score': int(last_score.split(':')[0]) if ':' in last_score else 0,
-                        'away_score': int(last_score.split(':')[1]) if ':' in last_score else 0,
-                        'minute': 90 if target_period == 'FT' else 45,
-                        'half': 'FT' if target_period == 'FT' else 'HT',
-                        'stage_text': 'Koniec meczu',
-                        'is_live': False
-                    }
-                    if self.check_and_update_match_status(synthetic_finished, card_key=key):
-                        if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
-                            settled_count += 1
+                # 3. Zniknięcie meczu z live NIE jest traktowane jako FT (NAPRAWA 3).
+                # Nie tworzymy sztucznego statusu zakończenia (synthetic_finished).
+                # Rozliczenie FT następuje WYŁĄCZNIE po potwierdzeniu ze źródeł zakończonych.
 
             # === SETTLEMENT WATCHDOG AUDIT ===
             for key, card in list(self.active_match_cards.items()):

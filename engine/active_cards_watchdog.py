@@ -249,17 +249,40 @@ class ActiveCardsWatchdog:
         okres rynku (FT vs Extra Time) oraz monotoniczność.
         NIGDY nie stosuje ślepej reguły 'więcej goli = lepsze źródło'.
         """
-        if fs_match and not sts_match:
-            return fs_match, "FLASHSCORE", "FLASHSCORE_ONLY"
-        if sts_match and not fs_match:
-            # Jedyne źródło to STS — jeśli jest w ET/Pen i rynek FT, blokuj
-            target_period_solo = str(card.get('target_period') or 'FT').upper()
-            if target_period_solo == 'FT' and self._is_extra_time_match(sts_match):
-                return sts_match, "STS", "STS_ONLY_ET_BLOCKED_FOR_FT_MARKET"
-            return sts_match, "STS", "STS_ONLY"
-
         target_period = str(card.get('target_period') or 'FT').upper()
         card_highest_goals = card.get('highest_goals', card.get('initial_goals', 0))
+
+        if fs_match and not sts_match:
+            fs_goals_solo = self._parse_score_goals(fs_match.get("score_str", "0:0"))
+            best_m = dict(fs_match)
+            if fs_goals_solo - card_highest_goals >= 2 and fs_match.get('is_live', True):
+                best_m['_unverified_score_jump'] = True
+                best_m['_canonical_verified'] = False
+                best_m['_reconciled'] = True
+                return best_m, "FLASHSCORE", "FLASHSCORE_ONLY_UNVERIFIED_SCORE_JUMP"
+            best_m['_canonical_verified'] = True
+            best_m['_reconciled'] = True
+            return best_m, "FLASHSCORE", "FLASHSCORE_ONLY"
+
+        if sts_match and not fs_match:
+            # Jedyne źródło to STS — jeśli jest w ET/Pen i rynek FT, blokuj
+            if target_period == 'FT' and self._is_extra_time_match(sts_match):
+                return sts_match, "STS", "STS_ONLY_ET_BLOCKED_FOR_FT_MARKET"
+
+            sts_goals_solo = self._parse_score_goals(sts_match.get("score_str", "0:0"))
+            best_m = dict(sts_match)
+            best_m['_sts_only'] = True
+            best_m['_reconciled'] = True
+            # LIVE STS-only z nagłym skokiem bramek lub bez drugiego źródła nie może powodować early settlementu bez walidacji
+            if sts_match.get('is_live', True):
+                best_m['_canonical_verified'] = False
+                if sts_goals_solo - card_highest_goals >= 2:
+                    best_m['_unverified_score_jump'] = True
+                    return best_m, "STS", "STS_ONLY_UNVERIFIED_SCORE_JUMP"
+                return best_m, "STS", "STS_ONLY"
+            else:
+                best_m['_canonical_verified'] = True
+                return best_m, "STS", "STS_ONLY_FINISHED"
 
         fs_score = fs_match.get("score_str", "0:0")
         sts_score = sts_match.get("score_str", "0:0")
@@ -294,20 +317,55 @@ class ActiveCardsWatchdog:
                 best_match = dict(fs_match)
                 if sts_match.get("sts_url"):
                     best_match["sts_url"] = sts_match["sts_url"]
+                best_match['_canonical_verified'] = True
+                best_match['_reconciled'] = True
                 return best_match, "FLASHSCORE", "FT_MARKET_PROTECTION_REGULATION_PREFERRED"
             if fs_is_et and not sts_is_et and sts_rank >= 30:
                 best_match = dict(sts_match)
+                best_match['_canonical_verified'] = True
+                best_match['_reconciled'] = True
                 return best_match, "STS", "FT_MARKET_PROTECTION_REGULATION_PREFERRED"
             # Oba źródła są w dogrywce — bezpieczny fallback do FS (lower score = bardziej regulaminowe)
             if sts_is_et and fs_is_et:
-                return fs_match, "FLASHSCORE", "BOTH_SOURCES_ET_BLOCKED_FOR_FT_MARKET"
+                best_match = dict(fs_match)
+                best_match['_canonical_verified'] = True
+                best_match['_reconciled'] = True
+                return best_match, "FLASHSCORE", "BOTH_SOURCES_ET_BLOCKED_FOR_FT_MARKET"
 
         # Reguła 2: Ochrona monotoniczności wyniku (brak rollbacku)
         if fs_goals >= card_highest_goals and sts_goals < card_highest_goals:
             best_match = dict(fs_match)
             if sts_match.get("sts_url"):
                 best_match["sts_url"] = sts_match["sts_url"]
+            best_match['_canonical_verified'] = True
+            best_match['_reconciled'] = True
             return best_match, "FLASHSCORE", "MONOTONICITY_GUARD_STS_ROLLBACK_REJECTED"
+
+        # Reguła 2b: SCORE JUMP GUARD (Anomalia nagłego skoku bramek >= 2)
+        # Jeżeli jedno źródło wykazuje skok >= 2 bramki względem poprzedniego wyniku,
+        # a drugie źródło pozostaje przy starym wyniku (np. FS=0:0 a STS=1:2):
+        # snapshot jest ODRZUCANY jako niezweryfikowana anomalia!
+        if sts_goals - card_highest_goals >= 2 and fs_goals <= card_highest_goals:
+            selected_source = "FLASHSCORE"
+            reason = "SCORE_JUMP_STS_UNVERIFIED_REJECTED"
+            best_match = dict(fs_match)
+            if sts_match.get("sts_url"):
+                best_match["sts_url"] = sts_match["sts_url"]
+            if sts_match.get("live_markets"):
+                best_match["live_markets"] = sts_match["live_markets"]
+            best_match['_canonical_verified'] = True
+            best_match['_reconciled'] = True
+            return best_match, selected_source, reason
+
+        if fs_goals - card_highest_goals >= 2 and sts_goals <= card_highest_goals and fs_rank < 40:
+            selected_source = "STS"
+            reason = "SCORE_JUMP_FS_UNVERIFIED_REJECTED"
+            best_match = dict(sts_match)
+            if fs_match.get("flashscore_id"):
+                best_match["flashscore_id"] = fs_match["flashscore_id"]
+            best_match['_canonical_verified'] = True
+            best_match['_reconciled'] = True
+            return best_match, selected_source, reason
 
         # Reguła 3: Zgodna aktualizacja nowszego gola na żywo z STS
         # Aby zaakceptować wyższy wynik STS, faza i czas muszą być spójne (brak anachronizmów typu 45' vs 60')
@@ -377,7 +435,9 @@ class ActiveCardsWatchdog:
                 selected_source=selected_source,
                 reason=reason
             )
-
+        if not best_match.get('_unverified_score_jump'):
+            best_match['_canonical_verified'] = True
+        best_match['_reconciled'] = True
         return best_match, selected_source, reason
 
     def _log_source_sync_telemetry(
