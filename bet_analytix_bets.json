@@ -2454,5 +2454,14 @@
     "status": "LOST",
     "created_at": 1788675836.6140854,
     "settled_at": 1788678163.867601
+  },
+  "apia leichhardt tigers vs nws spirit": {
+    "bet_id": 119298422,
+    "match": "APIA Leichhardt Tigers vs NWS Spirit",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788678780.3876576
   }
 }

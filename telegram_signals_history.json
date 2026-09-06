@@ -5718,5 +5718,27 @@
     "profit_units": -2.0,
     "profit_pln": -4.0,
     "resolved_at": "2026-09-06 09:02:41"
+  },
+  {
+    "id": "sig_1788678779_apinws",
+    "created_at": "2026-09-06 09:12:59",
+    "timestamp": 1788678779.8167262,
+    "date": "2026-09-06",
+    "home_team": "APIA Leichhardt Tigers",
+    "away_team": "NWS Spirit",
+    "match_title": "APIA Leichhardt Tigers vs NWS Spirit",
+    "league": "Australia, NPL NSW",
+    "minute": 49,
+    "score_initial": "0:0",
+    "score_final": "0:0",
+    "market": "OVER 1.5 FT",
+    "odds": 1.9,
+    "unit_tag": "2J",
+    "units": 2,
+    "stake_pln": 4.0,
+    "status": "PENDING",
+    "profit_units": 0.0,
+    "profit_pln": 0.0,
+    "resolved_at": ""
   }
 ]
