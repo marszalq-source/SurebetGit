@@ -2067,14 +2067,20 @@ class TelegramNotifier:
                     latest_odds = mkt.get('odds', odds_val)
                     break
 
-            orig_danger = card.get('initial_danger', card.get('danger', 85))
-            orig_apm = card.get('initial_apm', card.get('apm', 0.9))
+            # Dynamiczny Danger Index i APM z bieżącego snapshotu (bez naruszania initial_danger/initial_apm)
+            curr_danger = match.get('danger_index')
+            if curr_danger is None or curr_danger <= 0:
+                curr_danger = card.get('danger') or card.get('initial_danger', 85)
+            curr_apm = match.get('apm')
+            if curr_apm is None or curr_apm <= 0:
+                curr_apm = card.get('apm') or card.get('initial_apm', 0.9)
+
             orig_odds = card.get('initial_odds', card.get('last_odds', 1.70))
             init_m = card.get('initial_minute', '')
             time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
             
             odds_str = f"<b>{orig_odds:.2f}</b>"
-            if 1.10 <= latest_odds <= 3.20 and abs(latest_odds - orig_odds) > 0.05:
+            if 1.10 <= latest_odds <= 3.50 and abs(latest_odds - orig_odds) > 0.05:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
             updated_msg = (
@@ -2084,35 +2090,55 @@ class TelegramNotifier:
                 f"🎯 <code>{badge}</code>\n"
                 f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
                 f"📈 <b>Kurs:</b> {odds_str}\n"
-                f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})"
+                f"🔥 <b>{curr_danger}%</b> (APM: {curr_apm})"
             )
 
-            score_changed = (current_score != card.get("initial_score") and curr_tot > card.get("initial_goals", 0))
+            last_rendered_score = card.get("last_rendered_score", card.get("initial_score", "0:0"))
+            score_changed = (current_score != last_rendered_score)
             time_since_edit = now - card.get("last_edit_time", 0)
             stage_changed = (card.get("last_rendered_stage") != eff_stage)
             last_rend_min = card.get("last_rendered_minute", card.get("initial_minute", 0))
-            minute_advanced = (abs(eff_minute - last_rend_min) >= 3)
-            
+            minute_advanced = (eff_minute > last_rend_min)
+
+            # Histereza i debounce kursu: minimalny skok 0.06 i min. 15s od ostatniej edycji kursowej
+            last_rendered_odds = card.get("last_rendered_odds", orig_odds)
+            odds_diff = abs(latest_odds - last_rendered_odds) if (latest_odds and last_rendered_odds) else 0.0
+            time_since_odds_edit = now - card.get("last_odds_edit_time", 0)
+            odds_swing = (odds_diff >= 0.06 and time_since_odds_edit >= 15.0 and 1.10 <= latest_odds <= 3.50)
+
+            # Zdarzenia pilne (URGENT): gol, zmiana fazy (HT/2H), duży skok kursu
+            is_urgent = (score_changed or stage_changed or odds_swing)
+            # Płynny upływ minuty (REGULAR): zmiana minuty po min. 35 sekundach od ostatniej edycji
+            regular_minute_update = (minute_advanced and time_since_edit >= 35.0)
+
             card["last_seen_score"] = current_score
             card["last_seen_minute"] = eff_minute
             card["last_seen_half"] = eff_stage
             card["last_seen_stage"] = time_display
             card["last_seen_time"] = now
-            if latest_odds <= 3.20:
+            card["danger"] = curr_danger
+            card["apm"] = curr_apm
+            if latest_odds <= 3.50:
                 card["last_odds"] = latest_odds
 
             should_edit = (
                 card.get("last_text") != updated_msg
-                and (score_changed or stage_changed or (time_since_edit >= 60 and minute_advanced))
+                and (is_urgent or regular_minute_update)
             )
 
             if should_edit:
-                self.edit_message_all(dev_msgs, updated_msg)
-                card["last_text"] = updated_msg
-                card["last_edit_time"] = now
-                card["last_rendered_stage"] = eff_stage
-                card["last_rendered_minute"] = eff_minute
-                self._save_cards()
+                edit_ok = self.edit_message_all(dev_msgs, updated_msg)
+                if edit_ok:
+                    card["last_text"] = updated_msg
+                    card["last_edit_time"] = now
+                    card["last_rendered_stage"] = eff_stage
+                    card["last_rendered_minute"] = eff_minute
+                    card["last_rendered_score"] = current_score
+                    card["last_rendered_odds"] = latest_odds
+                    if odds_swing:
+                        card["last_odds_edit_time"] = now
+                    self._save_cards()
+                    return True
             return False
 
     def auto_settle_active_cards(self, live_matches: List[Dict[str, Any]], finished_matches: Optional[List[Dict[str, Any]]] = None) -> int:

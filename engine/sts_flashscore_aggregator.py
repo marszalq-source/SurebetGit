@@ -141,6 +141,15 @@ class STSFlashscoreAggregator:
         t_settle = threading.Thread(target=_settlement_worker, daemon=True, name="FastSettlementWorker")
         t_settle.start()
 
+        # Dedykowany, ultra-szybki Watchdog aktywnych kart (Active Cards Sentinel)
+        from .active_cards_watchdog import ActiveCardsWatchdog
+        self.watchdog = ActiveCardsWatchdog(
+            fs_engine=self.fs_engine,
+            sts_engine=self.sts_engine,
+            telegram_notifier=self.telegram
+        )
+        self.watchdog.start()
+
     def scan_all(self, only_signals: bool = False, min_minute: int = 0, half_filter: str = "ALL", demo_mode: bool = False) -> Dict[str, Any]:
         """
         Zwraca natychmiastowo mecze z pamięci RAM (czas < 0.001s).
