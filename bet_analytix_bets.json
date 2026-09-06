@@ -2321,8 +2321,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.85,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788644391.7903907
+    "status": "LOST",
+    "created_at": 1788644391.7903907,
+    "settled_at": 1788668458.0018756
   },
   "cd universitario penonome ii vs independiente la chorrera ii": {
     "bet_id": 119282946,
@@ -2350,8 +2351,9 @@
     "badge": "OVER 1.5 FT",
     "odds": 1.45,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788646458.9422102
+    "status": "LOST",
+    "created_at": 1788646458.9422102,
+    "settled_at": 1788668457.8773782
   },
   "cibao cf vs ca vega real": {
     "bet_id": 119283734,
@@ -2359,7 +2361,98 @@
     "badge": "OVER 1.5 FT",
     "odds": 1.5,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788646729.7976766
+    "status": "WON",
+    "created_at": 1788646729.7976766,
+    "settled_at": 1788647875.9212837
+  },
+  "ceara sc vs sport recife": {
+    "bet_id": 119284793,
+    "match": "Ceara SC vs Sport Recife",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788647913.1730466,
+    "settled_at": 1788668458.5563223
+  },
+  "sydney united vs manly united fc": {
+    "bet_id": 119295198,
+    "match": "Sydney United vs Manly United FC",
+    "badge": "OVER 1.5 HT",
+    "odds": 1.95,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788668848.5070693,
+    "settled_at": 1788668853.7514446
+  },
+  "fc tokushima vs r. velho takamatsu": {
+    "bet_id": 119295208,
+    "match": "FC Tokushima vs R. Velho Takamatsu",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.53,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788668884.0454783,
+    "settled_at": 1788669602.9817407
+  },
+  "nankatsu sc [k] vs bunnys gunma fc white star [k]": {
+    "bet_id": 119295257,
+    "match": "Nankatsu SC [K] vs Bunnys Gunma FC White Star [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788669082.907634,
+    "settled_at": 1788673620.756052
+  },
+  "taroona [k] vs launceston united [k]": {
+    "bet_id": 119295497,
+    "match": "Taroona [K] vs Launceston United [K]",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.05,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788670249.9443555,
+    "settled_at": 1788670990.5059397
+  },
+  "adelaide comets fc ii [k] vs metrostars adelaide ii [k]": {
+    "bet_id": 119295772,
+    "match": "Adelaide Comets FC II [K] vs MetroStars Adelaide II [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.48,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788671261.5883868,
+    "settled_at": 1788675810.6861534
+  },
+  "tadotsu fc vs kufc nankoku": {
+    "bet_id": 119295985,
+    "match": "Tadotsu FC vs Kufc Nankoku",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788672316.3629375,
+    "settled_at": 1788676858.237696
+  },
+  "ravia sa vs qi yi fc": {
+    "bet_id": 119296531,
+    "match": "Ravia SA vs Qi Yi FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788674175.0482533,
+    "settled_at": 1788677627.2198505
+  },
+  "broadmeadow magic fc vs maitland fc": {
+    "bet_id": 119297152,
+    "match": "Broadmeadow Magic FC vs Maitland FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.44,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788675836.6140854,
+    "settled_at": 1788678163.867601
   }
 }

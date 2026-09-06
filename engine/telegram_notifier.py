@@ -1418,13 +1418,12 @@ class TelegramNotifier:
         pin_data = pin_engine.get_sharp_benchmark(match, signal)
 
         msg = (
-            f"<b>ALERT</b> <i>({header_time})</i>\n\n"
             f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
             f"🏆 <b>Liga:</b> {league}\n"
             f"⏱️ <b>Czas:</b> {time_display}\n\n"
-            f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-            f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-            f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+            f"🎯 <code>{badge}</code>\n"
+            f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+            f"📈 <b>Kurs:</b> <b>{odds_val:.2f}</b>\n"
             f"🔥 <b>{danger}%</b> (APM: {apm})"
         )
 
@@ -1448,15 +1447,17 @@ class TelegramNotifier:
             card["danger"] = danger
             card["apm"] = apm
 
+            init_m = card.get('initial_minute', '')
+            time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
+
             # Konstrukcja wiadomości ze stałą rekomendacją i aktualnym czasem/wynikiem
             update_msg = (
-                f"<b>ALERT</b> <i>({header_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {time_display}\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{frozen_badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{frozen_unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                f"⏱️ <b>Czas:</b> {time_info}\n\n"
+                f"🎯 <code>{frozen_badge}</code>\n"
+                f"💰 <b>Stawka:</b> <code>{frozen_unit_tag}</code>\n"
+                f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})"
             )
 
@@ -1842,9 +1843,9 @@ class TelegramNotifier:
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
                     f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
-                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                    f"📈 <b>Trafiony Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
                     f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                     f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
                 )
@@ -1920,9 +1921,9 @@ class TelegramNotifier:
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
                     f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
-                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                    f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
                     f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
                     f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
                 )
@@ -2016,9 +2017,9 @@ class TelegramNotifier:
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
                     f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
-                    f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                    f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                    f"📈 <b>Kurs początkowy STS:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
                     f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})\n\n"
                     f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
                 )
@@ -2077,13 +2078,12 @@ class TelegramNotifier:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
             updated_msg = (
-                f"<b>ALERT</b> <i>({header_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Czas:</b> {time_info}\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> {odds_str}\n"
+                f"🎯 <code>{badge}</code>\n"
+                f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Kurs:</b> {odds_str}\n"
                 f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})"
             )
 
