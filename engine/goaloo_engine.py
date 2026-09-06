@@ -190,29 +190,30 @@ class GoalooEngine:
                 p = sections[8].split(',')
                 if len(p) >= 3:
                     att_h = int(p[0]) if p[0].isdigit() else 0
-                    dang_h = int(p[1]) if p[1].isdigit() else 0
+                    s_off_h = int(p[1]) if p[1].isdigit() else 0
                     poss_h = int(p[2]) if p[2].isdigit() else 50
 
             if len(sections) > 9 and ',' in sections[9]:
                 p = sections[9].split(',')
                 if len(p) >= 3:
                     att_a = int(p[0]) if p[0].isdigit() else 0
-                    dang_a = int(p[1]) if p[1].isdigit() else 0
+                    s_off_a = int(p[1]) if p[1].isdigit() else 0
                     poss_a = int(p[2]) if p[2].isdigit() else 50
 
             if len(sections) > 10 and ',' in sections[10]:
                 p = sections[10].split(',')
                 if len(p) >= 2:
-                    shots_tot_h = int(p[0]) if p[0].isdigit() else 0
+                    dang_h = int(p[0]) if p[0].isdigit() else 0
                     s_on_h = int(p[1]) if p[1].isdigit() else 0
-                    s_off_h = max(0, shots_tot_h - s_on_h)
 
             if len(sections) > 11 and ',' in sections[11]:
                 p = sections[11].split(',')
                 if len(p) >= 2:
-                    shots_tot_a = int(p[0]) if p[0].isdigit() else 0
+                    dang_a = int(p[0]) if p[0].isdigit() else 0
                     s_on_a = int(p[1]) if p[1].isdigit() else 0
-                    s_off_a = max(0, shots_tot_a - s_on_a)
+
+            shots_tot_h = s_on_h + s_off_h
+            shots_tot_a = s_on_a + s_off_a
 
             if len(sections) > 14 and sections[14].isdigit():
                 corn_h = int(sections[14])
@@ -238,6 +239,8 @@ class GoalooEngine:
                 'attacks_away': att_a,
                 'dangerous_attacks_home': dang_h,
                 'dangerous_attacks_away': dang_a,
+                'dangerous_attacks_total': dang_total,
+                'has_da': True,
                 'possession_home': poss_h,
                 'possession_away': poss_a,
                 'shots_on_target_home': s_on_h,

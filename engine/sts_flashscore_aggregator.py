@@ -311,6 +311,9 @@ class STSFlashscoreAggregator:
                     stats['xg_home'] = xg_h
                     stats['xg_away'] = xg_a
                     stats['xg_total'] = round(xg_h + xg_a, 2)
+                    stats['xg_is_estimated'] = True
+                else:
+                    stats.setdefault('xg_is_estimated', False)
 
                 # Dopasuj do STS
                 sts_match = self.matcher.match_flashscore_with_sts(fs_m, sts_matches) if sts_matches else None
@@ -400,6 +403,8 @@ class STSFlashscoreAggregator:
                     'stage_text': fs_m['stage_text'],
                     'stats': stats,
                     'danger_index': d_idx,
+                    'danger_index_10': eval_res.get('danger_index_10', d_idx),
+                    'danger_index_5': eval_res.get('danger_index_5', d_idx),
                     'danger_rating': d_rat,
                     'apm': eval_res.get('apm', 0.8),
                     'has_signals': eval_res.get('has_signals', False),
@@ -519,6 +524,8 @@ class STSFlashscoreAggregator:
                     'stage_text': sts_m.get('stage_text', 'LIVE STS'),
                     'stats': stats,
                     'danger_index': d_idx,
+                    'danger_index_10': eval_res.get('danger_index_10', d_idx),
+                    'danger_index_5': eval_res.get('danger_index_5', d_idx),
                     'danger_rating': d_rat,
                     'apm': eval_res.get('apm', 0.8),
                     'has_signals': eval_res.get('has_signals', False),

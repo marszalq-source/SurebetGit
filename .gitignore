@@ -4,3 +4,5 @@ scratch/
 .system_generated/
 *.log
 bet_analytix_session.json
+*.bak
+test_fs.html

@@ -526,7 +526,7 @@ class GoalTriggersEngine:
 
         d_big_10 = float(deltas.get('delta_big_10', 0.0))
 
-        def _log_eval(c_type, market, odds, stage, status, reason=None, stars=0, ev_val=-1.0, model_p=0.0, implied_p=1.0, edge_val=0.0, raw_s=0, eff_s=0):
+        def _log_eval(c_type, market, odds, stage, status, reason=None, stars=0, ev_val=-1.0, model_p=0.0, implied_p=1.0, edge_val=0.0, raw_s=0, eff_s=0, dang_att=None):
             self.shadow_logger.log_evaluation(
                 match=match_data, scenario_type=c_type, market=market, odds=odds,
                 di_10=danger_index_10, di_5=danger_index_5,
@@ -534,6 +534,7 @@ class GoalTriggersEngine:
                 trend=trend, trend_state=trend_state,
                 sot_total=sot, sot_10m=d_sot_10, shots_total=shots_total,
                 corners_total=corners, big_chances=big_chances,
+                dangerous_attacks=dang_att if dang_att is not None else (int(stats['dangerous_attacks_total']) if stats.get('dangerous_attacks_total') is not None else None),
                 apm=apm, xg_total=xg_total, xg_10m=d_xg_10,
                 model_probability=model_p, implied_probability=implied_p,
                 edge=edge_val, ev=ev_val,
@@ -653,8 +654,39 @@ class GoalTriggersEngine:
                 cand['tier'] = 'SILVER'
                 cand['title'] = f"🥈 SILVER: {cand['title']}"
 
+            cand['is_golden'] = (cand.get('tier') == 'GOLDEN')
+            cand['is_silver'] = (cand.get('tier') == 'SILVER')
+            cand['di10'] = round(float(danger_index_10), 1)
+            cand['di5'] = round(float(danger_index_5), 1)
+            cand['sot10m'] = round(float(d_sot_10), 2)
+            cand['apm'] = round(float(apm), 2)
+            cand['xg'] = round(float(xg_total), 2)
+            # Rozróżnienie realnego 0 od braku danych (None / null w OOS)
+            has_da_metric = bool(stats.get('has_da') or ('dangerous_attacks_total' in stats and stats['dangerous_attacks_total'] is not None) or ('dangerous_attacks_home' in stats and 'dangerous_attacks_away' in stats))
+            if has_da_metric:
+                raw_da = stats.get('dangerous_attacks_total')
+                if raw_da is None and 'dangerous_attacks_home' in stats:
+                    raw_da = stats.get('dangerous_attacks_home', 0) + stats.get('dangerous_attacks_away', 0)
+                cand['dangerous_attacks'] = int(raw_da) if raw_da is not None else None
+            else:
+                cand['dangerous_attacks'] = None
+
+            has_bc_metric = bool(('big_chances_total' in stats and stats['big_chances_total'] is not None) or ('big_chances_home' in stats and 'big_chances_away' in stats))
+            if has_bc_metric:
+                raw_bc = stats.get('big_chances_total')
+                if raw_bc is None and 'big_chances_home' in stats:
+                    raw_bc = stats.get('big_chances_home', 0) + stats.get('big_chances_away', 0)
+                cand['big_chances'] = int(raw_bc) if raw_bc is not None else None
+            else:
+                cand['big_chances'] = None
+
+            cand['corners'] = int(corners)
+            cand['signal_type'] = cand.get('tier', 'SILVER')
+            cand['stats_provider'] = stats.get('source', 'FLASHSCORE')
+            cand['xg_is_estimated'] = bool(stats.get('xg_is_estimated', True))
+
             # Loguj wejście produkcyjne w ShadowLoggerze
-            _log_eval(cand_type, badge_v, odds_v, "11_ACCEPTED", "ACCEPTED", None, stars=stars_awarded, ev_val=ev_val, model_p=model_p, implied_p=implied_p, edge_val=edge_val, raw_s=raw_score, eff_s=effective_score)
+            _log_eval(cand_type, badge_v, odds_v, "11_ACCEPTED", "ACCEPTED", None, stars=stars_awarded, ev_val=ev_val, model_p=model_p, implied_p=implied_p, edge_val=edge_val, raw_s=raw_score, eff_s=effective_score, dang_att=cand['dangerous_attacks'])
 
             filtered_signals.append(cand)
 

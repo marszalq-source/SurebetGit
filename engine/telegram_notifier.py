@@ -436,10 +436,24 @@ class TelegramNotifier:
         if not device_messages:
             return False
         success = False
+        failed_devices = []
         for cid, msg_id in device_messages.items():
             res = self.edit_message(msg_id, text, chat_id=cid, parse_mode=parse_mode)
             if res.get("success") or res.get("not_modified"):
                 success = True
+            else:
+                failed_devices.append((cid, msg_id))
+
+        # Natychmiastowy retry dla czatów, które napotkały błąd (np. chwilowy 429 lub timeout)
+        if failed_devices:
+            time.sleep(0.5)
+            for cid, msg_id in failed_devices:
+                res_retry = self.edit_message(msg_id, text, chat_id=cid, parse_mode=parse_mode)
+                if res_retry.get("success") or res_retry.get("not_modified"):
+                    success = True
+                else:
+                    print(f"[Telegram Edit Retry] Nieudana edycja dla czatu {cid} (mid={msg_id}): {res_retry.get('error')}")
+
         return success
 
     def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None, show_alert: bool = False) -> Dict[str, Any]:
@@ -1316,9 +1330,16 @@ class TelegramNotifier:
         half_u = str(half or '').upper()
 
         # 1. Definitywny koniec meczu (FT - ranga 40)
-        if (
+        is_abandoned = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(status_code) in ('10', '11')
+        if is_abandoned:
+            return ('FT', 40)
+
+        # OCHRONA: Mecz piłkarski nie może zakończyć się FT przed 80. minutą (odrzucenie błędnych snapshotów/glitchy)
+        is_premature_ft = (0 < minute < 80)
+
+        if not is_premature_ft and (
             half_u == 'FT' 
-            or str(status_code) in ('3', '8', '9', '10', '11')
+            or str(status_code) in ('3', '8', '9')
             or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.'])
             or (not is_live and (minute >= 85 or 'koniec' in st_low or 'ended' in st_low))
         ):
@@ -1461,7 +1482,9 @@ class TelegramNotifier:
             card["apm"] = apm
 
             init_m = card.get('initial_minute', '')
-            time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            time_info = f"{time_display} (Typ z: {init_m}'{score_tag})" if init_m else time_display
 
             # Konstrukcja wiadomości ze stałą rekomendacją i aktualnym czasem/wynikiem
             update_msg = (
@@ -1571,6 +1594,14 @@ class TelegramNotifier:
                 "apm": apm,
                 "initial_danger": danger,
                 "initial_apm": apm,
+                "di10": signal.get("di10", danger),
+                "di5": signal.get("di5", danger),
+                "sot10m": signal.get("sot10m", 0.0),
+                "xg": signal.get("xg", 0.0),
+                "shots": signal.get("shots", 0),
+                "dangerous_attacks": signal.get("dangerous_attacks", 0),
+                "corners": signal.get("corners", 0),
+                "big_chances": signal.get("big_chances", 0),
                 "is_golden": is_golden,
                 "is_silver": is_silver,
                 "signal_type": sig_type,
@@ -1833,6 +1864,8 @@ class TelegramNotifier:
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
             profit_units = round(units * (init_odds - 1.0), 2)
 
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
             if is_golden:
                 ht_disp = ht_score_str or current_score
                 ht_line = f"⏱️ <b>Wynik HT:</b> <b>{ht_disp}</b>"
@@ -1854,7 +1887,7 @@ class TelegramNotifier:
                     f"🥈 <b>SILVER ({badge})</b> <i>(Trafiono: {win_time})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
-                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min</b> | <b>Trafiono:</b> <b>{win_time}</b>\n\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b> | <b>Trafiono:</b> <b>{win_time}</b>\n\n"
                     f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
                     f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
                 )
@@ -1863,7 +1896,7 @@ class TelegramNotifier:
                     f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
-                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
                     f"🎯 <code>{badge}</code>\n"
                     f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
                     f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
@@ -1920,6 +1953,8 @@ class TelegramNotifier:
         if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
             card["settling"] = True
             card["status"] = "SETTLEMENT_ATTEMPT"
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
             if is_golden:
                 void_msg = (
                     f"🟡 <b>GOLDEN (Over 1.5 HT)</b> <i>({stage_text})</i>\n\n"
@@ -1932,7 +1967,8 @@ class TelegramNotifier:
                 void_msg = (
                     f"🟡 <b>SILVER ({badge})</b> <i>({stage_text})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                    f"🏆 <b>Liga:</b> {league}\n\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b>\n\n"
                     f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
                     f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
                 )
@@ -1941,7 +1977,7 @@ class TelegramNotifier:
                     f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
-                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b>\n\n"
                     f"🎯 <code>{badge}</code>\n"
                     f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
                     f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
@@ -2002,8 +2038,10 @@ class TelegramNotifier:
                     if curr_tot < target_goals:
                         is_period_finished = True
         elif target_period == 'FT':
-            is_ft_over = (eff_rank >= 40)
-            if is_ft_over and curr_tot < target_goals:
+            card_age = now - card.get('created_at', now)
+            last_seen_m = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), minute)
+            is_valid_ft = (eff_rank >= 40 and (last_seen_m >= 80 or card_age >= 3000))
+            if is_valid_ft and curr_tot < target_goals:
                 is_period_finished = True
 
         if is_period_finished:
@@ -2011,6 +2049,8 @@ class TelegramNotifier:
             card["status"] = "SETTLEMENT_ATTEMPT"
             loss_time = f"{eff_minute}'" if (eff_minute > 0 and eff_minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
 
             if is_golden:
                 ht_disp = ht_score_str or current_score
@@ -2027,6 +2067,7 @@ class TelegramNotifier:
                     f"🔴 <b>SILVER ({badge})</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
                     f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
                     f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
                 )
@@ -2037,7 +2078,7 @@ class TelegramNotifier:
                     f"🔴 <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
                     f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                     f"🏆 <b>Liga:</b> {league}\n"
-                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
                     f"🎯 <code>{badge}</code>\n"
                     f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
                     f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
@@ -2098,7 +2139,9 @@ class TelegramNotifier:
 
             orig_odds = card.get('initial_odds', card.get('last_odds', 1.70))
             init_m = card.get('initial_minute', '')
-            time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            time_info = f"{time_display} (Typ z: {init_m}'{score_tag})" if init_m else time_display
             
             odds_str = f"<b>{orig_odds:.2f}</b>"
             if 1.10 <= latest_odds <= 3.50 and abs(latest_odds - orig_odds) > 0.05:
@@ -2192,25 +2235,9 @@ class TelegramNotifier:
                 if not card_home or not card_away:
                     continue
 
-                # 1. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS) - najwyższy priorytet
-                matching_fin = [m for m in finished_list if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)]
-                if matching_fin:
-                    fin_m = max(matching_fin, key=lambda m: (
-                        self._get_match_stage_rank(m.get('half'), m.get('stage_text'), False, str(m.get('status_code', '')), int(m.get('minute') or 90))[1],
-                        int(m.get('minute') or 90)
-                    ))
-                    if "ft_detected_at" not in card:
-                        card["ft_detected_at"] = now
-                        card["status"] = "FT_DETECTED"
-                    fin_m_copy = dict(fin_m)
-                    fin_m_copy['home_team'] = card_home
-                    fin_m_copy['away_team'] = card_away
-                    if self.check_and_update_match_status(fin_m_copy, card_key=key):
-                        settled_count += 1
-                    continue
-
-                # 2. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore) - wybierz najbardziej zaawansowany snapshot
+                # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore) - najwyższy priorytet dla trwających spotkań
                 matching_live = [m for m in live_matches if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)]
+                is_active_live = False
                 if matching_live:
                     live_m = max(matching_live, key=lambda m: (
                         self._get_match_stage_rank(m.get('half'), m.get('stage_text'), m.get('is_live', True), str(m.get('status_code', '')), int(m.get('minute') or 0))[1],
@@ -2223,36 +2250,83 @@ class TelegramNotifier:
                         status_code=str(live_m.get('status_code', '')),
                         minute=int(live_m.get('minute') or 0)
                     )
-                    if l_rank >= 40 and "ft_detected_at" not in card:
-                        card["ft_detected_at"] = now
-                        card["status"] = "FT_DETECTED"
 
-                    card['last_seen_time'] = now
-                    live_min = live_m.get('minute', 0)
-                    if isinstance(live_min, int) and live_min > 0:
-                        card['last_seen_minute'] = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), live_min)
-                    
-                    curr_score = live_m.get('score_str', '0:0')
-                    try:
-                        tot = sum(map(int, curr_score.split(':')))
-                        if tot >= card.get('highest_goals', card.get('initial_goals', 0)):
-                            card['last_seen_score'] = curr_score
-                    except Exception:
-                        pass
+                    # Jeśli mecz trwa na żywo i nie osiągnął definitywnego końca (FT)
+                    if live_m.get('is_live', True) and l_rank < 40:
+                        is_active_live = True
+                        card['last_seen_time'] = now
+                        live_min = live_m.get('minute', 0)
+                        if isinstance(live_min, int) and live_min > 0:
+                            card['last_seen_minute'] = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), live_min)
+                        
+                        curr_score = live_m.get('score_str', '0:0')
+                        try:
+                            tot = sum(map(int, curr_score.split(':')))
+                            if tot >= card.get('highest_goals', card.get('initial_goals', 0)):
+                                card['last_seen_score'] = curr_score
+                        except Exception:
+                            pass
 
-                    if l_rank >= card.get('highest_stage_rank', 0):
-                        card['last_seen_half'] = l_stage
-                        card['last_seen_stage'] = live_m.get('stage_text', f"{live_m.get('minute', 0)}'")
+                        if l_rank >= card.get('highest_stage_rank', 0):
+                            card['last_seen_half'] = l_stage
+                            card['last_seen_stage'] = live_m.get('stage_text', f"{live_m.get('minute', 0)}'")
 
-                    if live_m.get('sts_url'):
-                        card['sts_url'] = live_m['sts_url']
+                        if live_m.get('sts_url'):
+                            card['sts_url'] = live_m['sts_url']
 
-                    live_m_copy = dict(live_m)
-                    live_m_copy['home_team'] = card_home
-                    live_m_copy['away_team'] = card_away
-                    if self.check_and_update_match_status(live_m_copy, card_key=key):
-                        settled_count += 1
-                    continue
+                        live_m_copy = dict(live_m)
+                        live_m_copy['home_team'] = card_home
+                        live_m_copy['away_team'] = card_away
+                        if self.check_and_update_match_status(live_m_copy, card_key=key):
+                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                settled_count += 1
+                        continue
+
+                    # Jeśli mecz na żywo osiągnął status FT (koniec meczu na żywo)
+                    elif l_rank >= 40:
+                        if "ft_detected_at" not in card:
+                            card["ft_detected_at"] = now
+                            card["status"] = "FT_DETECTED"
+                        live_m_copy = dict(live_m)
+                        live_m_copy['home_team'] = card_home
+                        live_m_copy['away_team'] = card_away
+                        if self.check_and_update_match_status(live_m_copy, card_key=key):
+                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                settled_count += 1
+                        continue
+
+                # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS) - gdy mecz zniknął z live
+                matching_fin = [m for m in finished_list if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)]
+                if matching_fin and not is_active_live:
+                    fin_m = max(matching_fin, key=lambda m: (
+                        self._get_match_stage_rank(m.get('half'), m.get('stage_text'), False, str(m.get('status_code', '')), int(m.get('minute') or 90))[1],
+                        int(m.get('minute') or 90)
+                    ))
+                    f_stage, f_rank = self._get_match_stage_rank(fin_m.get('half'), fin_m.get('stage_text'), False, str(fin_m.get('status_code', '')), int(fin_m.get('minute') or 90))
+                    f_min = int(fin_m.get('minute') or 90)
+                    card_m = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0))
+                    card_age = now - card.get('created_at', now)
+
+                    is_valid_settlement = True
+                    if card.get('target_period') == 'FT' and f_rank >= 40:
+                        # Odrzuć przedwczesne FT ze starych lub błędnych snapshotów przed 80'
+                        if f_min < 80 or (card_m < 80 and card_age < 3000):
+                            st_low = str(fin_m.get('stage_text', '')).lower()
+                            is_void = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(fin_m.get('status_code', '')) in ('10', '11')
+                            if not is_void:
+                                is_valid_settlement = False
+
+                    if is_valid_settlement:
+                        if "ft_detected_at" not in card:
+                            card["ft_detected_at"] = now
+                            card["status"] = "FT_DETECTED"
+                        fin_m_copy = dict(fin_m)
+                        fin_m_copy['home_team'] = card_home
+                        fin_m_copy['away_team'] = card_away
+                        if self.check_and_update_match_status(fin_m_copy, card_key=key):
+                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                settled_count += 1
+                        continue
 
                 # 3. Mecz zniknął z oferty STS Live (zakończył się)
                 card_age = now - card.get('created_at', now)
@@ -2304,7 +2378,8 @@ class TelegramNotifier:
                         'is_live': False
                     }
                     if self.check_and_update_match_status(synthetic_finished, card_key=key):
-                        settled_count += 1
+                        if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                            settled_count += 1
 
             # === SETTLEMENT WATCHDOG AUDIT ===
             for key, card in list(self.active_match_cards.items()):

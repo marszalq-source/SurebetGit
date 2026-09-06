@@ -49,6 +49,7 @@ class ShadowLogger:
         stars: int = 0,
         corners_total: int = 0,
         big_chances: int = 0,
+        dangerous_attacks: Optional[int] = None,
         raw_di_10: Optional[int] = None,
         raw_di_5: Optional[int] = None
     ):
@@ -95,6 +96,7 @@ class ShadowLogger:
             "sot_total": int(sot_total),
             "sot_10m": round(float(sot_10m), 1),
             "shots_total": int(shots_total),
+            "dangerous_attacks": int(dangerous_attacks) if dangerous_attacks is not None else None,
             "corners_total": int(corners_total),
             "big_chances": int(big_chances),
             "apm": round(float(apm), 2),
