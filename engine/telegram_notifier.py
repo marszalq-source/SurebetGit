@@ -1346,16 +1346,27 @@ class TelegramNotifier:
             return ('FT', 40)
 
         # 2. Druga połowa (2H - ranga 30)
-        if half_u == '2H' or '2.' in st_low or (is_live and minute >= 46):
+        # Kod Flashscore 13 to oficjalnie 2. połowa (2H). Kody 13-17 to fazy 2H.
+        if (
+            half_u == '2H' 
+            or str(status_code) in ('13', '14', '15', '16', '17')
+            or str(stage_text).strip() in ('13', '14', '15', '16', '17')
+            or '2.' in st_low 
+            or '2nd' in st_low 
+            or st_low == '2h' 
+            or (is_live and minute >= 46)
+        ):
             return ('2H', 30)
 
         # 3. Przerwa (HT - ranga 20)
+        # Kody Flashscore 38 i 46 to oficjalnie Przerwa (HT).
         if (
             half_u == 'HT' 
-            or str(status_code) == '13' 
+            or str(status_code) in ('38', '46')
+            or str(stage_text).strip() in ('38', '46')
             or 'przerw' in st_low 
             or 'halftime' in st_low
-            or (is_live and minute == 45 and any(w in st_low for w in ['przerw', 'ht', 'break', 'pause', '13']))
+            or (is_live and minute == 45 and any(w in st_low for w in ['przerw', 'ht', 'break', 'pause']))
         ):
             return ('HT', 20)
 

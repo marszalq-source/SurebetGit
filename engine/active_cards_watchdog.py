@@ -11,9 +11,10 @@ Zasady:
 import os
 import json
 import time
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TELEMETRY_FILE = os.path.join(BASE_DIR, "watchdog_telemetry.jsonl")
@@ -105,6 +106,8 @@ class ActiveCardsWatchdog:
         self._wake_event = threading.Event()
         self._sts_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="WatchdogSTSWorker")
         self._card_sts_schedulers: Dict[str, CardSTSScheduler] = {}
+        self._last_logged_sync: Dict[str, Any] = {}
+        self._last_logged_snapshot: Dict[str, Any] = {}
 
         if hasattr(self.telegram, 'register_on_card_added'):
             self.telegram.register_on_card_added(self._on_card_added)
@@ -143,6 +146,12 @@ class ActiveCardsWatchdog:
         dead_keys = [k for k in self._card_sts_schedulers if k not in active_keys]
         for k in dead_keys:
             del self._card_sts_schedulers[k]
+        for k in list(self._last_logged_sync.keys()):
+            if k not in active_keys:
+                del self._last_logged_sync[k]
+        for k in list(self._last_logged_snapshot.keys()):
+            if k not in active_keys:
+                del self._last_logged_snapshot[k]
 
     def _fetch_subpage_isolated(self, sts_url: str, timeout: float = STS_PER_REQUEST_TIMEOUT) -> List[Dict[str, Any]]:
         """Pobiera rynki STS z niezależnym, sztywnym timeoutem per-request."""
@@ -188,6 +197,264 @@ class ActiveCardsWatchdog:
             self._wake_event.clear()
             self._wake_event.wait(timeout=sleep_time)
 
+    @staticmethod
+    def _parse_score_goals(score_str: str) -> int:
+        try:
+            parts = str(score_str or '').split(':')
+            if len(parts) == 2:
+                return int(parts[0]) + int(parts[1])
+        except Exception:
+            pass
+        return -1
+
+    @staticmethod
+    def _is_extra_time_match(match_dict: Optional[Dict[str, Any]]) -> bool:
+        """
+        Bezpieczne wykrywanie dogrywki (Extra Time).
+        Uwaga: NIE używa ogólnego podciągu 'et' (false-positive np. na 'reset', 'set').
+        AC=6 → Extra Time, AC=7 → Karne (Penalties).
+        Oba traktowane jako po-regulaminowe dla ochrony rynku FT.
+        """
+        if not match_dict:
+            return False
+        half = str(match_dict.get('half') or '').upper()
+        stage_text = str(match_dict.get('stage_text') or '').lower()
+        status_code = str(match_dict.get('status_code') or '').strip()
+        minute = int(match_dict.get('minute') or 0)
+        if half in ('ET', 'DOGRYWKA', 'EXTRA_TIME', 'PENALTIES', 'PEN'):
+            return True
+        # Używamy doprecyzowanych fraz zamiast ogólnego 'et' (niebezpieczny false-positive)
+        if any(w in stage_text for w in ['dogr', 'extra time', 'po dogr', 'dogrywka', 'karne', 'penalties']):
+            return True
+        # Dokładne dopasowanie słowa 'et' jako całego słowa (np. "ET 105'" ale nie "reset")
+        if re.search(r'\bet\b', stage_text):
+            return True
+        # Oficjalne kody Flashscore: AC=6 (Extra Time), AC=7 (Penalties)
+        if status_code in ('6', '7'):
+            return True
+        if minute > 90 and half not in ('1H', '2H', 'FT'):
+            return True
+        return False
+
+    def _reconcile_match_sources(
+        self,
+        card_key: str,
+        card: Dict[str, Any],
+        fs_match: Optional[Dict[str, Any]],
+        sts_match: Optional[Dict[str, Any]]
+    ) -> Tuple[Dict[str, Any], str, str]:
+        """
+        Wielowymiarowa, bezpieczna synchronizacja Flashscore i STS:
+        Uwzględnia: wynik, minutę, fazę meczu (stage/rank), kody AC/AB,
+        okres rynku (FT vs Extra Time) oraz monotoniczność.
+        NIGDY nie stosuje ślepej reguły 'więcej goli = lepsze źródło'.
+        """
+        if fs_match and not sts_match:
+            return fs_match, "FLASHSCORE", "FLASHSCORE_ONLY"
+        if sts_match and not fs_match:
+            # Jedyne źródło to STS — jeśli jest w ET/Pen i rynek FT, blokuj
+            target_period_solo = str(card.get('target_period') or 'FT').upper()
+            if target_period_solo == 'FT' and self._is_extra_time_match(sts_match):
+                return sts_match, "STS", "STS_ONLY_ET_BLOCKED_FOR_FT_MARKET"
+            return sts_match, "STS", "STS_ONLY"
+
+        target_period = str(card.get('target_period') or 'FT').upper()
+        card_highest_goals = card.get('highest_goals', card.get('initial_goals', 0))
+
+        fs_score = fs_match.get("score_str", "0:0")
+        sts_score = sts_match.get("score_str", "0:0")
+        fs_min = int(fs_match.get("minute") or 0)
+        sts_min = int(sts_match.get("minute") or 0)
+
+        fs_stage, fs_rank = self.telegram._get_match_stage_rank(
+            half=fs_match.get('half'),
+            stage_text=fs_match.get('stage_text'),
+            is_live=fs_match.get('is_live', True),
+            status_code=str(fs_match.get('status_code', '')),
+            minute=fs_min
+        )
+        sts_stage, sts_rank = self.telegram._get_match_stage_rank(
+            half=sts_match.get('half'),
+            stage_text=sts_match.get('stage_text'),
+            is_live=sts_match.get('is_live', True),
+            status_code=str(sts_match.get('status_code', '')),
+            minute=sts_min
+        )
+
+        fs_goals = self._parse_score_goals(fs_score)
+        sts_goals = self._parse_score_goals(sts_score)
+
+        fs_is_et = self._is_extra_time_match(fs_match)
+        sts_is_et = self._is_extra_time_match(sts_match)
+
+        # Reguła 1: FT vs Extra Time (Dogrywka)
+        # Dla rynku FT (90 min) wynik z dogrywki NIE MOŻE zmienić wyniku regulaminowego.
+        if target_period == 'FT':
+            if sts_is_et and not fs_is_et and fs_rank >= 30:
+                best_match = dict(fs_match)
+                if sts_match.get("sts_url"):
+                    best_match["sts_url"] = sts_match["sts_url"]
+                return best_match, "FLASHSCORE", "FT_MARKET_PROTECTION_REGULATION_PREFERRED"
+            if fs_is_et and not sts_is_et and sts_rank >= 30:
+                best_match = dict(sts_match)
+                return best_match, "STS", "FT_MARKET_PROTECTION_REGULATION_PREFERRED"
+            # Oba źródła są w dogrywce — bezpieczny fallback do FS (lower score = bardziej regulaminowe)
+            if sts_is_et and fs_is_et:
+                return fs_match, "FLASHSCORE", "BOTH_SOURCES_ET_BLOCKED_FOR_FT_MARKET"
+
+        # Reguła 2: Ochrona monotoniczności wyniku (brak rollbacku)
+        if fs_goals >= card_highest_goals and sts_goals < card_highest_goals:
+            best_match = dict(fs_match)
+            if sts_match.get("sts_url"):
+                best_match["sts_url"] = sts_match["sts_url"]
+            return best_match, "FLASHSCORE", "MONOTONICITY_GUARD_STS_ROLLBACK_REJECTED"
+
+        # Reguła 3: Zgodna aktualizacja nowszego gola na żywo z STS
+        # Aby zaakceptować wyższy wynik STS, faza i czas muszą być spójne (brak anachronizmów typu 45' vs 60')
+        if sts_goals > fs_goals:
+            sts_congruent = (
+                sts_rank >= fs_rank 
+                and sts_min >= (fs_min - 3)
+                and not sts_is_et
+            )
+            if sts_congruent:
+                selected_source = "STS"
+                reason = "STS_AHEAD_GOALS_CONGRUENT"
+                best_match = dict(sts_match)
+                if fs_match.get("flashscore_id"):
+                    best_match["flashscore_id"] = fs_match["flashscore_id"]
+            else:
+                selected_source = "FLASHSCORE"
+                reason = "INCONGRUENT_STAGE_STS_REJECTED"
+                best_match = dict(fs_match)
+                if sts_match.get("sts_url"):
+                    best_match["sts_url"] = sts_match["sts_url"]
+
+        elif fs_goals > sts_goals:
+            selected_source = "FLASHSCORE"
+            reason = "FLASHSCORE_AHEAD_GOALS"
+            best_match = dict(fs_match)
+            if sts_match.get("sts_url"):
+                best_match["sts_url"] = sts_match["sts_url"]
+            if sts_match.get("live_markets"):
+                best_match["live_markets"] = sts_match["live_markets"]
+        else:
+            # Reguła 4: EQUAL_GOALS — preferuj nowszą fazę/minutę zamiast ślepego consensusu FS.
+            # Kluczowy przypadek: FS 0:1 45' HT vs STS 0:1 48' 2H → STS ma wyższy rank (30 > 20)
+            # co oznacza, że mecz już ruszył w 2H — nie wolno zwrócić przestarzałego snapshotu HT.
+            if sts_rank > fs_rank and not sts_is_et:
+                selected_source = "STS"
+                reason = "EQUAL_GOALS_STS_FRESHER_STAGE"
+                best_match = dict(sts_match)
+                if fs_match.get("flashscore_id"):
+                    best_match["flashscore_id"] = fs_match["flashscore_id"]
+                if not best_match.get("sts_url"):
+                    best_match["sts_url"] = fs_match.get("sts_url") or best_match.get("sts_url")
+            elif sts_rank == fs_rank and sts_min > fs_min + 2 and not sts_is_et:
+                # Ten sam rank (np. obie 2H), ale STS ma minutę późniejszą o >2 minuty
+                selected_source = "STS"
+                reason = "EQUAL_GOALS_STS_FRESHER_MINUTE"
+                best_match = dict(sts_match)
+                if fs_match.get("flashscore_id"):
+                    best_match["flashscore_id"] = fs_match["flashscore_id"]
+                if not best_match.get("live_markets") and fs_match.get("live_markets"):
+                    best_match["live_markets"] = fs_match["live_markets"]
+            else:
+                selected_source = "FLASHSCORE"
+                reason = "EQUAL_GOALS_CONSENSUS"
+                best_match = dict(fs_match)
+                if sts_match.get("sts_url"):
+                    best_match["sts_url"] = sts_match["sts_url"]
+                if sts_match.get("live_markets"):
+                    best_match["live_markets"] = sts_match["live_markets"]
+
+        if fs_score != sts_score:
+            self._log_source_sync_telemetry(
+                card_key=card_key,
+                fs_match=fs_match,
+                sts_match=sts_match,
+                selected_match=best_match,
+                selected_source=selected_source,
+                reason=reason
+            )
+
+        return best_match, selected_source, reason
+
+    def _log_source_sync_telemetry(
+        self,
+        card_key: str,
+        fs_match: Optional[Dict[str, Any]],
+        sts_match: Optional[Dict[str, Any]],
+        selected_match: Dict[str, Any],
+        selected_source: str,
+        reason: str
+    ):
+        """Loguje zdarzenie synchronizacji/rozbieżności wyników między Flashscore i STS."""
+        now = time.time()
+        fs_score = fs_match.get("score_str", "") if fs_match else ""
+        sts_score = sts_match.get("score_str", "") if sts_match else ""
+        selected_score = selected_match.get("score_str", "")
+
+        state_sig = (fs_score, sts_score, selected_score, selected_source, reason)
+        if self._last_logged_sync.get(card_key) == state_sig:
+            return
+        self._last_logged_sync[card_key] = state_sig
+
+        rec = {
+            "timestamp": round(now, 3),
+            "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
+            "type": "SOURCE_SYNC",
+            "match_id": card_key,
+            "flashscore_score": fs_score,
+            "sts_score": sts_score,
+            "selected_score": selected_score,
+            "flashscore_minute": fs_match.get("minute") if fs_match else None,
+            "sts_minute": sts_match.get("minute") if sts_match else None,
+            "flashscore_stage": fs_match.get("half") or fs_match.get("stage_text") if fs_match else None,
+            "sts_stage": sts_match.get("half") or sts_match.get("stage_text") if sts_match else None,
+            "selected_source": selected_source,
+            "reason_for_selection": reason
+        }
+        self._log_telemetry(rec)
+
+    def _log_snapshot_telemetry(
+        self,
+        card_key: str,
+        accepted: bool,
+        inc_rank: int,
+        highest_stage_rank: int,
+        score: str,
+        minute: int,
+        ac_code: str,
+        ab_code: str,
+        stage: str,
+        reject_reason: Optional[str] = None
+    ):
+        """Loguje akceptację lub odrzucenie snapshotu przez Watchdog z deduplikacją."""
+        now = time.time()
+        state_sig = (accepted, inc_rank, highest_stage_rank, score, minute, stage, reject_reason)
+        if self._last_logged_snapshot.get(card_key) == state_sig:
+            return
+        self._last_logged_snapshot[card_key] = state_sig
+
+        rec = {
+            "timestamp": round(now, 3),
+            "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now)),
+            "type": "WATCHDOG_SNAPSHOT",
+            "match_id": card_key,
+            "accepted": accepted,
+            "inc_rank": inc_rank,
+            "highest_stage_rank": highest_stage_rank,
+            "score": score,
+            "minute": minute,
+            "AC": ac_code,
+            "AB": ab_code,
+            "stage": stage,
+        }
+        if not accepted:
+            rec["reject_reason"] = reject_reason or "STALE_STAGE_RANK (inc_rank < highest_stage_rank)"
+
+        self._log_telemetry(rec)
 
     def check_active_cards_once(self, live_matches: Optional[List[Dict[str, Any]]] = None, sts_matches: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """
@@ -225,14 +492,12 @@ class ActiveCardsWatchdog:
         t1 = time.time()
         feed_fetch_ms = round((t1 - t_fetch_start) * 1000, 1)
 
-        # 2. Rezerwowy feed ogólny STS (odpytywany TYLKO wtedy, gdy aktywna karta nie została odnaleziona we Flashscore)
-        unmatched_cards_exist = any(
-            not any(self.telegram._matches_card(c.get('home_team', ''), c.get('away_team', ''), m.get('home_team', ''), m.get('away_team', ''), k) for m in live_matches)
-            for k, c in cards_snapshot.items()
+        # 2. Feed ogólny STS: odpytywany dla wszystkich aktywnych kart, aby zapobiec Source Masking (opóźnienie Flashscore nie blokuje wykrycia gola)
+        active_pending_cards = [
+            c for k, c in cards_snapshot.items()
             if not c.get("settling") and not c.get("settled")
-        )
-
-        if unmatched_cards_exist and sts_matches is None:
+        ]
+        if active_pending_cards and sts_matches is None:
             try:
                 sts_matches = self.sts_engine.fetch_live_matches(include_esports=False)
             except Exception:
@@ -253,19 +518,30 @@ class ActiveCardsWatchdog:
             if not card_home or not card_away:
                 continue
 
-            # Znajdź dopasowanie w feedzie na żywo
-            matching = [m for m in live_matches if self.telegram._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), card_key)]
-            if not matching and sts_matches:
-                matching = [m for m in sts_matches if self.telegram._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), card_key)]
+            # Znajdź dopasowanie w obu źródłach niezależnie
+            fs_matching = [m for m in live_matches if self.telegram._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), card_key)]
+            sts_matching = [m for m in sts_matches if self.telegram._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), card_key)]
 
-            if not matching:
-                continue
-
-            # Wybierz snapshot z najwyższym stage_rank
-            best_match = max(matching, key=lambda m: (
+            fs_match = max(fs_matching, key=lambda m: (
                 self.telegram._get_match_stage_rank(m.get('half'), m.get('stage_text'), m.get('is_live', True), str(m.get('status_code', '')), int(m.get('minute') or 0))[1],
                 int(m.get('minute') or 0)
-            ))
+            )) if fs_matching else None
+
+            sts_match = max(sts_matching, key=lambda m: (
+                self.telegram._get_match_stage_rank(m.get('half'), m.get('stage_text'), m.get('is_live', True), str(m.get('status_code', '')), int(m.get('minute') or 0))[1],
+                int(m.get('minute') or 0)
+            )) if sts_matching else None
+
+            if not fs_match and not sts_match:
+                continue
+
+            # Bezpieczny, wielowymiarowy wybór wyniku (eliminacja Source Masking)
+            best_match, selected_source, sync_reason = self._reconcile_match_sources(
+                card_key=card_key,
+                card=card,
+                fs_match=fs_match,
+                sts_match=sts_match
+            )
 
             t_proc_start = time.time()
 
@@ -279,10 +555,41 @@ class ActiveCardsWatchdog:
             )
 
             highest_rank = card.get("highest_stage_rank", 0)
+            current_score = best_match.get("score_str", card.get("last_seen_score", "0:0"))
+            minute_val = int(best_match.get('minute') or 0)
+            ac_code = str(best_match.get('stage_text') or best_match.get('status_code') or '')
+            ab_code = str(best_match.get('status_code') or '')
+
             if inc_rank < highest_rank:
                 # Odrzuć zredukowany / opóźniony snapshot (Stale Snapshot Rejection)
                 self.counters["stale_snapshots_rejected"] += 1
+                self._log_snapshot_telemetry(
+                    card_key=card_key,
+                    accepted=False,
+                    inc_rank=inc_rank,
+                    highest_stage_rank=highest_rank,
+                    score=current_score,
+                    minute=minute_val,
+                    ac_code=ac_code,
+                    ab_code=ab_code,
+                    stage=inc_stage,
+                    reject_reason="STALE_STAGE_RANK (inc_rank < highest_stage_rank)"
+                )
                 continue
+
+            # Zaakceptowany snapshot
+            self._log_snapshot_telemetry(
+                card_key=card_key,
+                accepted=True,
+                inc_rank=inc_rank,
+                highest_stage_rank=highest_rank,
+                score=current_score,
+                minute=minute_val,
+                ac_code=ac_code,
+                ab_code=ab_code,
+                stage=inc_stage,
+                reject_reason=None
+            )
 
             # Niezależny harmonogram STS per-karta (Scheduler + Circuit Breaker + Sztywny Timeout)
             current_score = best_match.get("score_str", card.get("last_seen_score", "0:0"))
