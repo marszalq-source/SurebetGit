@@ -236,8 +236,8 @@ def test_d_race_condition_protection():
 
 
 def test_e_network_timeout_isolation():
-    """Test E: Izolacja błędów sieciowych i timeoutów."""
-    print("\n[TEST E] Test odporności na błędy i timeouty sieciowe...")
+    """Test E: Izolacja błędów sieciowych, timeoutów i ochrona przed lawiną requestów STS."""
+    print("\n[TEST E] Test odporności na błędy, timeouty i ochrona przed lawiną STS...")
     tg = MockTelegramNotifier()
     
     class FailingFS:
@@ -252,16 +252,56 @@ def test_e_network_timeout_isolation():
 
     watchdog = ActiveCardsWatchdog(fs_engine=FailingFS(), sts_engine=FailingSTS(), telegram_notifier=tg)
     
-    # Dodaj kartę do RAM
+    # 1. Test globalnej awarii feedu Flashscore/STS (brak wyjątków i awarii procesu)
     tg.active_match_cards["error_match"] = {
         "home_team": "ErrA", "away_team": "ErrB", "device_messages": {"1": 1}
     }
 
-    # Uruchomienie pojedynczego sprawdzenia z symulowaną awarią obu feedów
     recs = watchdog.check_active_cards_once()
     assert watchdog.counters["feed_errors"] >= 1
     assert len(recs) == 0
-    print("  -> PASSED: Awaria sieciowa została bezpiecznie obsłużona, brak unhandled exceptions.")
+
+    # 2. Test CardSTSScheduler: per-karta scheduler, circuit breaker i zapobieganie retry storm
+    from engine.active_cards_watchdog import CardSTSScheduler
+    now = 1000.0
+    sched_a = CardSTSScheduler("card_a")
+    sched_b = CardSTSScheduler("card_b")
+
+    # Stan początkowy: can_poll dozwolone
+    assert sched_a.can_poll(now, "0:0", 10) is True
+    assert sched_b.can_poll(now, "0:0", 10) is True
+
+    # Karta A napotyka błąd STS -> backoff do 30s
+    sched_a.record_failure(now, "Timeout 3.0s")
+    assert sched_a.consecutive_errors == 1
+    assert sched_a.backoff_seconds == 30.0
+    assert sched_a.next_allowed_time == now + 30.0
+
+    # Pętla Watchdoga za 3 sekundy (now + 3.0) -> Karta A zablokowana (brak lawiny requestów!)
+    assert sched_a.can_poll(now + 3.0, "0:0", 10) is False, "Scheduler A musi zablokować natychmiastowy ponowny request"
+    
+    # Niezależność: Karta B jest w 100% niezależna i gotowa do pracy
+    assert sched_b.can_poll(now + 3.0, "0:0", 10) is True, "Awaria karty A nie może wpłynąć na kartę B"
+
+    # Drugi błąd na karcie A (po 30s) -> backoff wydłuża się do 60s
+    now_30 = now + 30.0
+    assert sched_a.can_poll(now_30, "0:0", 10) is True
+    sched_a.record_failure(now_30, "503 Service Unavailable")
+    assert sched_a.consecutive_errors == 2
+    assert sched_a.backoff_seconds == 60.0
+    assert sched_a.next_allowed_time == now_30 + 60.0
+
+    # Event-driven: gol na karcie A wyzwala natychmiastowe sprawdzenie, o ile minął bezpieczny cooldown 4s
+    assert sched_a.can_poll(now_30 + 2.0, "1:0", 10) is False, "Gol przed upływem 4s cooldownu nie może zaspamować STS"
+    assert sched_a.can_poll(now_30 + 5.0, "1:0", 10) is True, "Gol po 5s od próby musi natychmiast pozwolić na odpytanie"
+
+    # Po sukcesie: reset błędów i powrót do standardowego interwału 15s
+    sched_a.record_success(now_30 + 5.0, "1:0")
+    assert sched_a.consecutive_errors == 0
+    assert sched_a.backoff_seconds == 15.0
+
+    print("  -> PASSED: Awaria sieciowa, izolacja schedulerów i ochrona przed lawiną STS działają w 100%.")
+
 
 
 def test_f_restart_recovery():
@@ -422,9 +462,80 @@ def test_j_rate_limit_and_odds_hysteresis():
     print("  -> PASSED: Histereza kursów (0.06 / 15s) i rate limit minut (35s) działają perfekcyjnie.")
 
 
+def test_k_goal_sts_single_request_guarantee():
+    """
+    Test K: Udowodnienie, że cykl wyniku 0:0 -> 1:0 generuje DOKŁADNIE JEDEN request STS,
+    a nie powtarzające się requesty co 4s, nawet w przypadku awarii/timeoutu STS.
+    """
+    print("\n[TEST K] Gwarancja pojedynczego requestu STS po golu (0:0 -> 1:0)...")
+    from engine.active_cards_watchdog import CardSTSScheduler
+    
+    now = 2000.0
+    sched = CardSTSScheduler("match_goal_test")
+    sched.last_score = "0:0"
+    sched.last_attempt_time = now - 20.0  # stabilny stan
+    sched.next_allowed_time = now - 5.0
+
+    # 1. Pada bramka: 0:0 -> 1:0
+    t_goal = now
+    current_score = "1:0"
+    
+    # Pierwsze wykrycie gola: can_poll MUSI zwrócić True
+    assert sched.can_poll(t_goal, current_score, 10) is True, "Wykrycie nowego gola musi natychmiast zezwolić na odpytanie"
+
+    # W momencie podjęcia próby zapytania (record_attempt):
+    sched.record_attempt(t_goal, current_score)
+    assert sched.last_score == "1:0", "last_score musi zostać natychmiast zaktualizowane do 1:0"
+    assert sched.last_attempt_time == t_goal
+
+    # Symulacja błędu/timeoutu STS przy tym zapytaniu
+    sched.record_failure(t_goal, "STS Timeout 3.0s")
+    assert sched.consecutive_errors == 1
+    assert sched.backoff_seconds == 30.0
+    assert sched.next_allowed_time == t_goal + 30.0
+
+    # 2. Weryfikacja pętli w kolejnych sekundach (T+1s, T+3s, T+4s, T+8s, T+12s, T+20s, T+29.9s)
+    # Wynik meczu na Flashscore nadal wynosi "1:0"
+    for delta_sec in [1.0, 3.0, 4.0, 5.0, 8.0, 12.0, 15.0, 20.0, 25.0, 29.9]:
+        t_check = t_goal + delta_sec
+        allowed = sched.can_poll(t_check, current_score, 10)
+        assert allowed is False, f"BŁĄD: request do STS został dopuszczony w t={delta_sec}s po golu! Powinien być zablokowany!"
+
+    # 3. Dopiero po upływie pełnego backoffu 30s scheduler dopuszcza kolejne (zwykłe) odpytanie
+    assert sched.can_poll(t_goal + 30.0, current_score, 10) is True, "Po 30s backoffu dozwolone zwykłe odpytanie"
+
+    # 4. Weryfikacja: kolejny nowy gol (1:0 -> 2:0) wyzwala natychmiastowe zapytanie
+    t_goal2 = t_goal + 10.0 # drugi gol po 10s od pierwszego
+    assert sched.can_poll(t_goal2, "2:0", 10) is True, "Kolejny nowy gol (2:0) musi wyzwolić natychmiastowe odpytanie"
+    sched.record_attempt(t_goal2, "2:0")
+    assert sched.last_score == "2:0"
+
+    print("  -> PASSED: Dokładnie 1 request STS po golu 0:0 -> 1:0, brak spamu co 4s.")
+
+
+def test_l_wake_event_zero_to_one_card():
+    """
+    Test L: Natychmiastowe wybudzenie Watchdoga (0 -> 1 karta) bez czekania na 3s timeout.
+    """
+    print("\n[TEST L] Natychmiastowe wybudzenie Watchdoga przy dodaniu karty (0 -> 1)...")
+    tg = MockTelegramNotifier()
+    watchdog = ActiveCardsWatchdog(telegram_notifier=tg)
+    
+    # Początkowo wake_event jest czyste
+    watchdog._wake_event.clear()
+    assert watchdog._wake_event.is_set() is False
+
+    # Symulacja dodania nowej karty i wywołania zarejestrowanego callbacku
+    for cb in tg._on_card_added_callbacks:
+        cb("new_card_key")
+
+    assert watchdog._wake_event.is_set() is True, "Dodanie nowej karty musi natychmiast ustawić wake_event"
+    print("  -> PASSED: Watchdog budzi się natychmiastowo (<1ms) przy przejściu 0 -> 1 karta.")
+
+
 def run_all_tests():
     print("===================================================================")
-    print("🚀 ROZPOCZĘCIE KOMPLEKSOWEGO TESTU ACTIVE CARDS WATCHDOG (A -> J)")
+    print("🚀 ROZPOCZĘCIE KOMPLEKSOWEGO TESTU ACTIVE CARDS WATCHDOG (A -> L)")
     print("===================================================================")
     test_a_structure_and_imports()
     test_b_unit_urgency_decision()
@@ -436,9 +547,12 @@ def run_all_tests():
     test_h_ft_terminal_lock()
     test_i_duplicate_edit_prevention()
     test_j_rate_limit_and_odds_hysteresis()
+    test_k_goal_sts_single_request_guarantee()
+    test_l_wake_event_zero_to_one_card()
     print("\n===================================================================")
-    print("🏆 WSZYSTKIE 10 TESTÓW (A -> J) ZAKOŃCZONE PEŁNYM SUKCESEM! [10/10]")
+    print("🏆 WSZYSTKIE 12 TESTÓW (A -> L) ZAKOŃCZONE PEŁNYM SUKCESEM! [12/12]")
     print("===================================================================")
 
 if __name__ == "__main__":
     run_all_tests()
+

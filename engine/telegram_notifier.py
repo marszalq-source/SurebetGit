@@ -16,6 +16,12 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 CARDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_active_cards.json")
 SUBSCRIBERS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_subscribers.json")
 
+# Wewnętrzny, konserwatywny throttle aplikacji chroniący przed nadmierną częstotliwością edycji
+# (architektonicznie niezależny od zewnętrznych limitów API):
+INTERNAL_MINUTE_THROTTLE_SECONDS = 35.0   # Minimalny odstęp czasu dla zwykłego odświeżenia minuty (REGULAR)
+INTERNAL_ODDS_THROTTLE_SECONDS = 15.0     # Minimalny odstęp czasu dla odświeżenia przy wahaniu kursu (ODDS_SWING)
+INTERNAL_ODDS_SWING_THRESHOLD = 0.06      # Minimalny skok kursu kwalifikujący zmianę jako istotną
+
 class TelegramNotifier:
     _instance = None
 
@@ -35,6 +41,7 @@ class TelegramNotifier:
         self._last_update_id = 0
         self._poll_lock = threading.Lock()
         self._processed_update_ids = set()
+        self._on_card_added_callbacks = []
         self._http = urllib3.PoolManager(
             maxsize=10,
             timeout=urllib3.Timeout(connect=5.0, read=25.0),
@@ -44,6 +51,12 @@ class TelegramNotifier:
         self.start_polling_thread()
         # Automatyczne rozliczenie zaległych kart po starcie systemu
         threading.Thread(target=self._startup_settlement_check, daemon=True, name="StartupSettlementWorker").start()
+
+    def register_on_card_added(self, callback):
+        """Rejestruje obserwatora wywoływanego natychmiast przy dodaniu nowej aktywnej karty (np. wybudzenie Watchdoga 0 -> 1)."""
+        if not hasattr(self, '_on_card_added_callbacks'):
+            self._on_card_added_callbacks = []
+        self._on_card_added_callbacks.append(callback)
 
     def setup_bot_menu_commands(self):
         """Rejestruje oficjalne komendy w menu bocznym Telegrama (Menu Button)."""
@@ -1571,6 +1584,14 @@ class TelegramNotifier:
                 pass
             self._save_cards()
             self._last_emitted_signal_time = now
+
+            # Natychmiastowe powiadomienie obserwatorów (wybudzenie Watchdoga 0 -> 1 bez czekania na timeout pętli)
+            for cb in getattr(self, '_on_card_added_callbacks', []):
+                try:
+                    cb(new_key)
+                except Exception:
+                    pass
+
             return True
         return False
 
@@ -2100,16 +2121,16 @@ class TelegramNotifier:
             last_rend_min = card.get("last_rendered_minute", card.get("initial_minute", 0))
             minute_advanced = (eff_minute > last_rend_min)
 
-            # Histereza i debounce kursu: minimalny skok 0.06 i min. 15s od ostatniej edycji kursowej
+            # Histereza i wewnętrzny throttle kursu: minimalny skok 0.06 i min. 15s od ostatniej edycji kursowej
             last_rendered_odds = card.get("last_rendered_odds", orig_odds)
             odds_diff = abs(latest_odds - last_rendered_odds) if (latest_odds and last_rendered_odds) else 0.0
             time_since_odds_edit = now - card.get("last_odds_edit_time", 0)
-            odds_swing = (odds_diff >= 0.06 and time_since_odds_edit >= 15.0 and 1.10 <= latest_odds <= 3.50)
+            odds_swing = (odds_diff >= INTERNAL_ODDS_SWING_THRESHOLD and time_since_odds_edit >= INTERNAL_ODDS_THROTTLE_SECONDS and 1.10 <= latest_odds <= 3.50)
 
             # Zdarzenia pilne (URGENT): gol, zmiana fazy (HT/2H), duży skok kursu
             is_urgent = (score_changed or stage_changed or odds_swing)
-            # Płynny upływ minuty (REGULAR): zmiana minuty po min. 35 sekundach od ostatniej edycji
-            regular_minute_update = (minute_advanced and time_since_edit >= 35.0)
+            # Płynny upływ minuty (REGULAR): zmiana minuty po upływie wewnętrznego throttle 35s od ostatniej edycji
+            regular_minute_update = (minute_advanced and time_since_edit >= INTERNAL_MINUTE_THROTTLE_SECONDS)
 
             card["last_seen_score"] = current_score
             card["last_seen_minute"] = eff_minute
