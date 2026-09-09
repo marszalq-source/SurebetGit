@@ -33,6 +33,7 @@ class TelegramNotifier:
 
     def _init_notifier(self):
         self._cards_lock = threading.RLock()
+        self._start_time = time.time()
         self.config = self.load_config()
         self.active_match_cards, self.settled_matches = self._load_cards()
         self.subscribers_data = self._load_subscribers()
@@ -64,6 +65,8 @@ class TelegramNotifier:
         if not token:
             return
         commands = [
+            {"command": "ping", "description": "🏓 Test łączności i status skanera live"},
+            {"command": "status", "description": "👑 Status systemu i czas pracy (Uptime)"},
             {"command": "stats", "description": "📊 Statystyki skuteczności (dzień, tydzień, ...)"},
             {"command": "sniper", "description": "🎯 Włącz / Wyłącz Tryb Snajper (VIP)"},
             {"command": "ba", "description": "📈 Bet-Analytix (Status i synchronizacja)"},
@@ -689,7 +692,7 @@ class TelegramNotifier:
 
                 # Normalizacja tekstu: np. "/ kod 30" -> "/kod 30", "admin" -> "/admin"
                 text = re.sub(r'^/\s+', '/', raw_text)
-                if text.lower() in ("admin", "panel", "status", "konto", "mojekonto", "kup", "cennik", "lista", "kody", "stats", "statystyki", "bilans", "raport"):
+                if text.lower() in ("admin", "panel", "status", "konto", "mojekonto", "kup", "cennik", "lista", "kody", "stats", "statystyki", "bilans", "raport", "ping", "test", "check", "dziala", "wycisz", "odcisz"):
                     text = "/" + text
                 text_lower = text.lower()
                 is_admin = (cid in admins)
@@ -1181,9 +1184,67 @@ class TelegramNotifier:
                         self.send_message("❌ Niepoprawny kod promocyjny. Sprawdź pisownię lub wpisz <code>/kup</code>.", chat_id=cid)
                     continue
 
+                elif text_lower.startswith(("/ping", "/test", "/check", "/dziala", "/alive")):
+                    uptime_secs = int(time.time() - getattr(self, '_start_time', time.time()))
+                    h, rem = divmod(uptime_secs, 3600)
+                    m, s = divmod(rem, 60)
+                    uptime_str = f"{h}h {m}m {s}s" if h > 0 else f"{m}m {s}s"
+                    start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(getattr(self, '_start_time', time.time())))
+
+                    from engine.notifications import is_sound_enabled
+                    sound_txt = "Wyciszony 🔇" if not is_sound_enabled() else "Włączony 🔊"
+                    cards_count = len(self.active_match_cards)
+
+                    ping_msg = (
+                        "🏓 <b>PONG! Skaner OverRadar Live DZIAŁA W PEŁNI!</b> 🟢\n\n"
+                        f"⏱️ <b>Czas pracy (Uptime):</b> <code>{uptime_str}</code>\n"
+                        f"📅 <b>Start usługi:</b> <code>{start_str}</code>\n"
+                        "💻 <b>Tryb:</b> Usługa tła Windows (AtStartup / SYSTEM)\n"
+                        "🌐 <b>Serwer HTTP:</b> <code>http://127.0.0.1:5050</code> (OK 🟢)\n"
+                        f"🎫 <b>Aktywne kupony:</b> <code>{cards_count}</code> / {self.config.get('max_active_cards', 3)}\n"
+                        f"🔇 <b>Dźwięk:</b> {sound_txt}\n"
+                        "🎯 <b>Model EV:</b> Poisson k-goli (Podatek 12%, min. kurs 1.48)\n\n"
+                        "🚀 <i>Komputer czuwa w tle, nawet bez logowania do pulpitu!</i>"
+                    )
+                    self.send_message(ping_msg, chat_id=cid)
+                    continue
+
+                elif is_admin and text_lower in ("/wycisz", "/mute", "/cicho", "/silent"):
+                    from engine.notifications import set_sound_enabled
+                    set_sound_enabled(False)
+                    self.send_message("🔇 <b>Dźwięki powiadomień na komputerze zostały wyłączone.</b>", chat_id=cid)
+                    continue
+
+                elif is_admin and text_lower in ("/odcisz", "/unmute", "/glos", "/sound", "/dzwiek"):
+                    from engine.notifications import set_sound_enabled
+                    set_sound_enabled(True)
+                    self.send_message("🔊 <b>Dźwięki powiadomień na komputerze zostały włączone.</b>", chat_id=cid)
+                    continue
+
                 elif text_lower in ("/status", "/mojekonto", "/konto"):
                     if is_admin:
-                        self.send_message("👑 <b>Twój status:</b> WŁAŚCICIEL / TWÓRCA (ADMIN)\n📅 <b>Ważność:</b> Dożywotnia (Bez limitu)", chat_id=cid)
+                        uptime_secs = int(time.time() - getattr(self, '_start_time', time.time()))
+                        h, rem = divmod(uptime_secs, 3600)
+                        m, s = divmod(rem, 60)
+                        uptime_str = f"{h}h {m}m {s}s" if h > 0 else f"{m}m {s}s"
+                        start_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(getattr(self, '_start_time', time.time())))
+
+                        from engine.notifications import is_sound_enabled
+                        sound_txt = "Wyciszony 🔇" if not is_sound_enabled() else "Włączony 🔊"
+                        cards_count = len(self.active_match_cards)
+
+                        status_msg = (
+                            "👑 <b>STATUS SKANERA OVERRADAR LIVE</b> 🟢\n\n"
+                            "👤 <b>Rola:</b> WŁAŚCICIEL / TWÓRCA (ADMIN)\n"
+                            f"⏱️ <b>Uptime bota:</b> <code>{uptime_str}</code> (od: {start_str})\n"
+                            "💻 <b>Tryb:</b> Usługa tła Windows (AtStartup / SYSTEM)\n"
+                            "🌐 <b>Serwer HTTP:</b> Port 5050 (Aktywny 🟢)\n"
+                            f"🎫 <b>Aktywne kupony:</b> <code>{cards_count}</code> / {self.config.get('max_active_cards', 3)}\n"
+                            f"🔇 <b>Dźwięk powiadomień:</b> {sound_txt}\n"
+                            "🎯 <b>Model algorytmu:</b> Over 1.5 FT k-goli (Podatek 12%, min. 1.48)\n\n"
+                            "💡 <i>Możesz wpisać <code>/ping</code>, aby szybko przetestować łączność.</i>"
+                        )
+                        self.send_message(status_msg, chat_id=cid)
                     elif sub_found:
                         r = sub_found.get("role", "VIP")
                         exp = sub_found.get("expires_at", "Brak danych")
