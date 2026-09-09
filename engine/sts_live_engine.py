@@ -7,6 +7,7 @@ import time
 import queue
 import threading
 import atexit
+from typing import List, Dict, Any, Optional, Tuple
 import os
 if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and os.path.exists(r"C:\Users\Technolog\AppData\Local\ms-playwright"):
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = r"C:\Users\Technolog\AppData\Local\ms-playwright"

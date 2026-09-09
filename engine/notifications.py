@@ -2,8 +2,36 @@
 Moduł powiadomień dla SurebetGit
 Obsluguje dzwięk oszczędnościowy (winsound) oraz Toast Notifications w Windows (winotify).
 """
+import os
+import json
 import sys
 import threading
+
+CONFIG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SOUND_CONFIG_FILE = os.path.join(CONFIG_DIR, "sound_config.json")
+
+
+def is_sound_enabled() -> bool:
+    """Zwraca True jeśli dźwięk jest włączony, False jeśli wyciszony."""
+    try:
+        if os.path.exists(SOUND_CONFIG_FILE):
+            with open(SOUND_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return bool(data.get("sound_enabled", True))
+    except Exception:
+        pass
+    return True
+
+
+def set_sound_enabled(enabled: bool) -> bool:
+    """Zapisuje stan włączenia dźwięków do pliku sound_config.json."""
+    try:
+        with open(SOUND_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({"sound_enabled": bool(enabled)}, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[SoundConfig Error] {e}")
+        return False
 
 try:
     import winsound
@@ -18,6 +46,9 @@ except ImportError:
 
 def play_surebet_sound():
     """Odtwarza w osobnym wątku chwytliwy sygnał powiadomienia o surebecie (zysk!)."""
+    if not is_sound_enabled():
+        return
+
     def _beep():
         if winsound:
             try:
@@ -41,7 +72,10 @@ def send_windows_notification(title: str, msg: str, icon_path: str = ""):
                     msg=msg,
                     duration="short"
                 )
-                toast.set_audio(audio.Default, loop=False)
+                if is_sound_enabled():
+                    toast.set_audio(audio.Default, loop=False)
+                else:
+                    toast.set_audio(audio.Silent, loop=False)
                 toast.show()
             except Exception as e:
                 print(f"[Notification Error] {e}")

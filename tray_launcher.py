@@ -41,6 +41,7 @@ try:
         sys.path.insert(0, BASE_DIR)
 
     from sts_live_scanner import LiveApi, run_http_server
+    from engine.notifications import is_sound_enabled, set_sound_enabled
 
     SERVER_URL = "http://127.0.0.1:5050"
     ICON_PATH = os.path.join(BASE_DIR, "assets", "app_icon.png")
@@ -126,6 +127,30 @@ try:
         icon.stop()
         os._exit(0)
 
+    def get_sound_menu_label(item):
+        if is_sound_enabled():
+            return "🔇 Wyłącz dźwięk skanera"
+        else:
+            return "🔊 Włącz dźwięk skanera"
+
+    def on_toggle_sound(icon, item):
+        new_state = not is_sound_enabled()
+        set_sound_enabled(new_state)
+        try:
+            import urllib.request
+            urllib.request.urlopen(f"http://127.0.0.1:5050/api/sound/toggle?enabled={str(new_state).lower()}", timeout=1)
+        except Exception:
+            pass
+        try:
+            icon.update_menu()
+        except Exception:
+            pass
+        status_text = "WŁĄCZONE 🔊" if new_state else "WYŁĄCZONE (Wyciszone) 🔇"
+        try:
+            icon.notify(f"Dźwięki powiadomień zostały {status_text}", "OverRadar Live – Dźwięk")
+        except Exception:
+            pass
+
     def main():
         print("Entering main()...")
         
@@ -135,7 +160,9 @@ try:
             item('🌐 Otwórz Panel Skanera', on_open_panel, default=True),
             item('📊 Otwórz Dziennik Typera & Stats', on_open_stats),
             pystray.Menu.SEPARATOR,
+            item(get_sound_menu_label, on_toggle_sound, checked=lambda item: is_sound_enabled()),
             item('🔄 Odśwież Skaner', on_restart),
+            pystray.Menu.SEPARATOR,
             item('❌ Wyłącz i Wyjdź', on_quit)
         )
         

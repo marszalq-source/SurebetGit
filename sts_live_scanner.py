@@ -399,6 +399,23 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
             self._send_json(result)
             return
 
+        # 6. Endpointy Dźwięku
+        elif parsed.path == '/api/sound':
+            from engine.notifications import is_sound_enabled
+            self._send_json({"sound_enabled": is_sound_enabled()})
+            return
+
+        elif parsed.path == '/api/sound/toggle':
+            from engine.notifications import is_sound_enabled, set_sound_enabled
+            target = params.get('enabled', [None])[0]
+            if target is not None:
+                new_state = target.lower() == 'true'
+            else:
+                new_state = not is_sound_enabled()
+            set_sound_enabled(new_state)
+            self._send_json({"sound_enabled": new_state})
+            return
+
         elif parsed.path == '/api/telegram/remove_sub':
             cid = params.get('chat_id', [''])[0]
             result = self.api_instance.remove_telegram_subscriber(cid)
