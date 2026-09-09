@@ -203,5 +203,6 @@ TRIGGERS_CONFIG = {
     }
 }
 
-# Powiadomienia dźwiękowe
-SOUND_ALERT_ENABLED = True
+# Powiadomienia dźwiękowe (domyślnie wyłączone)
+SOUND_ALERT_ENABLED = False
+

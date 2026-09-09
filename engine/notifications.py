@@ -12,15 +12,15 @@ SOUND_CONFIG_FILE = os.path.join(CONFIG_DIR, "sound_config.json")
 
 
 def is_sound_enabled() -> bool:
-    """Zwraca True jeśli dźwięk jest włączony, False jeśli wyciszony."""
+    """Zwraca True jeśli dźwięk jest włączony, False jeśli wyciszony (domyślnie: False)."""
     try:
         if os.path.exists(SOUND_CONFIG_FILE):
             with open(SOUND_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return bool(data.get("sound_enabled", True))
+                return bool(data.get("sound_enabled", False))
     except Exception:
         pass
-    return True
+    return False
 
 
 def set_sound_enabled(enabled: bool) -> bool:

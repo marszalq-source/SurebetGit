@@ -33,3 +33,15 @@ def test_sound_toggle():
     finally:
         # Przywrócenie stanu początkowego
         set_sound_enabled(initial)
+
+
+def test_default_sound_is_false():
+    # Przy braku pliku konfiguracyjnego domyślny stan to False
+    bak_path = SOUND_CONFIG_FILE + ".bak"
+    try:
+        if os.path.exists(SOUND_CONFIG_FILE):
+            os.replace(SOUND_CONFIG_FILE, bak_path)
+        assert is_sound_enabled() is False
+    finally:
+        if os.path.exists(bak_path):
+            os.replace(bak_path, SOUND_CONFIG_FILE)

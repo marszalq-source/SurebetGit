@@ -3,7 +3,7 @@ let activeTab = 'live';
 
 // Live state
 let currentMatches = [];
-let soundEnabled = true;
+let soundEnabled = false;
 let liveFilterMode = 'ALL'; // 'ALL', 'WORTH', 'SIGNALS'
 let halfFilter = 'ALL';
 let searchLiveQuery = '';
@@ -1299,12 +1299,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Dźwięk
-    document.getElementById('btn-sound').addEventListener('click', (e) => {
-        soundEnabled = !soundEnabled;
-        e.currentTarget.classList.toggle('active', soundEnabled);
-        e.currentTarget.innerHTML = soundEnabled ? '🔊 Dźwięk WŁ' : '🔇 Dźwięk WYŁ';
-        if (soundEnabled) playSignalSound();
-    });
+    const btnSound = document.getElementById('btn-sound');
+    if (btnSound) {
+        fetch('/api/sound')
+            .then(r => r.json())
+            .then(d => {
+                if (typeof d.sound_enabled === 'boolean') {
+                    soundEnabled = d.sound_enabled;
+                    btnSound.classList.toggle('active', soundEnabled);
+                    btnSound.classList.toggle('btn-success', soundEnabled);
+                    btnSound.classList.toggle('btn-secondary', !soundEnabled);
+                    btnSound.innerHTML = soundEnabled ? '🔊 Dźwięk WŁ' : '🔇 Dźwięk WYŁ';
+                }
+            })
+            .catch(() => {});
+
+        btnSound.addEventListener('click', (e) => {
+            soundEnabled = !soundEnabled;
+            btnSound.classList.toggle('active', soundEnabled);
+            btnSound.classList.toggle('btn-success', soundEnabled);
+            btnSound.classList.toggle('btn-secondary', !soundEnabled);
+            btnSound.innerHTML = soundEnabled ? '🔊 Dźwięk WŁ' : '🔇 Dźwięk WYŁ';
+            fetch(`/api/sound/toggle?enabled=${soundEnabled}`).catch(() => {});
+            if (soundEnabled) playSignalSound();
+        });
+    }
 
     // Filtry Live
     const btnAllLive = document.getElementById('btn-filter-all-live');
