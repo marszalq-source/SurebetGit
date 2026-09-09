@@ -17,6 +17,10 @@ os.chdir(BASE_DIR)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+# Ścieżka do przeglądarek Playwright dla konta SYSTEM
+if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and os.path.exists(r"C:\Users\Technolog\AppData\Local\ms-playwright"):
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = r"C:\Users\Technolog\AppData\Local\ms-playwright"
+
 # Plik logów usługi
 LOG_FILE = os.path.join(BASE_DIR, "background_service.log")
 log_fp = open(LOG_FILE, "a", encoding="utf-8")
