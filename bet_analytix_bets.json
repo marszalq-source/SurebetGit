@@ -2920,8 +2920,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.55,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788769752.3536189
+    "status": "WON",
+    "created_at": 1788769752.3536189,
+    "settled_at": 1788931580.3212237
   },
   "fardu ferghana vs aral nukus": {
     "bet_id": 119384815,
@@ -3029,8 +3030,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.55,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788802170.1120887
+    "status": "WON",
+    "created_at": 1788802170.1120887,
+    "settled_at": 1788931580.3212237
   },
   "petrojet fc vs al masry sc": {
     "bet_id": 119405484,
@@ -3048,8 +3050,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.57,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788806660.6840374
+    "status": "LOST",
+    "created_at": 1788806660.6840374,
+    "settled_at": 1788931580.3212237
   },
   "paulista sp vs gd prudente sp": {
     "bet_id": 119408752,
@@ -3147,8 +3150,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.65,
     "stake": 20.0,
-    "status": "PENDING",
-    "created_at": 1788832396.221185
+    "status": "WON",
+    "created_at": 1788832396.221185,
+    "settled_at": 1788931580.3212237
   },
   "mizoram police fc vs fc lawtngtlai": {
     "bet_id": 119448963,
