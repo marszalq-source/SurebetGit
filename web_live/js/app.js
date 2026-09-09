@@ -77,7 +77,7 @@ async function runLiveScan(force = false) {
             }
         } else {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             const resp = await fetch(`/api/scan?only_signals=false&half=ALL&_t=${Date.now()}`, { signal: controller.signal });
             clearTimeout(timeoutId);
             result = await resp.json();

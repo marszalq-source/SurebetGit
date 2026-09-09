@@ -2130,8 +2130,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.7,
     "stake": 30.0,
-    "status": "PENDING",
-    "created_at": 1788518375.811578
+    "status": "WON",
+    "created_at": 1788518375.811578,
+    "settled_at": 1788769769.1108294
   },
   "lions fc [k] vs eastern suburbs fc [k]": {
     "bet_id": 119145650,
@@ -2139,8 +2140,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.9,
     "stake": 30.0,
-    "status": "PENDING",
-    "created_at": 1788518654.3186772
+    "status": "LOST",
+    "created_at": 1788518654.3186772,
+    "settled_at": 1788769769.5188494
   },
   "salisbury inter [k] vs west adelaide [k]": {
     "bet_id": 119146308,
@@ -2168,8 +2170,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 2.0,
     "stake": 30.0,
-    "status": "PENDING",
-    "created_at": 1788520386.0186157
+    "status": "LOST",
+    "created_at": 1788520386.0186157,
+    "settled_at": 1788769769.9027762
   },
   "blue eagles vs renown sc": {
     "bet_id": 119146981,
@@ -2177,8 +2180,9 @@
     "badge": "OVER 2.5 FT",
     "odds": 2.21,
     "stake": 30.0,
-    "status": "PENDING",
-    "created_at": 1788520749.1606476
+    "status": "LOST",
+    "created_at": 1788520749.1606476,
+    "settled_at": 1788769770.283401
   },
   "hapoel bnei ein mahel vs sc bney mmba hagolan galil": {
     "bet_id": 119148966,
@@ -2186,7 +2190,1034 @@
     "badge": "OVER 2.5 FT",
     "odds": 1.62,
     "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788523451.4271686,
+    "settled_at": 1788769770.7089684
+  },
+  "royal union tubize-braine vs union rochefortoise": {
+    "bet_id": 119270335,
+    "match": "Royal Union Tubize-Braine vs Union Rochefortoise",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.71,
+    "stake": 30.0,
+    "status": "WON",
+    "created_at": 1788633993.4104843,
+    "settled_at": 1788636308.6433036
+  },
+  "campo grande ac rj vs aa carapebus rj": {
+    "bet_id": 119270351,
+    "match": "Campo Grande AC RJ vs AA Carapebus RJ",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.72,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788634008.4344003,
+    "settled_at": 1788637559.867431
+  },
+  "joinville ec sc vs blumenau ec sc": {
+    "bet_id": 119270363,
+    "match": "Joinville EC SC vs Blumenau EC SC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.76,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788634014.730031,
+    "settled_at": 1788640085.7074118
+  },
+  "kvv thes sport vs royal knokke": {
+    "bet_id": 119273030,
+    "match": "KVV Thes Sport vs Royal Knokke",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.63,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788636312.069693,
+    "settled_at": 1788637405.5856404
+  },
+  "atletico sucre vs cd fatic": {
+    "bet_id": 119274217,
+    "match": "Atletico Sucre vs CD Fatic",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788637409.916696,
+    "settled_at": 1788769771.1597674
+  },
+  "st. mirren fc vs celtic glasgow": {
+    "bet_id": 119274444,
+    "match": "St. Mirren FC vs Celtic Glasgow",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.48,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788637631.0553315,
+    "settled_at": 1788640294.1851735
+  },
+  "pacatuba ec ce vs calouros do ar fc": {
+    "bet_id": 119277044,
+    "match": "Pacatuba EC CE vs Calouros do Ar FC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.47,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788640129.5685635,
+    "settled_at": 1788640259.0062482
+  },
+  "trindade ac go vs goiania go": {
+    "bet_id": 119277048,
+    "match": "Trindade AC GO vs Goiania GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788640135.3633175,
+    "settled_at": 1788645607.7764044
+  },
+  "cd eldense vs rcd mallorca": {
+    "bet_id": 119277174,
+    "match": "CD Eldense vs RCD Mallorca",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.66,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788640281.3161483,
+    "settled_at": 1788642127.473139
+  },
+  "sporting lizbona vs nacional madeira": {
+    "bet_id": 119277259,
+    "match": "Sporting Lizbona vs Nacional Madeira",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788640389.9465034,
+    "settled_at": 1788769771.5948412
+  },
+  "santiago city fc vs cd concon national": {
+    "bet_id": 119279265,
+    "match": "Santiago City FC vs CD Concon National",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788642151.4465973,
+    "settled_at": 1788769771.9613044
+  },
+  "ce bento goncalves rs vs ec pelotas rs": {
+    "bet_id": 119281253,
+    "match": "CE Bento Goncalves RS vs EC Pelotas RS",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788644043.8176785,
+    "settled_at": 1788769772.3566945
+  },
+  "deportes linares vs colchagua cd": {
+    "bet_id": 119281267,
+    "match": "Deportes Linares vs Colchagua CD",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788644053.3767905,
+    "settled_at": 1788645699.5221612
+  },
+  "morrinhos fc go vs goianesia go": {
+    "bet_id": 119281610,
+    "match": "Morrinhos FC GO vs Goianesia GO",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788644391.7903907,
+    "settled_at": 1788668458.0018756
+  },
+  "cd universitario penonome ii vs independiente la chorrera ii": {
+    "bet_id": 119282946,
+    "match": "CD Universitario Penonome II vs Independiente La Chorrera II",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788645688.6504574,
+    "settled_at": 1788646597.2395592
+  },
+  "everton vina del mar vs universidad catolica santiago": {
+    "bet_id": 119283108,
+    "match": "Everton Vina del Mar vs Universidad Catolica Santiago",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788645931.7113698,
+    "settled_at": 1788646175.613804
+  },
+  "deportes quindio vs cd real santander": {
+    "bet_id": 119283534,
+    "match": "Deportes Quindio vs CD Real Santander",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788646458.9422102,
+    "settled_at": 1788668457.8773782
+  },
+  "cibao cf vs ca vega real": {
+    "bet_id": 119283734,
+    "match": "Cibao CF vs CA Vega Real",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788646729.7976766,
+    "settled_at": 1788647875.9212837
+  },
+  "ceara sc vs sport recife": {
+    "bet_id": 119284793,
+    "match": "Ceara SC vs Sport Recife",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788647913.1730466,
+    "settled_at": 1788668458.5563223
+  },
+  "sydney united vs manly united fc": {
+    "bet_id": 119295198,
+    "match": "Sydney United vs Manly United FC",
+    "badge": "OVER 1.5 HT",
+    "odds": 1.95,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788668848.5070693,
+    "settled_at": 1788668853.7514446
+  },
+  "fc tokushima vs r. velho takamatsu": {
+    "bet_id": 119295208,
+    "match": "FC Tokushima vs R. Velho Takamatsu",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.53,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788668884.0454783,
+    "settled_at": 1788669602.9817407
+  },
+  "nankatsu sc [k] vs bunnys gunma fc white star [k]": {
+    "bet_id": 119295257,
+    "match": "Nankatsu SC [K] vs Bunnys Gunma FC White Star [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788669082.907634,
+    "settled_at": 1788673620.756052
+  },
+  "taroona [k] vs launceston united [k]": {
+    "bet_id": 119295497,
+    "match": "Taroona [K] vs Launceston United [K]",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.05,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788670249.9443555,
+    "settled_at": 1788670990.5059397
+  },
+  "adelaide comets fc ii [k] vs metrostars adelaide ii [k]": {
+    "bet_id": 119295772,
+    "match": "Adelaide Comets FC II [K] vs MetroStars Adelaide II [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.48,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788671261.5883868,
+    "settled_at": 1788675810.6861534
+  },
+  "tadotsu fc vs kufc nankoku": {
+    "bet_id": 119295985,
+    "match": "Tadotsu FC vs Kufc Nankoku",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788672316.3629375,
+    "settled_at": 1788676858.237696
+  },
+  "ravia sa vs qi yi fc": {
+    "bet_id": 119296531,
+    "match": "Ravia SA vs Qi Yi FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788674175.0482533,
+    "settled_at": 1788677627.2198505
+  },
+  "broadmeadow magic fc vs maitland fc": {
+    "bet_id": 119297152,
+    "match": "Broadmeadow Magic FC vs Maitland FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.44,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788675836.6140854,
+    "settled_at": 1788678163.867601
+  },
+  "apia leichhardt tigers vs nws spirit": {
+    "bet_id": 119298422,
+    "match": "APIA Leichhardt Tigers vs NWS Spirit",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788678780.3876576,
+    "settled_at": 1788679746.2991812
+  },
+  "moreton city excelsior u23 vs gold coast knights u23": {
+    "bet_id": 119299651,
+    "match": "Moreton City Excelsior U23 vs Gold Coast Knights U23",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.73,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788680935.049451,
+    "settled_at": 1788685886.083355
+  },
+  "sun hei sc vs sui tung": {
+    "bet_id": 119299935,
+    "match": "Sun Hei SC vs Sui Tung",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788681473.7471437,
+    "settled_at": 1788681759.2919822
+  },
+  "citizen aa vs south china fc": {
+    "bet_id": 119299981,
+    "match": "Citizen AA vs South China FC",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.58,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788681544.8754666,
+    "settled_at": 1788682528.306453
+  },
+  "kwai tsing vs wong tai sin": {
+    "bet_id": 119300102,
+    "match": "Kwai Tsing vs Wong Tai Sin",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.58,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788681778.6519463,
+    "settled_at": 1788687183.3585389
+  },
+  "shatin sa vs golik north district": {
+    "bet_id": 119300864,
+    "match": "Shatin SA vs Golik North District",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788683071.5461953,
+    "settled_at": 1788685735.3949964
+  },
+  "nyiregyhaza spartacus ii vs cigand se": {
+    "bet_id": 119303263,
+    "match": "Nyiregyhaza Spartacus II vs Cigand SE",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.0,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788686383.9143379,
+    "settled_at": 1788686675.0241885
+  },
+  "łks ii łomża vs pionier brańsk": {
+    "bet_id": 119303335,
+    "match": "ŁKS II Łomża vs Pionier Brańsk",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.05,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788686480.1782413,
+    "settled_at": 1788686687.7736151
+  },
+  "fc hradec kralove [k] vs fk pardubice [k]": {
+    "bet_id": 119303507,
+    "match": "FC Hradec Kralove [K] vs FK Pardubice [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.48,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788686722.3903356,
+    "settled_at": 1788691274.6188495
+  },
+  "valencia cf mestalla vs rcd mallorca b": {
+    "bet_id": 119303517,
+    "match": "Valencia CF Mestalla vs RCD Mallorca B",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.26,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788686730.4278204,
+    "settled_at": 1788688301.8774948
+  },
+  "esperanca d'andorra vs inter escaldes": {
+    "bet_id": 119303946,
+    "match": "Esperanca d'Andorra vs Inter Escaldes",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.95,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788687229.6769528,
+    "settled_at": 1788687790.240687
+  },
+  "viktoria zizkov vs fk pribram": {
+    "bet_id": 119304399,
+    "match": "Viktoria Zizkov vs FK Pribram",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788688012.0904737,
+    "settled_at": 1788689312.4946148
+  },
+  "fk teplice b vs fk pardubice b": {
+    "bet_id": 119304607,
+    "match": "FK Teplice B vs FK Pardubice B",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788688331.990098,
+    "settled_at": 1788690100.454533
+  },
+  "volos nps u19 vs olympiakos pireus u19": {
+    "bet_id": 119305540,
+    "match": "Volos NPS U19 vs Olympiakos Pireus U19",
+    "badge": "OVER 1.5 FT",
+    "odds": 2.0,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788689562.1834087,
+    "settled_at": 1788690377.2972531
+  },
+  "sparta praga [k] vs slavia praga [k]": {
+    "bet_id": 119305944,
+    "match": "Sparta Praga [K] vs Slavia Praga [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.47,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788690110.6598275,
+    "settled_at": 1788691269.9945576
+  },
+  "cadiz cf u19 vs sevilla fc u19": {
+    "bet_id": 119306185,
+    "match": "Cadiz CF U19 vs Sevilla FC U19",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788690383.4709053,
+    "settled_at": 1788693047.7779276
+  },
+  "sd amorebieta vs arosa sc": {
+    "bet_id": 119306877,
+    "match": "SD Amorebieta vs Arosa SC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.67,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788691299.0999978,
+    "settled_at": 1788694218.6230493
+  },
+  "cd badajoz vs cd tenerife b": {
+    "bet_id": 119307687,
+    "match": "CD Badajoz vs CD Tenerife B",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788692327.2893512,
+    "settled_at": 1788694599.8718016
+  },
+  "jagiellonia białystok u19 vs escola varsovia warszawa u19": {
+    "bet_id": 119308489,
+    "match": "Jagiellonia Białystok U19 vs Escola Varsovia Warszawa U19",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.97,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788693153.8999884,
+    "settled_at": 1788694805.295805
+  },
+  "hubei istar u20 vs shanghai port u20": {
+    "bet_id": 119309740,
+    "match": "Hubei Istar U20 vs Shanghai Port U20",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788694274.1636264,
+    "settled_at": 1788697479.3382907
+  },
+  "indie u20 vs bangladesz u20": {
+    "bet_id": 119310438,
+    "match": "Indie U20 vs Bangladesz U20",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.62,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788694918.5127928,
+    "settled_at": 1788698301.4074247
+  },
+  "ca osasuna u19 vs ud valle de aranguren u19": {
+    "bet_id": 119310702,
+    "match": "CA Osasuna U19 vs UD Valle de Aranguren U19",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788695084.5797377,
+    "settled_at": 1788695707.2483623
+  },
+  "aarhus fremad vs kolding if": {
+    "bet_id": 119311381,
+    "match": "Aarhus Fremad vs Kolding IF",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.76,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788695741.103905,
+    "settled_at": 1788697942.0858548
+  },
+  "kambodża u20 vs kuwejt u20": {
+    "bet_id": 119313672,
+    "match": "Kambodża U20 vs Kuwejt U20",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788697512.7441013,
+    "settled_at": 1788769772.7090323
+  },
+  "gor mahia fc vs pyramids fc": {
+    "bet_id": 119314500,
+    "match": "Gor Mahia FC vs Pyramids FC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.73,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788698118.9709144,
+    "settled_at": 1788703400.879822
+  },
+  "malezja u20 vs laos u20": {
+    "bet_id": 119315202,
+    "match": "Malezja U20 vs Laos U20",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788698653.9787369,
+    "settled_at": 1788701965.4058857
+  },
+  "fc zlin vs fk teplice": {
+    "bet_id": 119319752,
+    "match": "FC Zlin vs FK Teplice",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.66,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788702229.8437796,
+    "settled_at": 1788706065.7270677
+  },
+  "cs scandicci vs acr siena": {
+    "bet_id": 119321242,
+    "match": "CS Scandicci vs ACR Siena",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.77,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788703401.709867,
+    "settled_at": 1788706833.6884801
+  },
+  "kepez belediyespor vs anadolu universitesi": {
+    "bet_id": 119324545,
+    "match": "Kepez Belediyespor vs Anadolu Universitesi",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.8,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788706103.3848982,
+    "settled_at": 1788708700.9373276
+  },
+  "fc kitzbuhel vs grazer ak": {
+    "bet_id": 119325967,
+    "match": "FC Kitzbuhel vs Grazer AK",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.83,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788707026.8830173,
+    "settled_at": 1788709930.0439074
+  },
+  "bsk bijelo brdo vs jadran luka ploce": {
+    "bet_id": 119331178,
+    "match": "BSK Bijelo Brdo vs Jadran Luka Ploce",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.74,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788710107.5642076,
+    "settled_at": 1788713791.6009982
+  },
+  "sarpsborg ff vs valerenga oslo": {
+    "bet_id": 119331278,
+    "match": "Sarpsborg FF vs Valerenga Oslo",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.71,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788710195.7796485,
+    "settled_at": 1788712978.8768036
+  },
+  "hellas verona vs ss arezzo": {
+    "bet_id": 119336467,
+    "match": "Hellas Verona vs SS Arezzo",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.69,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788713653.550189,
+    "settled_at": 1788713735.2132573
+  },
+  "cd celoricense vs fc tirsense": {
+    "bet_id": 119336669,
+    "match": "CD Celoricense vs FC Tirsense",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788713811.2609637,
+    "settled_at": 1788715688.4209774
+  },
+  "rebordosa ac vs atletico de vila mea": {
+    "bet_id": 119336693,
+    "match": "Rebordosa AC vs Atletico de Vila Mea",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.72,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788713829.1958518,
+    "settled_at": 1788718013.6958256
+  },
+  "viimsi jk [k] vs flora tallin [k]": {
+    "bet_id": 119338789,
+    "match": "Viimsi JK [K] vs Flora Tallin [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.64,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788715740.2916758,
+    "settled_at": 1788715754.4395459
+  },
+  "kocaelispor\ngol vs samsunspor": {
+    "bet_id": 119338863,
+    "match": "Kocaelispor\nGOL vs Samsunspor",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.58,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788715785.3317885,
+    "settled_at": 1788716843.3276308
+  },
+  "cd guadalajara vs salamanca uds": {
+    "bet_id": 119340544,
+    "match": "CD Guadalajara vs Salamanca UDS",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.74,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788717037.4967313,
+    "settled_at": 1788720147.746673
+  },
+  "ad sarchi vs ad rosario": {
+    "bet_id": 119342111,
+    "match": "AD Sarchi vs AD Rosario",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.76,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788718070.2670755,
+    "settled_at": 1788720330.5391836
+  },
+  "cdc nicanor otamendi vs csd sol de mayo": {
+    "bet_id": 119346008,
+    "match": "CDC Nicanor Otamendi vs CSD Sol de Mayo",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788720341.7421064,
+    "settled_at": 1788723829.7635338
+  },
+  "audax rio ec rj u20 vs artsul fc rj": {
+    "bet_id": 119346057,
+    "match": "Audax Rio EC RJ U20 vs Artsul FC RJ",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.73,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788720390.0393355,
+    "settled_at": 1788723830.778598
+  },
+  "deportes rengo vs santiago morning": {
+    "bet_id": 119350021,
+    "match": "Deportes Rengo vs Santiago Morning",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788723863.0737343,
+    "settled_at": 1788725725.916182
+  },
+  "gil vicente vs academico viseu": {
+    "bet_id": 119350473,
+    "match": "Gil Vicente vs Academico Viseu",
+    "badge": "OVER 1.5 HT",
+    "odds": 2.1,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788724300.9794168,
+    "settled_at": 1788725883.5585513
+  },
+  "ca central cordoba vs ca independiente": {
+    "bet_id": 119352385,
+    "match": "CA Central Cordoba vs CA Independiente",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788726447.465778,
+    "settled_at": 1788754623.1566908
+  },
+  "ca central norte salta vs almirante brown": {
+    "bet_id": 119352422,
+    "match": "CA Central Norte Salta vs Almirante Brown",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788726482.7706103,
+    "settled_at": 1788754623.152588
+  },
+  "shaanxi union u20 vs beijing guoan u20": {
+    "bet_id": 119376004,
+    "match": "Shaanxi Union U20 vs Beijing Guoan U20",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
     "status": "PENDING",
-    "created_at": 1788523451.4271686
+    "created_at": 1788769752.3536189
+  },
+  "fardu ferghana vs aral nukus": {
+    "bet_id": 119384815,
+    "match": "Fardu Ferghana vs Aral Nukus",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.63,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788781219.239976,
+    "settled_at": 1788785736.0870519
+  },
+  "al-ahed fc vs akhaa ahli aley": {
+    "bet_id": 119386493,
+    "match": "Al-Ahed FC vs Akhaa Ahli Aley",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.53,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788784266.3744426,
+    "settled_at": 1788788273.4338863
+  },
+  "korea północna u20 [k] vs portugalia u20 [k]": {
+    "bet_id": 119390220,
+    "match": "Korea Północna U20 [K] vs Portugalia U20 [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.77,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788789566.7336717,
+    "settled_at": 1788793124.1885364
+  },
+  "sportist svoge vs lokomotiv gorna oryahovitsa": {
+    "bet_id": 119391018,
+    "match": "Sportist Svoge vs Lokomotiv Gorna Oryahovitsa",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788790634.539281,
+    "settled_at": 1788796437.7250245
+  },
+  "istanbulspor vs igdir belediyespor": {
+    "bet_id": 119392471,
+    "match": "Istanbulspor vs Igdir Belediyespor",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.8,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788792399.627341,
+    "settled_at": 1788796646.3129058
+  },
+  "fc asia talas vs alga bishkek": {
+    "bet_id": 119394791,
+    "match": "FC Asia Talas vs Alga Bishkek",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788793184.3213317,
+    "settled_at": 1788796395.7031794
+  },
+  "fc telavi vs fc samtredia": {
+    "bet_id": 119399303,
+    "match": "FC Telavi vs FC Samtredia",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.48,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788798234.880792,
+    "settled_at": 1788802139.2278128
+  },
+  "fk vozdovac vs tsc backa topola": {
+    "bet_id": 119399467,
+    "match": "FK Vozdovac vs TSC Backa Topola",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788798424.416276,
+    "settled_at": 1788801360.8277707
+  },
+  "al-jabalain fc vs al-wehda fc": {
+    "bet_id": 119399721,
+    "match": "Al-Jabalain FC vs Al-Wehda FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788798688.4785976,
+    "settled_at": 1788804310.1015432
+  },
+  "cagliari vs lecce": {
+    "bet_id": 119402752,
+    "match": "Cagliari vs Lecce",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.29,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788801697.6921208,
+    "settled_at": 1788805601.1036432
+  },
+  "lusitania fc\ngol vs avs futebol sad": {
+    "bet_id": 119403248,
+    "match": "Lusitania FC\nGOL vs AVS Futebol SAD",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788802170.1120887
+  },
+  "petrojet fc vs al masry sc": {
+    "bet_id": 119405484,
+    "match": "Petrojet FC vs Al Masry SC",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.0,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788804419.9759684,
+    "settled_at": 1788805234.6645455
+  },
+  "deportivo maldonado ii vs juventud las piedras ii": {
+    "bet_id": 119408685,
+    "match": "Deportivo Maldonado II vs Juventud Las Piedras II",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.57,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788806660.6840374
+  },
+  "paulista sp vs gd prudente sp": {
+    "bet_id": 119408752,
+    "match": "Paulista SP vs GD Prudente SP",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.3,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788806725.1255279,
+    "settled_at": 1788808880.8565958
+  },
+  "catania fc vs cosenza calcio": {
+    "bet_id": 119409364,
+    "match": "Catania FC vs Cosenza Calcio",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788807431.2689672,
+    "settled_at": 1788810448.2837167
+  },
+  "pro vercelli vs folgore caratese": {
+    "bet_id": 119413229,
+    "match": "Pro Vercelli vs Folgore Caratese",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.15,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788810540.460069,
+    "settled_at": 1788814971.2203596
+  },
+  "glentoran belfast [k] vs linfield fc [k]": {
+    "bet_id": 119413368,
+    "match": "Glentoran Belfast [K] vs Linfield FC [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.57,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788810700.4725828,
+    "settled_at": 1788811775.9757614
+  },
+  "stjarnan gardabaer [k] vs vikingur reykjavik [k]": {
+    "bet_id": 119415699,
+    "match": "Stjarnan Gardabaer [K] vs Vikingur Reykjavik [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788812353.3072598,
+    "settled_at": 1788814934.7440314
+  },
+  "ad carmelita vs pitbulls santa barbara": {
+    "bet_id": 119418271,
+    "match": "AD Carmelita vs Pitbulls Santa Barbara",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788815128.6410544,
+    "settled_at": 1788818253.6035488
+  },
+  "cerro porteno asuncion vs nacional asuncion": {
+    "bet_id": 119420778,
+    "match": "Cerro Porteno Asuncion vs Nacional Asuncion",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.85,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788817641.4441726,
+    "settled_at": 1788823537.175156
+  },
+  "ec vitoria ba vs gremio porto alegre": {
+    "bet_id": 119425243,
+    "match": "EC Vitoria BA vs Gremio Porto Alegre",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.47,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788823381.4229097,
+    "settled_at": 1788829415.4877431
+  },
+  "universidad central vs academia puerto cabello": {
+    "bet_id": 119425329,
+    "match": "Universidad Central vs Academia Puerto Cabello",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788823684.0667624,
+    "settled_at": 1788829029.9533737
+  },
+  "atletico nacional medellin vs deportivo cali": {
+    "bet_id": 119437644,
+    "match": "Atletico Nacional Medellin vs Deportivo Cali",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1788832396.221185
+  },
+  "mizoram police fc vs fc lawtngtlai": {
+    "bet_id": 119448963,
+    "match": "Mizoram Police FC vs FC Lawtngtlai",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788860528.8665712,
+    "settled_at": 1788863344.0416195
+  },
+  "yangon united vs ezra fc": {
+    "bet_id": 119450642,
+    "match": "Yangon United vs Ezra FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788863847.4640968,
+    "settled_at": 1788865186.9837322
+  },
+  "fc olimpia savyntsi vs kryvbas kryvyi rih": {
+    "bet_id": 119451359,
+    "match": "FC Olimpia Savyntsi vs Kryvbas Kryvyi Rih",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.45,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788865216.9887595,
+    "settled_at": 1788868582.0756152
+  },
+  "olympic kingsway vs perth sc": {
+    "bet_id": 119453381,
+    "match": "Olympic Kingsway vs Perth SC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788868589.7238154,
+    "settled_at": 1788872139.5670702
+  },
+  "perth sc [k] vs fremantle city fc [k]": {
+    "bet_id": 119457299,
+    "match": "Perth SC [K] vs Fremantle City FC [K]",
+    "badge": "OVER 2.5 FT",
+    "odds": 2.05,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788872366.788717,
+    "settled_at": 1788874775.2612913
+  },
+  "al-mesaimeer sc vs al-kharaitiyat sc": {
+    "bet_id": 119462321,
+    "match": "Al-Mesaimeer SC vs Al-Kharaitiyat SC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788877828.4793696,
+    "settled_at": 1788882616.8144655
+  },
+  "cumbernauld colts vs kelty hearts fc": {
+    "bet_id": 119494800,
+    "match": "Cumbernauld Colts vs Kelty Hearts FC",
+    "badge": "OVER 2.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1788898446.132237,
+    "settled_at": 1788899617.0849688
   }
 }

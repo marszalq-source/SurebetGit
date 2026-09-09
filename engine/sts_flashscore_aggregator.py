@@ -59,6 +59,97 @@ class STSFlashscoreAggregator:
         t = threading.Thread(target=_worker, daemon=True, name="AggregatorBackgroundScanner")
         t.start()
 
+        def _settlement_worker():
+            """
+            Niezależna, błyskawiczna pętla rozliczeń (SETTLEMENT_INTERVAL = 5s).
+            Sprawdza aktywne pozycje w pamięci RAM i natychmiast rozlicza:
+            1. Flashscore Live / HT / FT
+            2. Telegram Cards (In-Place Edit)
+            3. BetTracker (Dziennik Typera)
+            4. ShadowLogger (telegram_shadow_log.jsonl)
+            """
+            SETTLEMENT_INTERVAL = 5
+            time.sleep(2)
+            t_last_cycle_end = time.time()
+
+            while True:
+                try:
+                    active_cards_count = len(getattr(self.telegram, 'active_match_cards', {}))
+                    has_pending_bets = False
+                    try:
+                        bets_data = self.tracker._load_data()
+                        has_pending_bets = any(b.get("status") == "PENDING" for b in bets_data.get("bets", []))
+                    except Exception:
+                        pass
+
+                    # Rozliczaj tylko jeśli są aktywne pozycje w RAM
+                    if active_cards_count > 0 or has_pending_bets:
+                        t_cycle_start = time.time()
+                        cycle_wait_sec = round(t_cycle_start - t_last_cycle_end, 2) if t_last_cycle_end else float(SETTLEMENT_INTERVAL)
+
+                        fs_live_today = []
+                        t_fetch_start = time.time()
+                        try:
+                            fs_live_today = self.fs_engine.get_live_soccer_matches(include_all_today=True)
+                        except Exception as ex:
+                            print(f"[FastSettlement] Błąd pobierania live Flashscore: {ex}")
+
+                        sts_live = []
+                        try:
+                            sts_live = self.sts_engine.fetch_live_matches(include_esports=False)
+                        except Exception:
+                            pass
+
+                        fs_finished = []
+                        try:
+                            fs_finished = self.fs_engine.get_finished_results(days_back=1)
+                        except Exception as ex:
+                            print(f"[FastSettlement] Błąd pobierania zakończonych Flashscore: {ex}")
+
+                        t_fetch_end = time.time()
+                        fetch_dur = round(t_fetch_end - t_fetch_start, 3)
+
+                        all_matches = fs_live_today + sts_live + fs_finished
+                        if all_matches:
+                            for m in all_matches:
+                                m['_feed_fetched_at'] = t_fetch_end
+                                m['_cycle_start_at'] = t_cycle_start
+                                m['_fetch_duration_sec'] = fetch_dur
+                                m['_poll_interval_sec'] = SETTLEMENT_INTERVAL
+                                m['_cycle_wait_sec'] = cycle_wait_sec
+
+                            all_live = [m for m in all_matches if m.get('is_live')]
+                            all_fin = [m for m in all_matches if not m.get('is_live')]
+
+                            settled_cards = self.telegram.auto_settle_active_cards(live_matches=all_live, finished_matches=all_fin)
+                            resolved_bets = self.tracker.auto_resolve_bets(all_matches)
+
+                            try:
+                                from .shadow_logger import ShadowLogger
+                                ShadowLogger().update_settled_matches_batch(fs_finished)
+                            except Exception as ex:
+                                print(f"[FastSettlement] Błąd ShadowLogger: {ex}")
+
+                            if settled_cards > 0 or (resolved_bets and len(resolved_bets) > 0):
+                                print(f"[FastSettlement] ⚡ Błyskawicznie rozliczono: {settled_cards} kart Telegram, {len(resolved_bets) if resolved_bets else 0} kuponów!")
+                except Exception as loop_ex:
+                    print(f"[FastSettlement Loop] Wyjątek: {loop_ex}")
+
+                time.sleep(SETTLEMENT_INTERVAL)
+                t_last_cycle_end = time.time()
+
+        t_settle = threading.Thread(target=_settlement_worker, daemon=True, name="FastSettlementWorker")
+        t_settle.start()
+
+        # Dedykowany, ultra-szybki Watchdog aktywnych kart (Active Cards Sentinel)
+        from .active_cards_watchdog import ActiveCardsWatchdog
+        self.watchdog = ActiveCardsWatchdog(
+            fs_engine=self.fs_engine,
+            sts_engine=self.sts_engine,
+            telegram_notifier=self.telegram
+        )
+        self.watchdog.start()
+
     def scan_all(self, only_signals: bool = False, min_minute: int = 0, half_filter: str = "ALL", demo_mode: bool = False) -> Dict[str, Any]:
         """
         Zwraca natychmiastowo mecze z pamięci RAM (czas < 0.001s).
@@ -109,12 +200,9 @@ class STSFlashscoreAggregator:
             fs_all_matches = self.fs_engine.get_live_soccer_matches(include_all_today=True)
             fs_matches = [m for m in fs_all_matches if m.get('is_live')] if not demo_mode else fs_all_matches
             
-            # Pobierz pełną bazę zakończonych spotkań (do 3-4 dni wstecz dla pełnej ciągłości)
+            # Rozliczanie odseparowane: obsługiwane przez niezależny wątek FastSettlementWorker (co 5s).
+            # Nie blokujemy pętli skanera live pobieraniem historii 3 dni wstecz!
             fs_finished_all = []
-            try:
-                fs_finished_all = self.fs_engine.get_finished_results(days_back=3)
-            except Exception as e:
-                print(f"[Aggregator] Finished results fetch error: {e}")
 
             # 2. Pobierz mecze z STS (jeśli są)
             sts_matches = []
@@ -125,19 +213,15 @@ class STSFlashscoreAggregator:
             except Exception as e:
                 print(f"[Aggregator] STS fetch error: {e}")
 
-            # 3. Automatycznie rozlicz kupony w Dzienniku Typera oraz karty na Telegramie
-            all_today_matches = fs_all_matches + sts_matches + fs_finished_all
-            try:
-                self.tracker.auto_resolve_bets(all_today_matches)
-            except Exception as ex:
-                print(f"[Aggregator] Błąd auto-rozliczania kuponów: {ex}")
-
-            try:
-                all_live_now = [m for m in (fs_all_matches + sts_matches) if m.get('is_live')]
-                all_finished_now = [m for m in all_today_matches if not m.get('is_live')]
-                self.telegram.auto_settle_active_cards(live_matches=all_live_now, finished_matches=all_finished_now)
-            except Exception as ex:
-                print(f"[Aggregator] Błąd auto-rozliczania Telegram: {ex}")
+            # 3. Zabezpieczenie auto-rozliczania kart (szybki fallback gdy są aktywne karty)
+            all_today_matches = fs_all_matches + sts_matches
+            if getattr(self.telegram, 'active_match_cards', None):
+                try:
+                    all_live_now = [m for m in all_today_matches if m.get('is_live')]
+                    all_finished_now = [m for m in all_today_matches if not m.get('is_live')]
+                    self.telegram.auto_settle_active_cards(live_matches=all_live_now, finished_matches=all_finished_now)
+                except Exception as ex:
+                    print(f"[Aggregator] Błąd auto-rozliczania Telegram: {ex}")
 
             # Ogranicz do max 40 najbardziej aktywnych meczów w jednym cyklu dla maksymalnej prędkości
             target_matches = fs_matches[:40]
@@ -210,23 +294,30 @@ class STSFlashscoreAggregator:
                 if not stats or not stats.get('has_stats'):
                     stats = stats_map.get(fs_m['flashscore_id'], {})
 
-                if stats.get('xg_total', 0.0) == 0.0 and (stats.get('shots_total', 0) > 0 or stats.get('shots_on_target_total', 0) > 0 or stats.get('corners_total', 0) > 0):
-                    sot_h = stats.get('shots_on_target_home', 0)
-                    sot_a = stats.get('shots_on_target_away', 0)
-                    soff_h = max(0, stats.get('shots_total_home', 0) - sot_h)
-                    soff_a = max(0, stats.get('shots_total_away', 0) - sot_a)
-                    dang_h = stats.get('dangerous_attacks_home', 0)
-                    dang_a = stats.get('dangerous_attacks_away', 0)
-                    corn_h = stats.get('corners_home', 0)
-                    corn_a = stats.get('corners_away', 0)
-                    big_h = stats.get('big_chances_home', 0)
-                    big_a = stats.get('big_chances_away', 0)
+                s_tot = stats.get('shots_total') or 0
+                sot_tot = stats.get('shots_on_target_total') or 0
+                corn_tot = stats.get('corners_total') or 0
+                xg_tot = stats.get('xg_total') or 0.0
+                if xg_tot == 0.0 and (s_tot > 0 or sot_tot > 0 or corn_tot > 0):
+                    sot_h = float(stats.get('shots_on_target_home') or 0)
+                    sot_a = float(stats.get('shots_on_target_away') or 0)
+                    soff_h = max(0.0, float(stats.get('shots_total_home') or 0) - sot_h)
+                    soff_a = max(0.0, float(stats.get('shots_total_away') or 0) - sot_a)
+                    dang_h = float(stats.get('dangerous_attacks_home') or 0)
+                    dang_a = float(stats.get('dangerous_attacks_away') or 0)
+                    corn_h = float(stats.get('corners_home') or 0)
+                    corn_a = float(stats.get('corners_away') or 0)
+                    big_h = float(stats.get('big_chances_home') or 0)
+                    big_a = float(stats.get('big_chances_away') or 0)
 
                     xg_h = round(sot_h * 0.25 + soff_h * 0.05 + dang_h * 0.01 + corn_h * 0.035 + big_h * 0.35, 2)
                     xg_a = round(sot_a * 0.25 + soff_a * 0.05 + dang_a * 0.01 + corn_a * 0.035 + big_a * 0.35, 2)
                     stats['xg_home'] = xg_h
                     stats['xg_away'] = xg_a
                     stats['xg_total'] = round(xg_h + xg_a, 2)
+                    stats['xg_is_estimated'] = True
+                else:
+                    stats.setdefault('xg_is_estimated', False)
 
                 # Dopasuj do STS
                 sts_match = self.matcher.match_flashscore_with_sts(fs_m, sts_matches) if sts_matches else None
@@ -316,6 +407,8 @@ class STSFlashscoreAggregator:
                     'stage_text': fs_m['stage_text'],
                     'stats': stats,
                     'danger_index': d_idx,
+                    'danger_index_10': eval_res.get('danger_index_10', d_idx),
+                    'danger_index_5': eval_res.get('danger_index_5', d_idx),
                     'danger_rating': d_rat,
                     'apm': eval_res.get('apm', 0.8),
                     'has_signals': eval_res.get('has_signals', False),
@@ -435,6 +528,8 @@ class STSFlashscoreAggregator:
                     'stage_text': sts_m.get('stage_text', 'LIVE STS'),
                     'stats': stats,
                     'danger_index': d_idx,
+                    'danger_index_10': eval_res.get('danger_index_10', d_idx),
+                    'danger_index_5': eval_res.get('danger_index_5', d_idx),
                     'danger_rating': d_rat,
                     'apm': eval_res.get('apm', 0.8),
                     'has_signals': eval_res.get('has_signals', False),

@@ -16,6 +16,12 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 CARDS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_active_cards.json")
 SUBSCRIBERS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_subscribers.json")
 
+# Wewnętrzny, konserwatywny throttle aplikacji chroniący przed nadmierną częstotliwością edycji
+# (architektonicznie niezależny od zewnętrznych limitów API):
+INTERNAL_MINUTE_THROTTLE_SECONDS = 35.0   # Minimalny odstęp czasu dla zwykłego odświeżenia minuty (REGULAR)
+INTERNAL_ODDS_THROTTLE_SECONDS = 15.0     # Minimalny odstęp czasu dla odświeżenia przy wahaniu kursu (ODDS_SWING)
+INTERNAL_ODDS_SWING_THRESHOLD = 0.04      # Minimalny skok kursu kwalifikujący zmianę jako istotną (standardowy krok STS: 0.05)
+
 class TelegramNotifier:
     _instance = None
 
@@ -35,6 +41,7 @@ class TelegramNotifier:
         self._last_update_id = 0
         self._poll_lock = threading.Lock()
         self._processed_update_ids = set()
+        self._on_card_added_callbacks = []
         self._http = urllib3.PoolManager(
             maxsize=10,
             timeout=urllib3.Timeout(connect=5.0, read=25.0),
@@ -44,6 +51,12 @@ class TelegramNotifier:
         self.start_polling_thread()
         # Automatyczne rozliczenie zaległych kart po starcie systemu
         threading.Thread(target=self._startup_settlement_check, daemon=True, name="StartupSettlementWorker").start()
+
+    def register_on_card_added(self, callback):
+        """Rejestruje obserwatora wywoływanego natychmiast przy dodaniu nowej aktywnej karty (np. wybudzenie Watchdoga 0 -> 1)."""
+        if not hasattr(self, '_on_card_added_callbacks'):
+            self._on_card_added_callbacks = []
+        self._on_card_added_callbacks.append(callback)
 
     def setup_bot_menu_commands(self):
         """Rejestruje oficjalne komendy w menu bocznym Telegrama (Menu Button)."""
@@ -254,6 +267,16 @@ class TelegramNotifier:
             k: v for k, v in cards.items()
             if isinstance(v, dict)
         }
+        # Oczyszczanie skażonych pól kursowych: jeśli karta nie ma potwierdzonego STS_REAL,
+        # usuwamy niesprawdzone last_rendered_odds i resetujemy last_odds do initial_odds
+        for c in cleaned_cards.values():
+            if not c.get('last_real_odds'):
+                c.pop('last_rendered_odds', None)
+                if 'initial_odds' in c:
+                    c['last_odds'] = c['initial_odds']
+            elif c.get('is_market_withdrawn'):
+                c.pop('last_rendered_odds', None)
+
         cleaned_settled = {
             k: float(v) for k, v in settled.items()
             if isinstance(v, (int, float)) and (now - v) < 86400
@@ -369,9 +392,28 @@ class TelegramNotifier:
             res_body = json.loads(resp.data.decode('utf-8'))
             if resp.status == 200 and res_body.get("ok"):
                 return {"success": True, "result": res_body.get("result", {})}
-            err_desc = res_body.get("description", "")
-            if "message is not modified" in err_desc:
+            err_desc = str(res_body.get("description", ""))
+            err_lower = err_desc.lower()
+            if "message is not modified" in err_lower or "messagenotmodified" in err_lower or "not modified" in err_lower:
                 return {"success": True, "not_modified": True}
+            if resp.status == 429:
+                retry_after = res_body.get("parameters", {}).get("retry_after", 3)
+                print(f"[Telegram API 429] Rate limit hit dla czatu {target_chat}, odczekanie {retry_after}s...")
+                time.sleep(min(float(retry_after), 5.0))
+                resp_retry = self._http.request(
+                    "POST",
+                    url,
+                    body=data,
+                    headers={"Content-Type": "application/json", "User-Agent": "SurebetScanner/2.0"},
+                    timeout=8.0
+                )
+                res_body_retry = json.loads(resp_retry.data.decode('utf-8'))
+                if resp_retry.status == 200 and res_body_retry.get("ok"):
+                    return {"success": True, "result": res_body_retry.get("result", {})}
+                err_retry_desc = str(res_body_retry.get("description", ""))
+                err_retry_lower = err_retry_desc.lower()
+                if "message is not modified" in err_retry_lower or "messagenotmodified" in err_retry_lower or "not modified" in err_retry_lower:
+                    return {"success": True, "not_modified": True}
             return {"success": False, "error": f"HTTP {resp.status}: {err_desc}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -423,10 +465,32 @@ class TelegramNotifier:
         if not device_messages:
             return False
         success = False
+        failed_devices = []
         for cid, msg_id in device_messages.items():
             res = self.edit_message(msg_id, text, chat_id=cid, parse_mode=parse_mode)
             if res.get("success") or res.get("not_modified"):
                 success = True
+            else:
+                failed_devices.append((cid, msg_id, res.get("error", "")))
+
+        # Natychmiastowy retry lub fallback dla urządzeń, które napotkały błąd
+        if failed_devices:
+            time.sleep(1.0)
+            for cid, msg_id, err in failed_devices:
+                err_lower = str(err).lower()
+                if any(w in err_lower for w in ["message to edit not found", "message can't be edited", "chat not found"]):
+                    print(f"[Telegram Edit Fallback] Wiadomość {msg_id} na czacie {cid} niedostępna ({err}), wysyłanie nowej wiadomości...")
+                    send_res = self.send_message(text, chat_id=cid, parse_mode=parse_mode)
+                    if send_res.get("success"):
+                        success = True
+                    continue
+
+                res_retry = self.edit_message(msg_id, text, chat_id=cid, parse_mode=parse_mode)
+                if res_retry.get("success") or res_retry.get("not_modified"):
+                    success = True
+                else:
+                    print(f"[Telegram Edit Retry] Nieudana edycja dla czatu {cid} (mid={msg_id}): {res_retry.get('error')}")
+
         return success
 
     def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None, show_alert: bool = False) -> Dict[str, Any]:
@@ -1141,6 +1205,10 @@ class TelegramNotifier:
                         p_arg = parts[1].strip()
                         if p_arg in ("1d", "dzis", "dzisiaj", "today", "1"):
                             period = "1d"
+                        elif p_arg in ("yesterday", "wczoraj", "wcz"):
+                            period = "yesterday"
+                        elif p_arg in ("24h", "24", "1day"):
+                            period = "24h"
                         elif p_arg in ("7d", "tydzien", "tydzień", "week", "7"):
                             period = "7d"
                         elif p_arg in ("30d", "miesiac", "miesiąc", "month", "30"):
@@ -1281,6 +1349,69 @@ class TelegramNotifier:
         finally:
             if lock: lock.release()
 
+    def _matches_card(self, card_home: str, card_away: str, target_home: str, target_away: str, key: str) -> bool:
+        """Weryfikuje czy dany mecz z feedu (STS/Flashscore) odpowiada aktywnej karcie."""
+        from engine.live_matcher import LiveMatcher
+        if LiveMatcher.is_same_fixture(card_home, card_away, target_home, target_away):
+            return True
+        found_k = self._find_existing_card_key(target_home, target_away)
+        return found_k == key
+
+    @staticmethod
+    def _get_match_stage_rank(half: str, stage_text: str, is_live: bool, status_code: str = '', minute: int = 0) -> tuple:
+        """
+        Zwraca znormalizowaną fazę meczu oraz jej numeryczną rangę (1H=10, HT=20, 2H=30, FT=40).
+        Zapewnia ścisłą monotoniczność maszyny stanów: 1H < HT < 2H < FT.
+        """
+        st_low = str(stage_text or '').lower()
+        half_u = str(half or '').upper()
+
+        # 1. Definitywny koniec meczu (FT - ranga 40) lub stan terminalny VOID (przerwany/odwołany/przełożony)
+        # AC=4 (Postponed), AC=5 (Cancelled), AC=36 (Interrupted)
+        is_abandoned = any(w in st_low for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']) or str(status_code) in ('4', '5', '36')
+        if is_abandoned:
+            return ('FT', 40)
+
+        # OCHRONA: Mecz piłkarski nie może zakończyć się FT przed 80. minutą (odrzucenie błędnych snapshotów/glitchy)
+        is_premature_ft = (0 < minute < 80)
+
+        # AC=3 (FT), AC=8, AC=9, AC=10 (After Extra Time), AC=11 (After Penalties)
+        if not is_premature_ft and (
+            half_u in ('FT', 'AET', 'AP')
+            or str(status_code) in ('3', '8', '9', '10', '11')
+            or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.', 'aet', 'ap'])
+            or (not is_live and (minute >= 85 or 'koniec' in st_low or 'ended' in st_low))
+        ):
+            return ('FT', 40)
+
+        # 2. Druga połowa (2H - ranga 30)
+        # Kod Flashscore 13 to oficjalnie 2. połowa (2H). Kody 13-17 to fazy 2H.
+        if (
+            half_u == '2H' 
+            or str(status_code) in ('13', '14', '15', '16', '17')
+            or str(stage_text).strip() in ('13', '14', '15', '16', '17')
+            or '2.' in st_low 
+            or '2nd' in st_low 
+            or st_low == '2h' 
+            or (is_live and minute >= 46)
+        ):
+            return ('2H', 30)
+
+        # 3. Przerwa (HT - ranga 20)
+        # Kody Flashscore 38 i 46 to oficjalnie Przerwa (HT).
+        if (
+            half_u == 'HT' 
+            or str(status_code) in ('38', '46')
+            or str(stage_text).strip() in ('38', '46')
+            or 'przerw' in st_low 
+            or 'halftime' in st_low
+            or (is_live and minute == 45 and any(w in st_low for w in ['przerw', 'ht', 'break', 'pause']))
+        ):
+            return ('HT', 20)
+
+        # 4. Pierwsza połowa (1H - ranga 10)
+        return ('1H', 10)
+
     def _is_match_already_settled(self, home: str, away: str) -> bool:
         """Sprawdza czy dany mecz został już dzisiaj definitywnie rozliczony (WIN / LOSS / VOID)."""
         from engine.live_matcher import LiveMatcher
@@ -1344,6 +1475,51 @@ class TelegramNotifier:
         danger = match.get('danger_index', 50)
         apm = match.get('apm', 0.8)
 
+        # PRE-SEND GATEKEEPER: Wymóg rzeczywistej dostępności w STS (status STS_REAL)
+        badge_u = str(badge).upper()
+        m_obj = signal.get("market_obj", {})
+        m_src = str(m_obj.get("source", "")).upper()
+        if m_src != "STS_REAL":
+            print(f"[Telegram] [DROPPED] MARKET_NOT_AVAILABLE_ON_STS: Odrzucono {badge_u}! Linia nie istnieje w STS ze statusem STS_REAL (source='{m_src}').")
+            return False
+
+        # Weryfikacja obecności w live_markets jeśli w snapshotcie przekazano rynki STS_REAL
+        live_mkts = match.get("live_markets", [])
+        real_sts_in_match = [m for m in live_mkts if m.get("source") == "STS_REAL"]
+        if real_sts_in_match:
+            found_real_line = False
+            target_line = None
+            m_line = re.search(r'(\d+(?:\.\d+)?)', badge_u)
+            if m_line:
+                try:
+                    target_line = float(m_line.group(1))
+                except Exception:
+                    pass
+            for mkt in real_sts_in_match:
+                if mkt is m_obj or (mkt.get("name") == m_obj.get("name") and abs(float(mkt.get("odds", 0)) - float(m_obj.get("odds", 0))) < 0.01):
+                    found_real_line = True
+                    break
+                mkt_line = mkt.get("line")
+                if target_line is not None and mkt_line is not None and abs(float(mkt_line) - target_line) < 0.01:
+                    found_real_line = True
+                    break
+                if badge_u.replace(" ", "") in str(mkt.get("name", "")).upper().replace(" ", ""):
+                    found_real_line = True
+                    break
+            if not found_real_line:
+                print(f"[Telegram] [DROPPED] MARKET_NOT_AVAILABLE_ON_STS: Odrzucono {badge_u}! Linia nie jest obecnie dostepna w live_markets meczu.")
+                return False
+
+        # PRE-SEND VALIDATION: Kategoryczna blokada wysyłki rynków drużynowych
+        m_hdr = str(m_obj.get("market_header", "")).strip().lower()
+        if "FT" in badge_u:
+            if m_hdr and m_hdr not in ("liczba goli", "liczba goli w meczu"):
+                print(f"[Telegram] [BLOCKED] REJECTED_TEAM_MARKET_LEAK: Zablokowano wysylke {badge_u}! Rynek z kafelka '{m_hdr}'.")
+                return False
+            if m_obj.get("is_match_total") is False:
+                print(f"[Telegram] [BLOCKED] REJECTED_TEAM_MARKET_LEAK: Zablokowano wysylke {badge_u}! is_match_total=False.")
+                return False
+
         # Precyzyjne formatowanie minuty (zawsze minuta np. 23' lub Przerwa, NIGDY sam tekst 'Live')
         stage_raw = str(match.get('stage_text', '')).lower()
         if half == 'HT' or 'przerw' in stage_raw:
@@ -1371,13 +1547,12 @@ class TelegramNotifier:
         pin_data = pin_engine.get_sharp_benchmark(match, signal)
 
         msg = (
-            f"<b>ALERT</b> <i>({header_time})</i>\n\n"
             f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
             f"🏆 <b>Liga:</b> {league}\n"
             f"⏱️ <b>Czas:</b> {time_display}\n\n"
-            f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-            f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-            f"📈 <b>Kurs STS:</b> <b>{odds_val:.2f}</b>\n"
+            f"🎯 <code>{badge}</code>\n"
+            f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+            f"📈 <b>Kurs:</b> <b>{odds_val:.2f}</b>\n"
             f"🔥 <b>{danger}%</b> (APM: {apm})"
         )
 
@@ -1401,15 +1576,19 @@ class TelegramNotifier:
             card["danger"] = danger
             card["apm"] = apm
 
+            init_m = card.get('initial_minute', '')
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            time_info = f"{time_display} (Typ z: {init_m}'{score_tag})" if init_m else time_display
+
             # Konstrukcja wiadomości ze stałą rekomendacją i aktualnym czasem/wynikiem
             update_msg = (
-                f"<b>ALERT</b> <i>({header_time})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Czas:</b> {time_display}\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{frozen_badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{frozen_unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
+                f"⏱️ <b>Czas:</b> {time_info}\n\n"
+                f"🎯 <code>{frozen_badge}</code>\n"
+                f"💰 <b>Stawka:</b> <code>{frozen_unit_tag}</code>\n"
+                f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
                 f"🔥 <b>{danger}%</b> (APM: {apm})"
             )
 
@@ -1438,19 +1617,36 @@ class TelegramNotifier:
             except Exception:
                 pass
 
-            # Dystrybucja na kanał FREE (Darmowy Typ Dnia - max 2 alerty dziennie)
+            # Dystrybucja na kanał FREE (Darmowe Typy Dnia: pasmo 14:00-20:59, min. odstęp czasowy, max 3 alerty dziennie)
             free_cid = self.config.get("free_channel_id")
             if free_cid:
                 today_str = time.strftime('%Y-%m-%d')
                 free_data = self.config.setdefault("_free_picks_tracker", {})
                 picks_today = free_data.setdefault(today_str, [])
-                if len(picks_today) < 2 and stars >= 4:
+
+                max_free_picks = int(self.config.get("free_picks_max_daily", 3))
+                start_hour = int(self.config.get("free_picks_start_hour", 14))
+                end_hour = int(self.config.get("free_picks_end_hour", 20))
+                min_interval_min = int(self.config.get("free_picks_min_interval_minutes", 60))
+
+                now_dt = datetime.datetime.now()
+                now_ts = time.time()
+                last_free_ts = float(self.config.get("_free_picks_last_sent_ts", 0))
+
+                in_time_window = (start_hour <= now_dt.hour <= end_hour)
+                interval_ok = ((now_ts - last_free_ts) >= (min_interval_min * 60))
+                quota_ok = (len(picks_today) < max_free_picks)
+
+                if quota_ok and in_time_window and interval_ok and stars >= 4:
+                    pick_num = len(picks_today) + 1
                     picks_today.append(new_key)
+                    self.config["_free_picks_last_sent_ts"] = now_ts
                     self.save_config(self.config)
+
                     free_msg = (
-                        "🎁 <b>DARMOWY TYP DNIA | OVERRADAR LIVE</b> ⚽\n\n"
+                        f"🎁 <b>DARMOWY TYP #{pick_num}/{max_free_picks} | OVERRADAR LIVE</b> ⚽\n\n"
                         + msg + "\n\n"
-                        + "<i>To jest bezpłatna próbka możliwości algorytmu.</i>\n"
+                        + f"<i>To jest bezpłatna próbka możliwości algorytmu (Typ {pick_num} z {max_free_picks} na dziś).</i>\n"
                         + "👑 <b>Chcesz wszystkie alerty na żywo 24/7 i Tryb Snajper (91.4%)?</b>\n"
                         + "👉 Odbierz 3 dni darmowego Trialu VIP!"
                     )
@@ -1459,6 +1655,14 @@ class TelegramNotifier:
                         f_mid = res_free.get("result", {}).get("message_id")
                         if f_mid:
                             dev_msgs[str(free_cid)] = f_mid
+                    print(f"[Telegram] [FREE_CHANNEL] Wysłano darmowy typ #{pick_num}/{max_free_picks}: {new_key} na kanał FREE ({free_cid}).")
+                elif not in_time_window:
+                    print(f"[Telegram] [FREE_CHANNEL_SKIP] {new_key} pominięty na kanale FREE: poza oknem godzinowym ({now_dt.strftime('%H:%M')} poza pasmem {start_hour}:00-{end_hour}:59).")
+                elif not interval_ok:
+                    mins_passed = int((now_ts - last_free_ts) / 60)
+                    print(f"[Telegram] [FREE_CHANNEL_SKIP] {new_key} pominięty na kanale FREE: minimalny odstęp {min_interval_min}m (minęło {mins_passed}m).")
+                elif not quota_ok:
+                    print(f"[Telegram] [FREE_CHANNEL_SKIP] {new_key} pominięty na kanale FREE: osiągnięto limit dzienny ({len(picks_today)}/{max_free_picks}).")
             badge_u = badge.upper()
             sig_type = str(signal.get("type", "")).upper()
             try:
@@ -1477,6 +1681,9 @@ class TelegramNotifier:
                 target_goals = int(line_val + 0.5)
             else:
                 target_goals = init_tot + 1
+
+            is_golden = bool(signal.get("is_golden") or "GOLDEN" in badge_u or "OVER_15_HT" in sig_type)
+            is_silver = bool(signal.get("is_silver") or "SILVER" in badge_u)
 
             self.active_match_cards[new_key] = {
                 "device_messages": dev_msgs,
@@ -1506,7 +1713,20 @@ class TelegramNotifier:
                 "danger": danger,
                 "apm": apm,
                 "initial_danger": danger,
-                "initial_apm": apm
+                "initial_apm": apm,
+                "di10": signal.get("di10", danger),
+                "di5": signal.get("di5", danger),
+                "sot10m": signal.get("sot10m", 0.0),
+                "xg": signal.get("xg", 0.0),
+                "shots": signal.get("shots", 0),
+                "dangerous_attacks": signal.get("dangerous_attacks", 0),
+                "corners": signal.get("corners", 0),
+                "big_chances": signal.get("big_chances", 0),
+                "is_golden": is_golden,
+                "is_silver": is_silver,
+                "signal_type": sig_type,
+                "status": "PENDING",
+                "settled": False
             }
             self.stats_engine.record_signal(match, signal, unit_tag)
             try:
@@ -1515,27 +1735,127 @@ class TelegramNotifier:
                 pass
             self._save_cards()
             self._last_emitted_signal_time = now
+
+            # Natychmiastowe powiadomienie obserwatorów (wybudzenie Watchdoga 0 -> 1 bez czekania na timeout pętli)
+            for cb in getattr(self, '_on_card_added_callbacks', []):
+                try:
+                    cb(new_key)
+                except Exception:
+                    pass
+
             return True
         return False
 
+    def _log_settlement_telemetry(self, card: Dict[str, Any], outcome: str, current_score: str, match: Dict[str, Any], detected_at: float, settled_at: float, t_edit_start: float, telegram_updated_at: float):
+        """Zapisuje precyzyjną telemetrię opóźnień (end-to-end latency) do pliku settlement_telemetry.jsonl."""
+        try:
+            telemetry_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settlement_telemetry.jsonl")
+            cycle_start = match.get('_cycle_start_at', detected_at)
+            feed_fetch_sec = match.get('_fetch_duration_sec', 0.0)
 
-    def check_and_update_match_status(self, match: Dict[str, Any]) -> bool:
+            e2e_latency_sec = round(telegram_updated_at - cycle_start, 3)
+            detect_to_settle_ms = round((settled_at - detected_at) * 1000, 1)
+            telegram_edit_ms = round((telegram_updated_at - t_edit_start) * 1000, 1)
+
+            kickoff_ts = match.get('kickoff_ts') or card.get('kickoff_ts')
+            last_live_ts = card.get('last_seen_time')
+
+            # Przedział niepewności detekcji (Uncertainty Bounds):
+            # FT nastąpiło w oknie: [last_live_ts, detected_at]
+            latency_min_sec = round(telegram_updated_at - detected_at, 3)
+            latency_max_sec = round(telegram_updated_at - last_live_ts, 3) if (last_live_ts and last_live_ts > 0) else latency_min_sec
+            latency_est_sec = round(telegram_updated_at - (last_live_ts + detected_at) / 2.0, 3) if (last_live_ts and last_live_ts > 0) else latency_min_sec
+            uncertainty_window_sec = round(detected_at - last_live_ts, 3) if (last_live_ts and last_live_ts > 0) else 0.0
+
+            prev_stage = card.get('last_seen_stage') or f"{card.get('last_seen_minute', '')}'"
+            curr_stage = match.get('stage_text') or match.get('half') or 'FT'
+            transition_type = f"{prev_stage} -> {curr_stage}"
+
+            record = {
+                "timestamp": telegram_updated_at,
+                "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(telegram_updated_at)),
+                "home": card.get("home_team", ""),
+                "away": card.get("away_team", ""),
+                "badge": card.get("badge", ""),
+                "outcome": outcome,
+                "settlement_score": current_score,
+                "last_live_seen_at": time.strftime('%H:%M:%S', time.localtime(last_live_ts)) if last_live_ts else None,
+                "last_live_minute": card.get("last_seen_minute"),
+                "detected_at": detected_at,
+                "settled_at": settled_at,
+                "telegram_updated_at": telegram_updated_at,
+                "poll_interval_sec": match.get('_poll_interval_sec', 5.0),
+                "cycle_wait_sec": match.get('_cycle_wait_sec', 5.0),
+                "feed_fetch_sec": feed_fetch_sec,
+                "detect_to_settle_ms": detect_to_settle_ms,
+                "telegram_edit_ms": telegram_edit_ms,
+                "e2e_latency_sec": e2e_latency_sec,
+                "detected_to_telegram_sec": round(telegram_updated_at - detected_at, 3),
+                "last_live_to_telegram_sec": latency_max_sec,
+                "latency_min_sec": latency_min_sec,
+                "latency_max_sec": latency_max_sec,
+                "latency_est_sec": latency_est_sec,
+                "uncertainty_window_sec": uncertainty_window_sec,
+                "transition_type": transition_type,
+                "kickoff_time": time.strftime('%H:%M:%S', time.localtime(kickoff_ts)) if kickoff_ts else None
+            }
+            with open(telemetry_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def _log_watchdog_alert(self, card: Dict[str, Any], age_sec: float, alert_type: str):
+        """Zapisuje alert watchdoga rozliczeń do settlement_telemetry.jsonl."""
+        try:
+            telemetry_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settlement_telemetry.jsonl")
+            record = {
+                "timestamp": time.time(),
+                "datetime": time.strftime('%Y-%m-%d %H:%M:%S'),
+                "type": "WATCHDOG_ALERT",
+                "alert_type": alert_type,
+                "home": card.get("home_team", ""),
+                "away": card.get("away_team", ""),
+                "badge": card.get("badge", ""),
+                "age_sec": round(age_sec, 1),
+                "state": card.get("status", "PENDING"),
+                "last_seen_minute": card.get("last_seen_minute"),
+                "initial_minute": card.get("initial_minute"),
+                "initial_score": card.get("initial_score"),
+                "last_seen_score": card.get("last_seen_score")
+            }
+            with open(telemetry_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def check_and_update_match_status(self, match: Dict[str, Any], card_key: Optional[str] = None) -> bool:
         if not self.config.get("enabled", False):
             return False
 
-        home = match.get('home_team', '')
-        away = match.get('away_team', '')
-        existing_key = self._find_existing_card_key(home, away)
+        home_m = match.get('home_team', '')
+        away_m = match.get('away_team', '')
+        existing_key = card_key or self._find_existing_card_key(home_m, away_m)
         if not existing_key or existing_key not in self.active_match_cards:
             return False
 
         card = self.active_match_cards[existing_key]
+
+        # Idempotencja: zabezpieczenie przed wielokrotnym rozliczeniem tej samej karty
+        if card.get("settling") or card.get("settled") or card.get("status") in ("SETTLED", "WON", "LOST", "VOID"):
+            return False
+
         dev_msgs = card.get("device_messages", {})
         if not dev_msgs and card.get("message_id"):
             dev_msgs = {str(self.config.get("chat_id")): card.get("message_id")}
 
+        # Zamrożone, kanoniczne dane drużyn i ligi (brak flappingu nazw między STS i Flashscore)
+        home = card.get('home_team') or home_m
+        away = card.get('away_team') or away_m
+        league = card.get('league') or match.get('league', 'Piłka Nożna')
+
+        raw_minute = match.get('minute', 0)
+        minute = int(raw_minute) if isinstance(raw_minute, int) else 0
         current_score = match.get("score_str", "0:0")
-        minute = match.get('minute', 0)
         half = match.get('half', '1H')
         stage_text = match.get('stage_text', f"{minute}'")
         is_live = match.get('is_live', True)
@@ -1550,66 +1870,208 @@ class TelegramNotifier:
         target_period = card.get('target_period', 'FT')
         badge = card.get('badge', 'OVER')
         odds_val = card.get('last_odds', 1.70)
-        league = card.get('league', match.get('league', 'Piłka Nożna'))
         unit_tag = card.get('unit_tag', '1J')
         units = 1
         if '3' in unit_tag: units = 3
         elif '2' in unit_tag: units = 2
         now = time.time()
+        detected_at = match.get('_feed_fetched_at') or now
 
-        if half == 'HT' or 'przerw' in str(stage_text).lower() or str(stage_text).strip() == '13':
-            time_display = "Przerwa"
-        elif half == 'FT' or 'koniec' in str(stage_text).lower() or str(stage_text).strip() == '3':
-            time_display = f"{minute}'" if minute > 0 else "Koniec meczu"
-        elif isinstance(minute, int) and minute > 0:
-            time_display = f"{minute}'"
+        # === MONOTONICZNA MASZYNA STANÓW MECZU (1H=10 < HT=20 < 2H=30 < FT=40) ===
+        inc_stage, inc_rank = self._get_match_stage_rank(
+            half=half,
+            stage_text=stage_text,
+            is_live=is_live,
+            status_code=status_code,
+            minute=minute
+        )
+
+        card_rank = card.get('highest_stage_rank')
+        if not card_rank:
+            prev_half = str(card.get('last_seen_half') or '1H').upper()
+            prev_min = int(card.get('last_seen_minute') or card.get('initial_minute') or 0)
+            card_rank = 30 if (prev_half == '2H' or prev_min >= 46) else (20 if prev_half == 'HT' else 10)
+            card['highest_stage_rank'] = card_rank
+
+        card_minute = card.get('highest_minute', max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0)))
+        card_is_terminal = card.get('terminal', False)
+
+        # Reguła 1: Terminal Lock - raz wykryte FT jest stanem absolutnie ostatecznym
+        if card_is_terminal and inc_rank < 40:
+            return False
+
+        # Reguła 2: Blokada cofania fazy (stale snapshot rejection)
+        if inc_rank < card_rank:
+            eff_rank = card_rank
+            eff_stage = card.get('highest_stage', '1H')
+            eff_minute = card_minute
         else:
-            m_dig = re.search(r'(\d+)', f"{minute} {stage_text}")
-            if m_dig:
-                time_display = f"{m_dig.group(1)}'"
-            else:
-                time_display = "23'" if half == '1H' else "68'"
+            eff_rank = inc_rank
+            eff_stage = inc_stage
+            card['highest_stage_rank'] = inc_rank
+            card['highest_stage'] = inc_stage
+            eff_minute = max(card_minute, minute)
+            card['highest_minute'] = eff_minute
+
+        if eff_rank >= 40:
+            card['terminal'] = True
+            card['terminal_at'] = now
+            eff_minute = max(eff_minute, 90)
+            card['highest_minute'] = eff_minute
+
+        # Monotoniczność bramek i ochrona przed niezweryfikowanym skokiem wyniku (Score Jump Guard)
+        prev_goals = card.get('highest_goals', card.get('initial_goals', 0))
+        is_canonical = bool(match.get('_canonical_verified', False))
+        is_unverified_jump = bool(match.get('_unverified_score_jump', False))
+        is_sts_only = bool(match.get('_sts_only', False))
+
+        # NAPRAWA 4 & 5: SCORE JUMP GUARD + HIGHEST_GOALS PROTECTION
+        # Jeżeli snapshot jest oznaczony jako niezweryfikowany skok wyniku (_unverified_score_jump):
+        # Odrzucamy skok bramek! highest_goals NIE rośnie, current_score jest przywracany.
+        if is_unverified_jump:
+            current_score = card.get('last_seen_score', card.get('initial_score', '0:0'))
+            curr_tot = prev_goals
+        elif curr_tot < prev_goals:
+            current_score = card.get('last_seen_score', current_score)
+            curr_tot = prev_goals
+        else:
+            card['highest_goals'] = curr_tot
+            card['last_seen_score'] = current_score
+
+        # Kanoniczne formatowanie czasu na karcie Telegrama (100% stabilne, 0 flappingu)
+        if eff_rank >= 40:
+            time_display = "Koniec meczu"
+            header_time = "FT"
+        elif eff_rank == 20:
+            time_display = "Przerwa"
+            header_time = "Przerwa"
+        elif eff_minute > 0:
+            time_display = f"{eff_minute}'"
+            header_time = f"{eff_minute}'"
+        else:
+            time_display = "23'" if eff_rank <= 10 else "68'"
+            header_time = time_display
+
+        is_golden = bool(
+            card.get('is_golden')
+            or ('GOLDEN' in str(badge).upper())
+            or ('1.5 HT' in str(badge).upper() and target_period == '1H')
+            or ('OVER_15_HT' in str(card.get('signal_type', '')).upper())
+        )
+        is_silver = bool(
+            card.get('is_silver')
+            or ('SILVER' in str(badge).upper())
+        )
+
+        ht_score_str = match.get('ht_score') or card.get('ht_score')
+        if not ht_score_str and target_period == '1H':
+            ht_score_str = current_score
 
         # 1. SCENARIUSZ: TYP WYGRANY (ZIELONY ZNACZEK OK ✅ 🟢)
         is_won = False
-        if target_period == '1H':
-            if curr_tot >= target_goals:
-                is_won = True
-            elif match.get('ht_score'):
-                try:
-                    ht_tot = sum(map(int, match['ht_score'].split(':')))
-                    if ht_tot >= target_goals:
-                        is_won = True
-                except Exception:
-                    pass
-        else:
-            if curr_tot >= target_goals:
-                is_won = True
+        # NAPRAWA 2 & 4: Early Settlement Guard
+        # Dla meczów na żywo wczesne rozliczenie wymaga zweryfikowanego snapshotu.
+        # Blokujemy wczesne rozliczenie na żywo dla:
+        # - niezweryfikowanego skoku wyniku (is_unverified_jump)
+        # - snapshotu STS-only na żywo bez walidacji drugiego źródła (is_sts_only i not is_canonical)
+        allow_live_early_settle = True
+        if is_live and eff_rank < 40:
+            if is_unverified_jump or (is_sts_only and not is_canonical):
+                allow_live_early_settle = False
+
+        if allow_live_early_settle or (not is_live) or (eff_rank >= 40):
+            if target_period == '1H':
+                if curr_tot >= target_goals:
+                    is_won = True
+                elif match.get('ht_score'):
+                    try:
+                        ht_tot = sum(map(int, match['ht_score'].split(':')))
+                        if ht_tot >= target_goals:
+                            is_won = True
+                    except Exception:
+                        pass
+            else:
+                if curr_tot >= target_goals:
+                    is_won = True
 
         danger = match.get('danger_index', card.get('danger', 50))
         apm = match.get('apm', card.get('apm', 0.8))
-
         init_m = card.get('initial_minute', card.get('last_seen_minute', minute))
         init_odds = card.get('initial_odds', card.get('last_odds', 1.70))
 
         if is_won:
+            card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
             win_time = f"{minute}'" if (minute > 0 and minute <= 90) else (time_display if time_display != "Koniec meczu" else ("45'" if target_period == '1H' else "90'"))
             profit_units = round(units * (init_odds - 1.0), 2)
-            win_msg = (
-                f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Trafiony Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J</b>"
-            )
-            self.edit_message_all(dev_msgs, win_msg)
+
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            if is_golden:
+                ht_disp = ht_score_str or current_score
+                ht_line = f"⏱️ <b>Wynik HT:</b> <b>{ht_disp}</b>"
+                if half in ('HT', '2H', 'FT') or not is_live:
+                    ht_line += " | <b>Koniec:</b> <b>45'</b>"
+                else:
+                    ht_line += f" | <b>Trafiono:</b> <b>{win_time}</b>"
+
+                win_msg = (
+                    f"🟢 <b>GOLDEN (Over 1.5 HT)</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"{ht_line}\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+            elif is_silver:
+                win_msg = (
+                    f"🥈 <b>SILVER ({badge})</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b> | <b>Trafiono:</b> <b>{win_time}</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+            else:
+                win_msg = (
+                    f"✅ <b>ALERT</b> <i>(Trafiono: {win_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b> | <b>Trafiono w:</b> <b>{win_time}</b>\n\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                    f"🎉 <b>STATUS:</b> <b>WYGRANA +{profit_units:.2f} J ✅</b>"
+                )
+
+            t_edit_start = time.time()
+            edit_ok = self.edit_message_all(dev_msgs, win_msg)
+            t_edit_end = time.time()
+            if not edit_ok:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                card["status"] = "PENDING"
+                return False
+
+            # Stan: TELEGRAM UPDATED -> SETTLED
+            card["status"] = "TELEGRAM_UPDATED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "WON"
+            card["settlement_score"] = current_score
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "WON", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "WON", current_score, final_odds=init_odds)
+            try:
+                from engine.shadow_logger import ShadowLogger
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
+            except Exception:
+                pass
             try:
                 from engine.notifications import send_windows_notification, play_surebet_sound
                 send_windows_notification(
@@ -1627,23 +2089,70 @@ class TelegramNotifier:
             return True
 
         # 2. SCENARIUSZ: MECZ ODWOŁANY / PRZERWANY (ZWROT STAWKI 🟡 🔄)
+        # AC=4 (Postponed), AC=5 (Cancelled), AC=36 (Interrupted)
         st_lower = str(stage_text).lower()
-        if any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
-            void_msg = (
-                f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
-                f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
-            )
-            self.edit_message_all(dev_msgs, void_msg)
+        if str(status_code) in ('4', '5', '36') or any(w in st_lower for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc']):
+            card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            if is_golden:
+                void_msg = (
+                    f"🟡 <b>GOLDEN (Over 1.5 HT)</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+            elif is_silver:
+                void_msg = (
+                    f"🟡 <b>SILVER ({badge})</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+            else:
+                void_msg = (
+                    f"🟡 <b>ALERT</b> <i>({stage_text})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b>\n\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{danger}%</b> (APM: {apm})\n\n"
+                    f"🔄 <b>STATUS:</b> <b>ZWROT (VOID)</b>"
+                )
+
+            t_edit_start = time.time()
+            edit_ok = self.edit_message_all(dev_msgs, void_msg)
+            t_edit_end = time.time()
+            if not edit_ok:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                card["status"] = "PENDING"
+                return False
+
+            # Stan: TELEGRAM UPDATED -> SETTLED
+            card["status"] = "TELEGRAM_UPDATED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "VOID"
+            card["settlement_score"] = current_score
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "VOID", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "VOID", current_score, final_odds=init_odds)
+            try:
+                from engine.shadow_logger import ShadowLogger
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
+            except Exception:
+                pass
             try:
                 self.ba_sync.settle_bet_async(match, "VOID")
             except Exception:
@@ -1656,8 +2165,7 @@ class TelegramNotifier:
         st_low = str(stage_text).lower()
 
         if target_period == '1H':
-            # 1H kończy się tylko w przerwie HT, w 2H lub po zakończeniu meczu
-            is_1h_over = (half in ('HT', '2H', 'FT') or 'koniec' in st_low or (not is_live and minute >= 45))
+            is_1h_over = (eff_rank >= 20)
             if is_1h_over:
                 if match.get('ht_score'):
                     try:
@@ -1671,39 +2179,81 @@ class TelegramNotifier:
                     if curr_tot < target_goals:
                         is_period_finished = True
         elif target_period == 'FT':
-            # FT kończy się TYLKO I WYŁĄCZNIE po upływie 90+ minut i końcowym gwizdku sędziego
-            # OCHRONA ABSOLUTNA: Mecz trwający na żywo, w 1H, HT lub 2H, lub przed 88. minutą NIGDY nie jest przegrany!
-            if is_live or half in ('1H', 'HT', '2H') or (isinstance(minute, int) and 0 < minute < 88):
-                is_ft_over = False
-            else:
-                is_ft_over = (
-                    (half == 'FT' or 'koniec' in st_low or 'ended' in st_low or status_code in ('3', '8', '9'))
-                    and not is_live
-                    and (minute >= 88 or 'koniec' in st_low or status_code in ('3', '8', '9'))
-                )
-            if is_ft_over and curr_tot < target_goals:
+            card_age = now - card.get('created_at', now)
+            last_seen_m = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), minute)
+            is_valid_ft = (eff_rank >= 40 and (last_seen_m >= 80 or card_age >= 3000))
+            if is_valid_ft and curr_tot < target_goals:
                 is_period_finished = True
 
         if is_period_finished:
-            loss_time = f"{minute}'" if (minute > 0 and minute <= 90) else ("90'" if target_period == 'FT' else "45'")
+            card["settling"] = True
+            card["status"] = "SETTLEMENT_ATTEMPT"
+            loss_time = f"{eff_minute}'" if (eff_minute > 0 and eff_minute <= 90) else ("90'" if target_period == 'FT' else "45'")
             loss_units = float(units)
-            orig_danger = card.get('initial_danger', card.get('danger', 85))
-            orig_apm = card.get('initial_apm', card.get('apm', 0.9))
-            loss_msg = (
-                f"❌ <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
-                f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
-                f"🏆 <b>Liga:</b> {league}\n"
-                f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs początkowy STS:</b> <b>{init_odds:.2f}</b>\n"
-                f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})\n\n"
-                f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J</b>"
-            )
-            self.edit_message_all(dev_msgs, loss_msg)
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+
+            if is_golden:
+                ht_disp = ht_score_str or current_score
+                loss_msg = (
+                    f"🔴 <b>GOLDEN (Over 1.5 HT)</b> <i>(Rozliczenie: 45')</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Wynik HT:</b> <b>{ht_disp}</b> | <b>Koniec:</b> <b>45'</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+            elif is_silver:
+                loss_msg = (
+                    f"🔴 <b>SILVER ({badge})</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ z:</b> <b>{init_m}' min{score_tag}</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
+                    f"📈 <b>Kurs wejścia:</b> <b>{init_odds:.2f}</b>\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+            else:
+                orig_danger = card.get('initial_danger', card.get('danger', 85))
+                orig_apm = card.get('initial_apm', card.get('apm', 0.9))
+                loss_msg = (
+                    f"🔴 <b>ALERT</b> <i>(Rozliczenie: {loss_time})</i>\n\n"
+                    f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
+                    f"🏆 <b>Liga:</b> {league}\n"
+                    f"⏱️ <b>Typ podany w:</b> <b>{init_m}' min{score_tag}</b> | <b>Koniec:</b> <b>{loss_time}</b>\n\n"
+                    f"🎯 <code>{badge}</code>\n"
+                    f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                    f"📈 <b>Kurs:</b> <b>{init_odds:.2f}</b>\n"
+                    f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})\n\n"
+                    f"📉 <b>STATUS:</b> <b>PRZEGRANA -{loss_units:.2f} J ❌</b>"
+                )
+
+            t_edit_start = time.time()
+            edit_ok = self.edit_message_all(dev_msgs, loss_msg)
+            t_edit_end = time.time()
+            if not edit_ok:
+                print(f"[Telegram Settlement] Błąd edycji Telegram dla {home} vs {away}, ponawianie w następnym cyklu")
+                card["settling"] = False
+                card["status"] = "PENDING"
+                return False
+
+            # Stan: TELEGRAM UPDATED -> SETTLED
+            card["status"] = "TELEGRAM_UPDATED"
+            card["settled"] = True
+            card["settled_at"] = time.time()
+            card["outcome"] = "LOST"
+            card["settlement_score"] = current_score
+            card["telegram_updated"] = True
+            card["telegram_updated_at"] = t_edit_end
+            self._log_settlement_telemetry(card, "LOST", current_score, match, detected_at, card["settled_at"], t_edit_start, t_edit_end)
+
             self.active_match_cards.pop(existing_key, None)
             self.settled_matches[existing_key] = time.time()
             self.stats_engine.settle_signal(home, away, "LOST", current_score, final_odds=init_odds)
+            try:
+                from engine.shadow_logger import ShadowLogger
+                ShadowLogger().update_settled_match(home, away, current_score, ht_score=ht_score_str)
+            except Exception:
+                pass
             try:
                 self.ba_sync.settle_bet_async(match, "LOST")
             except Exception:
@@ -1712,48 +2262,154 @@ class TelegramNotifier:
             return True
 
         # 4. SCENARIUSZ: LIVE UPDATE IN-PLACE (Płynna aktualizacja minuty, wyniku i kursu w tej samej wiadomości)
-        if self.config.get("live_update_mode", True) and is_live and not is_won and not is_period_finished:
-            latest_odds = odds_val
+        if self.config.get("live_update_mode", True) and is_live and not is_won and not is_period_finished and not card_is_terminal:
+            # Poszukiwanie wyłącznie w 100% autentycznych, zeskrapowanych kursach STS (STS_REAL)
+            # Rynki syntetyczne/estymowane (STS_LIVE) NIGDY nie mogą nadpisywać kursu na Telegramie!
+            real_mkt_odds = None
+            badge_u = str(badge).upper()
+            target_line = None
+            m_line = re.search(r'(\d+(?:\.\d+)?)', badge_u)
+            if m_line:
+                try:
+                    target_line = float(m_line.group(1))
+                except Exception:
+                    pass
+
+            has_real_sts_markets = False
             for mkt in match.get('live_markets', []):
-                if badge.upper().replace(' ', '') in str(mkt.get('name', '')).upper().replace(' ', ''):
-                    latest_odds = mkt.get('odds', odds_val)
+                if mkt.get('source') != 'STS_REAL':
+                    continue
+                has_real_sts_markets = True
+                m_name = str(mkt.get('name', '')).upper()
+                mkt_line = mkt.get('line')
+                mkt_period = str(mkt.get('period', 'FT')).upper()
+
+                # Ścisłe dopasowanie linii i połowy
+                if target_line is not None and mkt_line is not None:
+                    if abs(float(mkt_line) - target_line) < 0.01:
+                        if target_period == '1H' and ('HT' in m_name or mkt_period == '1H'):
+                            real_mkt_odds = float(mkt.get('odds', 0.0))
+                            break
+                        elif target_period == 'FT' and ('FT' in m_name or mkt_period == 'FT') and 'HT' not in m_name:
+                            real_mkt_odds = float(mkt.get('odds', 0.0))
+                            break
+                elif badge_u.replace(' ', '') in m_name.replace(' ', ''):
+                    real_mkt_odds = float(mkt.get('odds', 0.0))
                     break
 
-            orig_danger = card.get('initial_danger', card.get('danger', 85))
-            orig_apm = card.get('initial_apm', card.get('apm', 0.9))
-            orig_odds = card.get('initial_odds', card.get('last_odds', 1.70))
+            if real_mkt_odds and real_mkt_odds > 1.0:
+                latest_odds = real_mkt_odds
+                card['last_real_odds'] = real_mkt_odds
+                card['last_real_odds_minute'] = eff_minute
+                card['last_odds'] = real_mkt_odds
+                card['is_market_withdrawn'] = False
+                card.pop('withdrawn_first_seen', None)
+            elif has_real_sts_markets:
+                # Bukmacher zwrócił rynki meczowe STS_REAL, ale poszukiwana linia (np. Over 2.5 FT) nie występuje w ofercie.
+                # Grace period: bufor ~60s chroni przed chwilowym zawieszeniem rynku (VAR, rzut karny, groźny atak).
+                w_first = card.get('withdrawn_first_seen')
+                if w_first is None:
+                    card['withdrawn_first_seen'] = now
+                    card['is_market_withdrawn'] = False
+                    latest_odds = card.get('last_real_odds')
+                elif (now - w_first) < 60.0:
+                    card['is_market_withdrawn'] = False
+                    latest_odds = card.get('last_real_odds')
+                else:
+                    card['is_market_withdrawn'] = True
+                    card.pop('last_rendered_odds', None)
+                    latest_odds = None
+            else:
+                # Brak odpytania STS_REAL w tym snapshotcie – pobieramy WYŁĄCZNIE zweryfikowane last_real_odds
+                latest_odds = card.get('last_real_odds')
+
+            # Dynamiczny Danger Index i APM z bieżącego snapshotu (bez naruszania initial_danger/initial_apm)
+            curr_danger = match.get('danger_index')
+            if curr_danger is None or curr_danger <= 0:
+                curr_danger = card.get('danger') or card.get('initial_danger', 85)
+            curr_apm = match.get('apm')
+            if curr_apm is None or curr_apm <= 0:
+                curr_apm = card.get('apm') or card.get('initial_apm', 0.9)
+
+            orig_odds = card.get('initial_odds', 1.70)
             init_m = card.get('initial_minute', '')
-            time_info = f"{time_display} (Typ z: {init_m}')" if init_m else time_display
+            init_s = card.get('initial_score', '')
+            score_tag = f" [{init_s}]" if init_s else ""
+            time_info = f"{time_display} (Typ z: {init_m}'{score_tag})" if init_m else time_display
             
             odds_str = f"<b>{orig_odds:.2f}</b>"
-            if 1.10 <= latest_odds <= 3.20 and abs(latest_odds - orig_odds) > 0.05:
+            if card.get('is_market_withdrawn'):
+                last_real = card.get('last_real_odds')
+                last_min = card.get('last_real_odds_minute')
+                if last_real and last_real > 1.0:
+                    min_tag = f" ⏱️ {last_min}'" if last_min else ""
+                    odds_str += f" <i>(Aktualny: 🔒 Wycofany | Ostatni: {last_real:.2f}{min_tag})</i>"
+                else:
+                    odds_str += " <i>(Aktualny: 🔒 Wycofany)</i>"
+            elif latest_odds and 1.10 <= latest_odds <= 3.50 and abs(latest_odds - orig_odds) > 0.05:
                 odds_str += f" <i>(Aktualny: {latest_odds:.2f})</i>"
 
             updated_msg = (
-                f"<b>ALERT</b> <i>({time_display})</i>\n\n"
                 f"⚽️ <b>{home} vs {away}</b>  <code>[{current_score}]</code>\n"
                 f"🏆 <b>Liga:</b> {league}\n"
                 f"⏱️ <b>Czas:</b> {time_info}\n\n"
-                f"🎯 <b>Rekomendacja:</b> <code>{badge}</code>\n"
-                f"💰 <b>Sugerowana Stawka:</b> <code>{unit_tag}</code>\n"
-                f"📈 <b>Kurs STS:</b> {odds_str}\n"
-                f"🔥 <b>{orig_danger}%</b> (APM: {orig_apm})"
+                f"🎯 <code>{badge}</code>\n"
+                f"💰 <b>Stawka:</b> <code>{unit_tag}</code>\n"
+                f"📈 <b>Kurs:</b> {odds_str}\n"
+                f"🔥 <b>{curr_danger}%</b> (APM: {curr_apm})"
             )
 
-            score_changed = (current_score != card.get("last_seen_score"))
+            last_rendered_score = card.get("last_rendered_score", card.get("initial_score", "0:0"))
+            score_changed = (current_score != last_rendered_score)
             time_since_edit = now - card.get("last_edit_time", 0)
-            
+            stage_changed = (card.get("last_rendered_stage") != eff_stage)
+            last_rend_min = card.get("last_rendered_minute", card.get("initial_minute", 0))
+            minute_advanced = (eff_minute > last_rend_min)
+            withdrawn_changed = (card.get("is_market_withdrawn", False) != card.get("last_rendered_withdrawn", False))
+
+            # Histereza i wewnętrzny throttle kursu: minimalny skok 0.06 i min. 15s od ostatniej edycji kursowej
+            last_rendered_odds = card.get("last_rendered_odds", orig_odds)
+            odds_diff = abs(latest_odds - last_rendered_odds) if (latest_odds and last_rendered_odds) else 0.0
+            time_since_odds_edit = now - card.get("last_odds_edit_time", 0)
+            odds_swing = (latest_odds is not None and odds_diff >= INTERNAL_ODDS_SWING_THRESHOLD and time_since_odds_edit >= INTERNAL_ODDS_THROTTLE_SECONDS and 1.10 <= latest_odds <= 3.50)
+
+            # Zdarzenia pilne (URGENT): gol, zmiana fazy (HT/2H), wycofanie linii, duży skok kursu
+            is_urgent = (score_changed or stage_changed or odds_swing or withdrawn_changed)
+            # Płynny upływ minuty (REGULAR): zmiana minuty po upływie wewnętrznego throttle 35s od ostatniej edycji
+            regular_minute_update = (minute_advanced and time_since_edit >= INTERNAL_MINUTE_THROTTLE_SECONDS)
+
             card["last_seen_score"] = current_score
-            card["last_seen_minute"] = minute
+            card["last_seen_minute"] = eff_minute
+            card["last_seen_half"] = eff_stage
+            card["last_seen_stage"] = time_display
             card["last_seen_time"] = now
-            if latest_odds <= 3.20:
+            card["danger"] = curr_danger
+            card["apm"] = curr_apm
+            if latest_odds and latest_odds <= 3.50:
                 card["last_odds"] = latest_odds
 
-            if card.get("last_text") != updated_msg and (score_changed or time_since_edit >= 45):
-                self.edit_message_all(dev_msgs, updated_msg)
-                card["last_text"] = updated_msg
-                card["last_edit_time"] = now
-                self._save_cards()
+            should_edit = (
+                card.get("last_text") != updated_msg
+                and (is_urgent or regular_minute_update)
+            )
+
+            if should_edit:
+                edit_ok = self.edit_message_all(dev_msgs, updated_msg)
+                if edit_ok:
+                    card["last_text"] = updated_msg
+                    card["last_edit_time"] = now
+                    card["last_rendered_stage"] = eff_stage
+                    card["last_rendered_minute"] = eff_minute
+                    card["last_rendered_score"] = current_score
+                    card["last_rendered_withdrawn"] = card.get("is_market_withdrawn", False)
+                    if latest_odds:
+                        card["last_rendered_odds"] = latest_odds
+                    elif card.get("is_market_withdrawn"):
+                        card.pop("last_rendered_odds", None)
+                    if odds_swing:
+                        card["last_odds_edit_time"] = now
+                    self._save_cards()
+                    return True
             return False
 
     def auto_settle_active_cards(self, live_matches: List[Dict[str, Any]], finished_matches: Optional[List[Dict[str, Any]]] = None) -> int:
@@ -1779,84 +2435,182 @@ class TelegramNotifier:
                 if key not in self.active_match_cards:
                     continue
                 card = self.active_match_cards[key]
+                if card.get("settling"):
+                    continue
+                if card.get("settled") or card.get("status") in ("SETTLED", "TELEGRAM_UPDATED"):
+                    # Karta została już wcześniej rozliczona – usuwamy zombie z aktywnych kart
+                    self.active_match_cards.pop(key, None)
+                    self.settled_matches[key] = card.get("settled_at", time.time())
+                    self._save_cards()
+                    continue
                 card_home = card.get('home_team', '')
                 card_away = card.get('away_team', '')
                 if not card_home or not card_away:
                     continue
 
-                # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore)
-                from engine.live_matcher import LiveMatcher
-                live_m = next((m for m in live_matches if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
-                if live_m:
-                    card['last_seen_time'] = now
-                    card['last_seen_minute'] = live_m.get('minute', card.get('last_seen_minute', 0))
-                    card['last_seen_score'] = live_m.get('score_str', card.get('last_seen_score', '0:0'))
-                    card['last_seen_half'] = live_m.get('half', card.get('last_seen_half', '1H'))
-                    if live_m.get('sts_url'):
-                        card['sts_url'] = live_m['sts_url']
+                # 1. Sprawdź czy mecz jest w feedzie LIVE (STS lub Flashscore) - najwyższy priorytet dla trwających spotkań
+                matching_live = [m for m in live_matches if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)]
+                is_active_live = False
+                if matching_live:
+                    live_m = max(matching_live, key=lambda m: (
+                        self._get_match_stage_rank(m.get('half'), m.get('stage_text'), m.get('is_live', True), str(m.get('status_code', '')), int(m.get('minute') or 0))[1],
+                        int(m.get('minute') or 0)
+                    ))
+                    l_stage, l_rank = self._get_match_stage_rank(
+                        half=live_m.get('half'),
+                        stage_text=live_m.get('stage_text'),
+                        is_live=live_m.get('is_live', True),
+                        status_code=str(live_m.get('status_code', '')),
+                        minute=int(live_m.get('minute') or 0)
+                    )
 
-                    if self.check_and_update_match_status(live_m):
-                        settled_count += 1
-                    continue
+                    # Jeśli mecz trwa na żywo i nie osiągnął definitywnego końca (FT)
+                    if live_m.get('is_live', True) and l_rank < 40:
+                        is_active_live = True
+                        card['last_seen_time'] = now
+                        live_min = live_m.get('minute', 0)
+                        if isinstance(live_min, int) and live_min > 0:
+                            card['last_seen_minute'] = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0), live_min)
+                        
+                        curr_score = live_m.get('score_str', '0:0')
+                        try:
+                            tot = sum(map(int, curr_score.split(':')))
+                            if tot >= card.get('highest_goals', card.get('initial_goals', 0)):
+                                card['last_seen_score'] = curr_score
+                        except Exception:
+                            pass
 
-                # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS)
-                fin_m = next((m for m in finished_list if LiveMatcher.is_same_fixture(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''))), None)
-                if fin_m:
-                    fin_m_copy = dict(fin_m)
-                    fin_m_copy['home_team'] = card_home
-                    fin_m_copy['away_team'] = card_away
-                    if self.check_and_update_match_status(fin_m_copy):
-                        settled_count += 1
-                    continue
+                        if l_rank >= card.get('highest_stage_rank', 0):
+                            card['last_seen_half'] = l_stage
+                            card['last_seen_stage'] = live_m.get('stage_text', f"{live_m.get('minute', 0)}'")
 
-                # 3. Mecz zniknął z oferty STS Live (zakończył się)
-                card_age = now - card.get('created_at', now)
-                last_minute = card.get('last_seen_minute', 0)
-                if not last_minute:
-                    m_min = re.search(r'\((\d+)\'\)', card.get('last_text', ''))
-                    if m_min:
-                        last_minute = int(m_min.group(1))
-                target_period = card.get('target_period', 'FT')
-                last_score = card.get('last_seen_score', card.get('initial_score', '0:0'))
+                        if live_m.get('sts_url'):
+                            card['sts_url'] = live_m['sts_url']
 
-                is_finished_event = False
-                time_since_seen = now - card.get('last_seen_time', card.get('created_at', now))
-                if target_period == '1H':
-                    # 1H kończy się tylko gdy minęła 45. minuta i mecz zniknął z 1H na min. 4 minuty
-                    if last_minute >= 45 and time_since_seen > 240:
-                        is_finished_event = True
-                    elif card_age > 3600: # Ponad 60 minut od sygnału z 1. połowy
-                        is_finished_event = True
-                elif target_period == 'FT':
-                    # Mecz kończy się gdy osiągnął min. 90. minutę i zniknął z STS Live na >180s, LUB gdy upłynął realistyczny czas trwania
-                    init_m = card.get('initial_minute', last_minute or 0)
-                    rem_mins = max(10, 95 - (init_m if isinstance(init_m, int) else 45))
-                    if isinstance(init_m, int) and init_m < 45:
-                        rem_mins += 15 # dolicz przerwę HT
-                    max_expected_seconds = max(1800, (rem_mins + 15) * 60)
+                        # LIVE MATCHES: Nigdy nie przekazujemy bezpośrednio surowego live snapshotu do settlementu.
+                        # Rozliczanie na żywo wymaga przejścia przez reconciliation (ActiveCardsWatchdog).
+                        if live_m.get('_canonical_verified') and live_m.get('_reconciled'):
+                            live_m_copy = dict(live_m)
+                            live_m_copy['home_team'] = card_home
+                            live_m_copy['away_team'] = card_away
+                            if self.check_and_update_match_status(live_m_copy, card_key=key):
+                                if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                    settled_count += 1
+                        continue
 
-                    if last_minute >= 90 and time_since_seen > 180:
-                        is_finished_event = True
-                    elif time_since_seen > 300 and card_age >= max_expected_seconds:
-                        is_finished_event = True
-                    elif card_age > 7200: # Zapasowy limit 120 minut
-                        is_finished_event = True
+                    # Jeśli mecz na żywo osiągnął status FT (koniec meczu na żywo) lub stan VOID
+                    elif l_rank >= 40:
+                        status_code_str = str(live_m.get('status_code', ''))
+                        is_confirmed_ft = (
+                            status_code_str in ('3', '8', '9', '10', '11')
+                            or live_m.get('half') in ('FT', 'AET', 'AP')
+                            or 'koniec' in str(live_m.get('stage_text', '')).lower()
+                            or 'ended' in str(live_m.get('stage_text', '')).lower()
+                            or status_code_str in ('4', '5', '36')
+                            or any(w in str(live_m.get('stage_text', '')).lower() for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc'])
+                        )
+                        if is_confirmed_ft:
+                            if "ft_detected_at" not in card:
+                                card["ft_detected_at"] = now
+                                card["status"] = "FT_DETECTED"
+                            live_m_copy = dict(live_m)
+                            live_m_copy['home_team'] = card_home
+                            live_m_copy['away_team'] = card_away
+                            if self.check_and_update_match_status(live_m_copy, card_key=key):
+                                if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                    settled_count += 1
+                        continue
 
-                if is_finished_event:
-                    synthetic_finished = {
-                        'home_team': card_home,
-                        'away_team': card_away,
-                        'league': card.get('league', 'Piłka Nożna'),
-                        'score_str': last_score,
-                        'home_score': int(last_score.split(':')[0]) if ':' in last_score else 0,
-                        'away_score': int(last_score.split(':')[1]) if ':' in last_score else 0,
-                        'minute': 90 if target_period == 'FT' else 45,
-                        'half': 'FT' if target_period == 'FT' else 'HT',
-                        'stage_text': 'Koniec meczu',
-                        'is_live': False
-                    }
-                    if self.check_and_update_match_status(synthetic_finished):
-                        settled_count += 1
+                # 2. Sprawdź czy mecz jest w feedzie meczy zakończonych (Flashscore / STS) - gdy mecz zniknął z live
+                matching_fin = [m for m in finished_list if self._matches_card(card_home, card_away, m.get('home_team', ''), m.get('away_team', ''), key)]
+                if matching_fin and not is_active_live:
+                    fin_m = max(matching_fin, key=lambda m: (
+                        self._get_match_stage_rank(m.get('half'), m.get('stage_text'), False, str(m.get('status_code', '')), int(m.get('minute') or 90))[1],
+                        int(m.get('minute') or 90)
+                    ))
+                    f_stage, f_rank = self._get_match_stage_rank(fin_m.get('half'), fin_m.get('stage_text'), False, str(fin_m.get('status_code', '')), int(fin_m.get('minute') or 90))
+                    f_min = int(fin_m.get('minute') or 90)
+                    card_m = max(int(card.get('initial_minute', 0) or 0), int(card.get('last_seen_minute', 0) or 0))
+                    card_age = now - card.get('created_at', now)
+                    status_code_str = str(fin_m.get('status_code', ''))
+
+                    # FT wymaga wiarygodnego statusu końca meczu (AC=3, 8, 9, 10, 11) lub VOID (AC=4, 5, 36)
+                    is_valid_settlement = False
+                    if f_rank >= 40:
+                        is_confirmed_ft = (
+                            status_code_str in ('3', '8', '9', '10', '11')
+                            or fin_m.get('half') in ('FT', 'AET', 'AP')
+                            or 'koniec' in str(fin_m.get('stage_text', '')).lower()
+                            or 'ended' in str(fin_m.get('stage_text', '')).lower()
+                        )
+                        is_void_stage = (
+                            status_code_str in ('4', '5', '36')
+                            or any(w in str(fin_m.get('stage_text', '')).lower() for w in ['odwołan', 'przerwan', 'przełożon', 'walkower', 'abandoned', 'postponed', 'cancelled', 'canc'])
+                        )
+                        if is_confirmed_ft:
+                            if card.get('target_period') == 'FT':
+                                if f_min >= 80 or card_m >= 80 or card_age >= 3000:
+                                    is_valid_settlement = True
+                                else:
+                                    # Przedwczesne FT odrzucone chyba że mecz przerwany/odwołany
+                                    if is_void_stage:
+                                        is_valid_settlement = True
+                            else:
+                                is_valid_settlement = True
+                        elif is_void_stage:
+                            is_valid_settlement = True
+
+                    if is_valid_settlement:
+                        if "ft_detected_at" not in card:
+                            card["ft_detected_at"] = now
+                            card["status"] = "FT_DETECTED"
+                        fin_m_copy = dict(fin_m)
+                        fin_m_copy['home_team'] = card_home
+                        fin_m_copy['away_team'] = card_away
+                        if self.check_and_update_match_status(fin_m_copy, card_key=key):
+                            if key not in self.active_match_cards or self.active_match_cards[key].get("settled"):
+                                settled_count += 1
+                        continue
+
+                # 3. Zniknięcie meczu z live NIE jest traktowane jako FT (NAPRAWA 3).
+                # Nie tworzymy sztucznego statusu zakończenia (synthetic_finished).
+                # Rozliczenie FT następuje WYŁĄCZNIE po potwierdzeniu ze źródeł zakończonych.
+
+            # === SETTLEMENT WATCHDOG AUDIT ===
+            for key, card in list(self.active_match_cards.items()):
+                c_home = card.get('home_team', '')
+                c_away = card.get('away_team', '')
+                ft_det_at = card.get('ft_detected_at')
+                card_status = card.get('status', 'PENDING')
+
+                # Check 1: FT wykryte, ale nierozliczone w ciągu 10s (SETTLEMENT_DELAYED)
+                if ft_det_at and not card.get('settled') and card_status not in ('SETTLED', 'TELEGRAM_UPDATED'):
+                    delay = now - ft_det_at
+                    if delay > 10.0 and not card.get('_logged_delayed'):
+                        print(f"[SETTLEMENT_DELAYED] {c_home} vs {c_away} | stan: {card_status} | opóźnienie: {delay:.1f}s")
+                        card['_logged_delayed'] = True
+
+                    # Check 2: FT wykryte, ale nadal nierozliczone po 30s (🚨 WATCHDOG ALERT)
+                    if delay > 30.0 and not card.get('_logged_watchdog_ft'):
+                        print(f"🚨 SETTLEMENT WATCHDOG: match={c_home} vs {c_away}, status=FT, age={delay:.1f}s, state={card_status}")
+                        card['_logged_watchdog_ft'] = True
+                        self._log_watchdog_alert(card, delay, "UNSETTLED_FT_DELAY")
+
+                # Check 3: Mecz wisi w pamięci bez rozliczenia ponad 2 godziny (> 7200s)
+                c_created = card.get('created_at', now)
+                c_age = now - c_created
+                if c_age > 7200.0 and not card.get('_logged_watchdog_age'):
+                    print(f"🚨 SETTLEMENT WATCHDOG: match={c_home} vs {c_away} przekroczył 2h bez rozliczenia (age={c_age:.0f}s, state={card_status})")
+                    card['_logged_watchdog_age'] = True
+                    self._log_watchdog_alert(card, c_age, "MATCH_AGE_OVER_2H")
+
+                # Check 4: Ostrzeżenie WARNING jeśli mecz wisi w active_cards > 3h (10800s) od kickoffu / utworzenia karty
+                kickoff_ts = card.get('kickoff_ts') or card.get('created_at', now)
+                effective_age = max(c_age, now - kickoff_ts)
+                if effective_age >= 10800.0 and not card.get('_logged_watchdog_3h'):
+                    print(f"⚠️ [WARNING] POTENCJALNIE ZABLOKOWANE ZDARZENIE: match={c_home} vs {c_away} wisi w telegram_active_cards.json ponad 3h (age={effective_age:.0f}s, state={card_status})!")
+                    card['_logged_watchdog_3h'] = True
+                    self._log_watchdog_alert(card, effective_age, "MATCH_AGE_OVER_3H_WARNING")
 
             return settled_count
         finally:

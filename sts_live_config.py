@@ -11,21 +11,73 @@ ACTIVE_HOURS_ENABLED = False     # False = praca non-stop 24h/dobę
 ACTIVE_HOURS_START = 0
 ACTIVE_HOURS_END = 24
 
-# Pancerne progi Indeksu Groźności (Danger Index - 10-minutowe okno kroczące):
-MIN_DANGER_INDEX_1H = 85  # 1. połowa (min. 85% w oknie 10-min)
-MIN_DANGER_INDEX_2H = 90  # 2. połowa i przerwa (HT/2H) (min. 90% w oknie 10-min)
+# Zbalansowane progi Indeksu Groźności (Danger Index - okna kroczące 10m i 5m):
+MIN_DANGER_INDEX_1H = 55  # 1. połowa (min. 55% w oknie 10-min)
+MIN_DANGER_INDEX_2H = 55  # 2. połowa i przerwa (HT/2H) (min. 55% w oknie 10-min)
+MIN_DANGER_INDEX_5M = 60  # Wymóg naporu w oknie 5-minutowym (DI5 >= 60% dla 4⭐, >= 70% dla 5⭐)
+MAX_FALLING_TREND = -15   # Maksymalny dopuszczalny spadek trendu (DI5 - DI10)
 
-# Wymóg strzałów celnych (Shots on Target):
-MIN_SOT_1H = 3            # min. 3 celne strzały w meczu (lub min. 1 w ost. 10 min)
-MIN_SOT_2H = 3            # min. 3 celne strzały w meczu (lub min. 1 w ost. 10 min)
+# Wymóg strzałów celnych (Shots on Target - wymóg świeżości):
+MIN_SOT_1H = 3            # min. 3 celne strzały w meczu
+MIN_SOT_2H = 3            # min. 3 celne strzały w meczu
+MIN_SOT_10M_REQUIRED = 1  # Bezwzględny wymóg min. 1 strzału celnego w ostatnich 10 minutach
 
-# Żelazny warunek kursu (Value Bet floor):
-MIN_ODDS = 1.38           # Twardy próg kursowy (min. 1.38 dla Over 1.5 FT, sweet spot 1.45 - 2.35)
-MAX_ODDS = 2.45           # Maksymalny rozsądny kurs
+# Progi Wartości Oczekiwanej (Expected Value - EV):
+MIN_EV_4_STAR = 0.03      # Twardy próg EV >= +3.0% brutto dla oceny 4⭐
+MIN_EV_5_STAR = 0.07      # Twardy próg EV >= +7.0% brutto dla oceny 5⭐
+
+# Optymalizacja pod polski podatek obrotowy 12% (mnożnik 0.88):
+POLISH_TAX_MULTIPLIER = 0.88
+MIN_EV_PL_4_STAR = 0.05    # Twardy próg EV_PL >= +5.0% netto (po podatku 12%)
+MIN_EV_PL_5_STAR = 0.10    # Twardy próg EV_PL >= +10.0% netto
+
+# Żelazny warunek kursu (Value Bet floor ogólny):
+MIN_ODDS = 1.48           # Dolny próg kursowy (poniżej 1.48 podatek 12% drenuje kapitał)
+MAX_ODDS = 2.25           # Maksymalny rozsądny kurs
+
+# Dedykowane widełki kursowe per scenariusz (kontrolowany korytarz rynkowy):
+SCENARIO_ODDS_RANGES = {
+    'OVER_15_FT': (1.48, 2.25),      # Over 1.5 FT (Wczesna 2. połowa 46'-68')
+    'POST_GOAL_FT': (1.48, 2.25),    # Next Goal po bramce (wymóg tylko 1 gola)
+    'OVER_25_FT': (1.48, 2.25),      # Over 2.5 FT (gdy stan to 1:1 lub 2:0)
+    'OVER_15_HT': (1.70, 2.65),      # Over 1.5 HT
+    'OVER_05_HT': (1.50, 2.15),      # Over 0.5 HT
+    'OVER_05_2H': (1.48, 2.25),      # Over 0.5 2H
+    'OVER_1H_TO_FT': (1.48, 2.20),   # 0:0 w 1H
+}
 
 # Selekcja gwiazdek i rynków:
 MIN_STARS = 4             # Tylko pewniaki 4⭐ i 5⭐
 ALLOWED_OVER_LINES = [0.5, 1.5, 2.5]  # Dozwolone linie meczowe FT (0.5, 1.5, 2.5 FT)
+
+# TIER 1: Ligi o wysokiej płynności i bramkowości (bonus +1 pkt do scoringu)
+LEAGUE_TIER_1_KEYWORDS = [
+    'bundesliga', 'premier league', 'eredivisie', 'champions league', 'liga mistrzów',
+    'europa league', 'liga europy', 'eliteserien', 'allsvenskan', 'superliga',
+    'bundesliga austria', 'jupiler pro league', 'swiss super league'
+]
+
+# TIER 3: Ligi o niskiej bramkowości / underowe (kara -1 pkt do scoringu, wymagają wybitnych statystyk)
+LEAGUE_TIER_3_KEYWORDS = [
+    'egipt', 'egypt', 'division 2', '2. division',
+    'kolumbia: liga kobiety', 'kolumbia: primera a', 'kolumbia: primera b',
+    'colombia: primera a', 'colombia: primera b',
+    'ekwador: serie b', 'ecuador: serie b',
+    'iran: pro league', 'iran: league 1', 'iran',
+    'morocco: botola', 'maroko: botola', 'maroko: 2. botola',
+    'algeria: ligue 1', 'algeria: ligue 2', 'algieria',
+    'greece: super league 2', 'grecja: super league 2',
+    'argentina: primera b', 'argentina: torneo federal', 'argentina: primera nacional',
+    'argentyna: primera b', 'argentyna: torneo federal', 'argentyna: primera c', 'argentina: primera c', 'primera c',
+    'gruzja', 'georgia', 'erovnuli',
+    'azerbejdżan', 'azerbejdzan', 'azerbaijan',
+    'oman', 'omani',
+    'south africa: premier league', 'rpa: premier league',
+    'tunisia: ligue 1', 'tunezja',
+    'venezuela: primera division', 'wenezuela', 'venezuela',
+    'romania: liga 2', 'rumunia: liga 2',
+    'uganda', 'tanzania', 'kenya', 'zambia', 'zimbabwe', 'rwanda'
+]
 
 # Flaga białej listy lig (True = przepuszczane tylko renomowane, profesjonalne ligi)
 ENABLE_LEAGUE_WHITELIST = True
@@ -130,8 +182,8 @@ TRIGGERS_CONFIG = {
         "min_minute": 63,
         "max_minute": 75,         # TWARDY LIMIT: 75. minuta (eliminacja loterii w końcówce)
         "allowed_score_diff": 1,  # Wynik na styku (0:0, 1:0, 0:1, 2:1, 1:2)
-        "min_odds": 1.40,
-        "max_odds": 2.45,
+        "min_odds": 1.48,
+        "max_odds": 2.25,
         "min_apm": 0.90,
         "min_sot": 3,
         "min_shots_total": 8,
@@ -143,8 +195,8 @@ TRIGGERS_CONFIG = {
         "min_minute": 46,
         "max_minute": 68,
         "max_score_sum": 1,       # Wynik 0:0 lub 1:0 / 0:1
-        "min_odds": 1.45,
-        "max_odds": 2.45,
+        "min_odds": 1.48,
+        "max_odds": 2.25,
         "min_sot": 3,
         "min_shots_total": 7,
         "min_xg": 0.85,

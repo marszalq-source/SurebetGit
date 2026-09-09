@@ -10,6 +10,11 @@
   "max_active_cards": 3,
   "free_channel_id": "-1003953802945",
   "vip_channel_id": "-1004480240058",
+  "free_picks_max_daily": 3,
+  "free_picks_start_hour": 14,
+  "free_picks_end_hour": 20,
+  "free_picks_min_interval_minutes": 60,
+  "_free_picks_last_sent_ts": 1788877827.3253303,
   "_free_picks_tracker": {
     "2026-09-02": [
       "baia de pemba_vs_ferroviario lichinga",
@@ -22,6 +27,22 @@
     "2026-09-04": [
       "parramatta eagles_vs_prospect united",
       "lions_vs_eastern suburbs"
+    ],
+    "2026-09-05": [
+      "royal union tubize braine_vs_union rochefortoise",
+      "campo grande rj_vs_aa carapebus rj"
+    ],
+    "2026-09-06": [
+      "universitario penonome 2_vs_independiente la chorrera 2",
+      "everton vina del mar_vs_universidad catolica santiago"
+    ],
+    "2026-09-07": [
+      "shaanxi union u20_vs_beijing guoan u20",
+      "fardu ferghana_vs_aral nukus"
+    ],
+    "2026-09-08": [
+      "perth_vs_fremantle city",
+      "al mesaimeer_vs_al kharaitiyat"
     ]
   }
 }

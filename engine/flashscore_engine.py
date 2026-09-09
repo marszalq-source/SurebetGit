@@ -72,55 +72,68 @@ class FlashscoreEngine:
                     status_code = fields.get('AB', '')
                     stage_text = fields.get('AC', '')
                     minute_raw = fields.get('GB', fields.get('DB', ''))
+                    st_low = str(stage_text or '').lower()
+                    ac_val = str(stage_text or '').strip()
 
-                    is_live = status_code in LIVE_STATUSES
+                    is_live = status_code in LIVE_STATUSES or ac_val in ('12', '13', '38', '46', '6', '7')
 
                     # Dodatkowa detekcja z tekstu fazy
-                    st_low = stage_text.lower()
                     if not is_live:
                         if any(w in st_low for w in ['1. połowa', '2. połowa', 'przerwa', 'w grze', '1st half', '2nd half', 'live', 'ht', '1h', '2h', 'dogrywka', 'et']):
                             is_live = True
 
                     # Bezwzględne wykluczenie meczów zakończonych z trybu live
-                    if status_code in ('3', '10', '11') or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.']):
+                    if status_code in ('3', '10', '11') or ac_val in ('3', '10', '11') or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.']):
                         is_live = False
 
                     if not is_live and not include_all_today:
                         continue
 
+                    # 1. Mapowanie fazy meczu wg oficjalnych kodów Flashscore:
+                    # 12 = 1. połowa (1H), 38 / 46 = Przerwa (HT), 13 = 2. połowa (2H), 3 = Koniec (FT)
                     minute = 0
                     half_str = "1H"
-                    if status_code == '13' or 'przerwa' in stage_text.lower():
-                        minute = 45
-                        half_str = "HT"
-                    elif status_code == '14' or '2.' in stage_text.lower():
-                        half_str = "2H"
-                        minute = 46
-                    elif status_code == '3' or 'koniec' in stage_text.lower():
-                        minute = 90
-                        half_str = "FT"
+                    clean_stage = ""
 
-                    # Próba wyciągnięcia dokładnej minuty
+                    if ac_val in ('38', '46') or status_code in ('38', '46') or 'przerw' in st_low or 'halftime' in st_low or st_low == 'ht':
+                        half_str = "HT"
+                        clean_stage = "Przerwa"
+                        minute = 45
+                    elif ac_val == '13' or status_code in ('13', '14', '15', '16', '17') or '2.' in st_low or '2nd' in st_low or st_low == '2h':
+                        half_str = "2H"
+                        clean_stage = "2. połowa"
+                        minute = 46
+                    elif ac_val == '3' or status_code in ('3', '8', '9', '10', '11') or any(w in st_low for w in ['koniec', 'ended', 'finished', 'po karnych', 'po dogr.']):
+                        half_str = "FT"
+                        clean_stage = "Koniec"
+                        minute = 90
+                    elif ac_val == '12' or '1.' in st_low or '1st' in st_low or st_low == '1h':
+                        half_str = "1H"
+                        clean_stage = "1. połowa"
+                        minute = 1
+                    else:
+                        clean_stage = stage_text
+
+                    # 2. Próba wyciągnięcia dokładnej minuty z GB/DB
                     min_match = RE_DIGITS.search(minute_raw)
                     if min_match:
                         minute = int(min_match.group(1))
 
-                    # Jeśli brak bezpośredniego pola z minutą, wylicz z timestampu rozpoczęcia AD
+                    # 3. Jeśli brak bezpośredniego pola z minutą, wylicz z timestampu rozpoczęcia AD
                     ad_val = fields.get('AD', fields.get('ADE', ''))
-                    if minute == 0 and ad_val and ad_val.isdigit():
+                    if (not min_match or minute == 0) and ad_val and ad_val.isdigit():
                         start_ts = int(ad_val)
                         diff_secs = int(time.time() - start_ts)
                         if diff_secs > 0:
                             calc_min = diff_secs // 60
-                            if status_code in ('14', '15', '16', '17') or '2.' in str(stage_text):
-                                minute = max(46, min(90, calc_min - 15))
-                                half_str = "2H"
-                            elif status_code == '13' or 'przerwa' in str(stage_text).lower():
+                            if half_str == "HT":
                                 minute = 45
-                                half_str = "HT"
+                            elif half_str == "2H":
+                                minute = max(46, min(90, calc_min - 15))
+                            elif half_str == "FT":
+                                minute = 90
                             else:
                                 minute = max(1, min(45, calc_min))
-                                half_str = "1H"
 
                     home_team = fields.get('AE', '').strip()
                     away_team = fields.get('AF', '').strip()
@@ -140,16 +153,18 @@ class FlashscoreEngine:
                         continue
 
                     # Ignorujemy zakończone w trybie czysto na żywo
-                    if not include_all_today and (status_code == '3' or 'Koniec' in stage_text or 'Po karnych' in stage_text or 'Po dogr.' in stage_text):
+                    if not include_all_today and (status_code == '3' or ac_val == '3' or 'Koniec' in clean_stage or 'Po karnych' in clean_stage or 'Po dogr.' in clean_stage):
                         continue
 
-                    clean_stage = stage_text
-                    if status_code == '13' or 'przerwa' in str(stage_text).lower() or str(stage_text).strip() == '13':
+                    # 4. Formatowanie clean_stage do wyświetlania
+                    if half_str == "HT":
                         clean_stage = "Przerwa"
-                    elif status_code == '3' or 'koniec' in str(stage_text).lower() or str(stage_text).strip() == '3':
+                    elif half_str == "FT":
                         clean_stage = "Koniec"
+                    elif minute > 0:
+                        clean_stage = f"{minute}'"
                     elif not clean_stage or clean_stage.isdigit() or str(clean_stage).lower() == 'live':
-                        clean_stage = f"{minute}'" if minute > 0 else "1'"
+                        clean_stage = "2. połowa" if half_str == "2H" else "1. połowa"
 
                     matches.append({
                         'flashscore_id': match_id,
@@ -164,6 +179,8 @@ class FlashscoreEngine:
                         'stage_text': clean_stage,
                         'ht_score': f"{ht_home_score}:{ht_away_score}" if (ht_home_score is not None and ht_away_score is not None) else None,
                         'is_live': is_live,
+                        'status_code': status_code,
+                        'kickoff_ts': int(ad_val) if (ad_val and ad_val.isdigit()) else None,
                         'url': f"https://www.flashscore.pl/mecz/{match_id}/"
                     })
 
@@ -260,6 +277,7 @@ class FlashscoreEngine:
                             'stage_text': 'Koniec',
                             'is_live': False,
                             'status_code': '3',
+                            'kickoff_ts': int(fields.get('AD')) if (fields.get('AD', '').isdigit()) else None,
                             'url': f"https://www.flashscore.pl/mecz/{match_id}/"
                         })
             except Exception as e:

@@ -41,6 +41,134 @@ def _sts_route_handler(route):
         return
     route.continue_()
 
+GET_SUBPAGE_MARKETS_JS = """() => {
+    const mkts = [];
+    const seen = new Set();
+
+    const headers = document.querySelectorAll('.market-tile-header, [class*="market-tile-header"], [class*="market-header"]');
+
+    headers.forEach(h => {
+        const rawTitle = (h.innerText || '').replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim();
+        const cleanTitle = rawTitle.toLowerCase();
+        if (!cleanTitle) return;
+
+        // ZADANIE 1: Bezwzględne wykluczenie fraz drużynowych, połów i rynków pobocznych
+        const forbiddenKeywords = [
+            'drużyna', 'druzyna', '1. drużyna', '2. drużyna', '1.drużyna', '2.drużyna',
+            'gospodarz', 'gość', 'gosc', 'połowa', 'polowa', 'przedział', 'przedzial',
+            'dokładn', 'dokladn', 'kartk', 'rożn', 'rozn', 'handicap', 'czyste konto',
+            'strzeli gola', 'obie drużyny', 'suma goli'
+        ];
+        if (forbiddenKeywords.some(kw => cleanTitle.includes(kw))) {
+            return; // CAŁKOWICIE POMINIĘTY (continue)
+        }
+
+        // ZADANIE 2: Twarda reguła dopasowania
+        // Rynek meczowy FT ma być parsowany WYŁĄCZNIE z kafelka "Liczba goli" lub "Liczba goli w meczu"
+        let category = null;
+        if (cleanTitle === 'liczba goli' || cleanTitle === 'liczba goli w meczu') {
+            category = 'ft_goals';
+        } else if (cleanTitle === 'następny gol' || cleanTitle === 'nastepny gol') {
+            category = 'next_goal';
+        } else {
+            return; // Wszystkie inne kafelki są bezwzględnie pomijane
+        }
+
+        // Bezpieczne pobranie kontenera przycisków WYŁĄCZNIE dla tego nagłówka
+        let contentEl = h.nextElementSibling;
+        if (!contentEl) {
+            const p = h.parentElement;
+            if (p && p.querySelectorAll('.market-tile-header, [class*="market-tile-header"], [class*="market-header"]').length === 1) {
+                contentEl = p;
+            }
+        }
+        if (!contentEl) return;
+
+        contentEl.querySelectorAll('button, .odds-button, sds-odds-button').forEach(b => {
+            // Upewnij się, że przycisk nie znajduje się za kolejnym nagłówkiem
+            const subHeader = b.closest('.market-tile-header, [class*="market-tile-header"], [class*="market-header"]');
+            if (subHeader && subHeader !== h) return;
+
+            const lblEl = b.querySelector('.odds-button__label, [class*="label"]');
+            const oddEl = b.querySelector('.odds-button__odd-value, [data-testid="odds-value"], [class*="odd-value"]');
+            
+            let labelStr = lblEl ? (lblEl.innerText || '').trim() : '';
+            let oddStr = oddEl ? (oddEl.innerText || '').trim() : '';
+
+            const rawText = (b.innerText || '').trim();
+            const aria = (b.getAttribute('aria-label') || '').trim();
+            const candidates = [];
+            if (labelStr && oddStr) {
+                candidates.push(labelStr + ' ' + oddStr);
+            }
+            if (rawText) candidates.push(rawText);
+            if (aria) candidates.push(aria);
+
+            for (let str of candidates) {
+                if (!str) continue;
+                const clean = str.replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim();
+
+                if (category === 'next_goal') {
+                    const mNext = clean.match(/^(1|nikt|2)\\s+(\\d+(?:[,.]\\d+)?)$/i);
+                    if (mNext) {
+                        const side = mNext[1].toLowerCase();
+                        const odds = parseFloat(mNext[2].replace(',', '.'));
+                        if (!isNaN(odds) && odds > 1.0) {
+                            const key = 'next_' + side;
+                            if (!seen.has(key)) {
+                                seen.add(key);
+                                let label = side === '1' ? 'Gosp.' : (side === '2' ? 'Goście' : 'Nikt');
+                                mkts.push({
+                                    market: 'Następny gol: ' + label,
+                                    name: 'Następny gol: ' + label,
+                                    side: side,
+                                    odds: odds,
+                                    label: 'Następny gol: ' + label,
+                                    market_header: rawTitle,
+                                    is_match_total: false,
+                                    source: 'STS_REAL'
+                                });
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // Rynek meczowy (ft_goals): WYŁĄCZNIE z kafelka "Liczba goli" / "Liczba goli w meczu"
+                const m = clean.match(/^(?:\\+|powyżej\\s*|over\\s*)?\\s*(\\d+(?:[,.]\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/i) ||
+                          clean.match(/([+-]?\\s*\\d+(?:[,.]\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
+                if (m) {
+                    const rawLineStr = m[1].replace(/\\s+/g, '');
+                    const isUnder = rawLineStr.startsWith('-') || clean.toLowerCase().startsWith('poniżej') || clean.toLowerCase().startsWith('under');
+                    if (isUnder) continue;
+
+                    const line = parseFloat(rawLineStr.replace('+', '').replace(',', '.'));
+                    const odds = parseFloat(m[2].replace(',', '.'));
+
+                    if (!isNaN(line) && !isNaN(odds) && odds > 1.0) {
+                        const key = 'over_' + line + '_ft';
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            mkts.push({
+                                market: 'Over ' + line + ' FT',
+                                name: 'Over ' + line + ' FT',
+                                line: line,
+                                odds: odds,
+                                label: '+ Over ' + line + ' FT',
+                                period: 'FT',
+                                market_header: rawTitle,
+                                is_match_total: true,
+                                source: 'STS_REAL'
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    });
+    return mkts;
+}"""
+
 class _STSLiveWorker:
     """
     Dedykowany wątek roboczy zarządzający instancją Playwright i kontekstem przeglądarki.
@@ -205,23 +333,29 @@ class _STSLiveWorker:
 
                                     // 3. DOKŁADNY WYNIK MECZU (Total Home : Total Away)
                                     let scoreH = 0, scoreA = 0;
+                                    let scoreFound = false;
                                     const genEl = a.querySelector('.one-ticket-live-score__general, [class*="general"], [class*="match-tile-score"]');
                                     if (genEl) {
                                         const digits = genEl.innerText.trim().split(/\\s+/).filter(d => /^\\d+$/.test(d));
-                                        if (digits.length >= 2) {
+                                        if (digits.length === 2) {
                                             scoreH = parseInt(digits[0], 10);
                                             scoreA = parseInt(digits[1], 10);
+                                            scoreFound = true;
                                         }
-                                    } else {
-                                        const scoreEls = a.querySelectorAll('.one-ticket-match-tile-score div, [class*="score"] div');
-                                        const digits = [];
-                                        scoreEls.forEach(el => {
-                                            const t = el.innerText.trim();
-                                            if (/^\\d+$/.test(t)) digits.push(parseInt(t, 10));
-                                        });
-                                        if (digits.length >= 2) {
-                                            scoreH = digits[digits.length - 2];
-                                            scoreA = digits[digits.length - 1];
+                                    }
+                                    if (!scoreFound) {
+                                        const matchTileScore = a.querySelector('.one-ticket-match-tile-score');
+                                        if (matchTileScore) {
+                                            const digits = [];
+                                            matchTileScore.querySelectorAll('div').forEach(el => {
+                                                const t = el.innerText.trim();
+                                                if (/^\\d+$/.test(t)) digits.push(parseInt(t, 10));
+                                            });
+                                            if (digits.length === 2) {
+                                                scoreH = digits[0];
+                                                scoreA = digits[1];
+                                                scoreFound = true;
+                                            }
                                         }
                                     }
 
@@ -362,44 +496,9 @@ class _STSLiveWorker:
                                 ev_page.wait_for_selector('sds-odds-button, button.odds-button, [class*="odds-button"]', timeout=6000)
                             except Exception:
                                 pass
-                            ev_page.wait_for_timeout(800)
+                            ev_page.wait_for_timeout(350)
                             
-                            sub_markets = ev_page.evaluate("""() => {
-                                const mkts = [];
-                                const seen = new Set();
-                                document.querySelectorAll('button, .odds-button, [class*="odds-button"], sds-odds-button, div[role="button"]').forEach(b => {
-                                    const rawText = (b.innerText || '').trim();
-                                    const aria = (b.getAttribute('aria-label') || '').trim();
-                                    const candidates = [rawText, aria];
-
-                                    for (let str of candidates) {
-                                        if (!str) continue;
-                                        const clean = str.replace(/\\s+/g, ' ').trim();
-                                        const m = clean.match(/^([+-]?\\s*\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/) ||
-                                                  clean.match(/([+-]?\\s*\\d+(?:\\.\\d+)?)\\s+(\\d+(?:[,.]\\d+)?)$/);
-                                        if (m) {
-                                            const lineStr = m[1].replace(/\\s+/g, '');
-                                            const odds = parseFloat(m[2].replace(',', '.'));
-                                            if (lineStr.startsWith('+') && !isNaN(odds) && odds > 1.0) {
-                                                const line = parseFloat(lineStr.replace('+', ''));
-                                                const key = 'over_' + line;
-                                                if (!seen.has(key)) {
-                                                    seen.add(key);
-                                                    mkts.push({
-                                                        market: 'OVER ' + line + ' FT',
-                                                        name: 'Over ' + line + ' FT',
-                                                        line: line,
-                                                        odds: odds,
-                                                        label: '+ Over ' + line + ' FT',
-                                                        source: 'STS_REAL'
-                                                    });
-                                                }
-                                            }
-                                        }
-                                    }
-                                });
-                                return mkts;
-                            }""")
+                            sub_markets = ev_page.evaluate(GET_SUBPAGE_MARKETS_JS)
                             ev_page.close()
                             reply_q.put(('OK', sub_markets))
                         except Exception as ex:
@@ -513,7 +612,7 @@ class _STSLiveWorker:
             pass
         return []
 
-    def get_subpage_live_markets(self, match_url: str, timeout=3.5) -> List[Dict[str, Any]]:
+    def get_subpage_live_markets(self, match_url: str, timeout=6.5) -> List[Dict[str, Any]]:
         q = queue.Queue()
         self._cmd_queue.put(('GET_SUBPAGE_MARKETS', (match_url,), q))
         try:
@@ -680,12 +779,12 @@ class STSLiveEngine:
 
         return matches
 
-    def get_match_real_live_markets(self, match_url: str) -> List[Dict[str, Any]]:
+    def get_match_real_live_markets(self, match_url: str, timeout: float = 6.5) -> List[Dict[str, Any]]:
         """Pobiera 100% realne, dokładne kursy rynków bramkowych bezpośrednio z podstrony meczu w STS Live."""
         if not match_url or not match_url.startswith('http'):
             return []
         try:
-            return self._worker.get_subpage_live_markets(match_url)
+            return self._worker.get_subpage_live_markets(match_url, timeout=timeout)
         except Exception as e:
             print(f"[STSLiveEngine] Błąd get_match_real_live_markets: {e}")
             return []
@@ -802,19 +901,23 @@ class STSLiveEngine:
         while i < len(lines):
             l = lines[i]
 
-            if l == 'Liczba goli':
+            if l.strip().lower() in ('liczba goli', 'liczba goli w meczu'):
                 start_category('ft_goals'); i += 1; continue
 
-            if l in ('1. połowa - liczba goli', '1.połowa - liczba goli', '1. polowa - liczba goli'):
+            if l.strip().lower() in ('1. połowa - liczba goli', '1.połowa - liczba goli', '1. polowa - liczba goli'):
                 start_category('ht_goals'); i += 1; continue
 
-            if l == 'Następny gol':
+            if l.strip().lower() in ('następny gol', 'nastepny gol'):
                 start_category('next_goal'); i += 1; continue
 
-            if l in ('Mecz', 'Handicap', 'Gole', 'Inne', 'Specjalne', '1. drużyna - strzeli gola',
-                     '2. drużyna - strzeli gola', 'Obie drużyny - strzelą gola', 'Wygra od stanu',
-                     'Handicap 1X2', 'Podwójna szansa', 'Zakład bez remisu',
-                     '1. drużyna - zachowa czyste konto', '2. drużyna - zachowa czyste konto'):
+            l_low = l.lower().strip()
+            forbidden_text = (
+                'drużyn', 'druzyn', '1. drużyna', '2. drużyna', '1.drużyna', '2.drużyna',
+                'gospodarz', 'gość', 'gosc', 'połow', 'polow', 'przedział', 'przedzial',
+                'dokładn', 'dokladn', 'kartk', 'rożn', 'rozn', 'handicap', 'czyste konto',
+                'strzeli gola', 'obie drużyny', 'suma goli', 'mecz', 'gole', 'inne', 'specjalne'
+            )
+            if any(k in l_low for k in forbidden_text) and l_low not in ('liczba goli', 'liczba goli w meczu', 'następny gol', 'nastepny gol'):
                 if category and category not in parsed_categories:
                     parsed_categories.add(category)
                 category = None
@@ -840,8 +943,12 @@ class STSLiveEngine:
                                 'name': f"Over {total_line} FT",
                                 'label': f"+ Over {total_line} FT (+{goals_needed} {gol_str})",
                                 'market': f"Over {total_line} FT",
+                                'line': total_line,
                                 'odds': odds,
                                 'desc': f"Wystarczy jeszcze {goals_needed} {bram_str} w meczu (łącznie {int(total_line + 0.5)}+)",
+                                'market_header': 'Liczba goli',
+                                'is_match_total': True,
+                                'period': 'FT',
                                 'source': 'STS_REAL'
                             })
                         else:  # ht_goals
@@ -849,8 +956,12 @@ class STSLiveEngine:
                                 'name': f"Over {total_line} HT",
                                 'label': f"+ Over {total_line} HT (1. poł.)",
                                 'market': f"Over {total_line} HT",
+                                'line': total_line,
                                 'odds': odds,
                                 'desc': f"Wystarczy {goals_needed} {gol_str} do przerwy",
+                                'market_header': '1. połowa - liczba goli',
+                                'is_match_total': False,
+                                'period': '1H',
                                 'source': 'STS_REAL'
                             })
                     i += 2; continue
@@ -915,13 +1026,13 @@ class STSLiveEngine:
                 minute = 0
                 home_team = ""
                 away_team = ""
-                score_h = 0
-                score_a = 0
+                score_h = None
+                score_a = None
+                score_str = None
                 o1, oX, o2 = 2.20, 3.20, 3.10
 
                 j = i + 1
                 text_lines = []
-                score_lines = []
                 while j < min(n, i + 14):
                     l = lines[j]
                     if l == 'LIVE':
@@ -939,8 +1050,15 @@ class STSLiveEngine:
                         oX = _parse_float(lines[j + 3])
                         o2 = _parse_float(lines[j + 5])
                         j += 5
-                    elif l.isdigit() and len(l) <= 2:
-                        score_lines.append(int(l))
+                    # Ścisły wzorzec wyniku meczu: np. "0:0", "1:2", "0 - 0" (NIGDY pojedyncze cyfry "1", "2", statystyki)
+                    elif re.match(r'^\d{1,2}\s*[:\-]\s*\d{1,2}$', l.strip()):
+                        parts = re.split(r'[:\-]', l.strip())
+                        try:
+                            score_h = int(parts[0].strip())
+                            score_a = int(parts[1].strip())
+                            score_str = f"{score_h}:{score_a}"
+                        except Exception:
+                            score_h, score_a, score_str = None, None, None
                     elif (len(l) > 2 and l not in ['Filtruj', 'Koniec', 'Start o', 'Zapisane', 'Akceptuj', 'Ustawienia', 'GOL', 'Wydarzenie trwa', 'Przejdź do wydarzenia', 'Zakończony', 'Przerwany', 'Odwołany', 'Po dogrywce', 'Po karnych']
                           and not self._is_league_line(l) and not _is_odds(l)):
                         text_lines.append(l)
@@ -954,10 +1072,6 @@ class STSLiveEngine:
                 if len(text_lines) >= 2:
                     home_team = text_lines[0]
                     away_team = text_lines[1]
-                    if len(score_lines) >= 2:
-                        # Na STS ostatnie 2 cyfry to ZAWSZE aktualny wynik łączny meczu (Total Home : Total Away)
-                        score_h = score_lines[-2]
-                        score_a = score_lines[-1]
 
                     is_started = True
                     stage_lower = stage.lower()
@@ -967,6 +1081,8 @@ class STSLiveEngine:
                         half_val = 'PRE'
                         m_time = re.search(r'(\d{1,2}:\d{2})', stage)
                         stage = f"Start o {m_time.group(1)}" if m_time else "Start wkrótce"
+                        if score_str is None:
+                            score_h, score_a, score_str = 0, 0, "0:0"
                     elif 'przerwa' in stage_lower or 'ht' in stage_lower:
                         minute = 45
                         half_val = 'HT'
@@ -979,11 +1095,12 @@ class STSLiveEngine:
                             half_val = '1H'
                             if minute == 0: minute = 1
 
+                    goals_tot = (score_h + score_a) if (score_h is not None and score_a is not None) else 0
                     over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
-                        o1, oX, o2, score_h + score_a, minute
+                        o1, oX, o2, goals_tot, minute
                     )
                     live_markets = self.calculate_dynamic_live_markets(
-                        score_h, score_a, minute, half_val, o1, oX, o2
+                        score_h or 0, score_a or 0, minute, half_val, o1, oX, o2
                     )
 
                     matches.append({
@@ -991,7 +1108,7 @@ class STSLiveEngine:
                         'league': current_league,
                         'home_team': home_team,
                         'away_team': away_team,
-                        'score_str': f"{score_h}:{score_a}",
+                        'score_str': score_str,
                         'home_score': score_h,
                         'away_score': score_a,
                         'minute': minute,
@@ -1025,15 +1142,22 @@ class STSLiveEngine:
                 o2 = _parse_float(lines[i + 5])
 
                 home_team, away_team = "Gospodarz", "Gość"
-                score_h, score_a = 0, 0
+                score_h, score_a, score_str = None, None, None
                 minute = 0
 
                 prev_lines = [lines[j] for j in range(max(0, i - 6), i)]
                 
-                scores = [l for l in prev_lines if l.isdigit() and len(l) <= 2]
-                if len(scores) >= 2:
-                    score_h = int(scores[-2])
-                    score_a = int(scores[-1])
+                # Bezpieczne parsowanie wyniku wyłącznie z formatu X:Y (nigdy z pojedynczych cyfr)
+                for pl in prev_lines:
+                    m_sc = re.match(r'^\d{1,2}\s*[:\-]\s*\d{1,2}$', pl.strip())
+                    if m_sc:
+                        parts = re.split(r'[:\-]', pl.strip())
+                        try:
+                            score_h = int(parts[0].strip())
+                            score_a = int(parts[1].strip())
+                            score_str = f"{score_h}:{score_a}"
+                        except Exception:
+                            pass
 
                 for pl in prev_lines:
                     min_m = re.search(r'(\d+)(?:\+\d+)?\'', pl)
@@ -1054,8 +1178,9 @@ class STSLiveEngine:
                     home_team = text_cands[0]
 
                 if home_team != "Gospodarz" and away_team != "Gość":
+                    goals_tot = (score_h + score_a) if (score_h is not None and score_a is not None) else 0
                     over_05_ht, over_15_ht, over_05_2h, over_15_ft = self._calculate_standard_goal_odds(
-                        o1, oX, o2, score_h + score_a, minute
+                        o1, oX, o2, goals_tot, minute
                     )
 
                     matches.append({
@@ -1063,7 +1188,7 @@ class STSLiveEngine:
                         'league': current_league,
                         'home_team': home_team,
                         'away_team': away_team,
-                        'score_str': f"{score_h}:{score_a}",
+                        'score_str': score_str,
                         'home_score': score_h,
                         'away_score': score_a,
                         'minute': minute,

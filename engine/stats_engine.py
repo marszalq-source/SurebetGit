@@ -72,6 +72,78 @@ class StatsEngine:
         unit_pln = 2.0  # 1J = 2.00 zł bazowo
         stake_pln = units * unit_pln
 
+        # Metryki modelu i statystyki meczowe w momencie wejścia (telemetria rekordu OOS)
+        stats = match_data.get('stats', {}) or {}
+        di10 = round(float(signal_data.get('di10', signal_data.get('di_10', match_data.get('danger_index_10', match_data.get('danger_index', stats.get('danger_index_10', stats.get('danger_index', 0.0))))))), 1)
+        di5 = round(float(signal_data.get('di5', signal_data.get('di_5', match_data.get('danger_index_5', match_data.get('danger_index', stats.get('danger_index_5', stats.get('danger_index', 0.0))))))), 1)
+        sot10m = round(float(signal_data.get('sot10m', signal_data.get('sot_10m', stats.get('sot_10m', stats.get('delta_sot_10', 0.0))))), 2)
+        apm = round(float(signal_data.get('apm', match_data.get('apm', stats.get('apm', 0.0)))), 2)
+        xg = round(float(signal_data.get('xg', signal_data.get('xg_total', stats.get('xg_total', match_data.get('xg', 0.0))))), 2)
+        shots = int(signal_data.get('shots', stats.get('shots_total', match_data.get('shots', stats.get('shots_total_home', 0) + stats.get('shots_total_away', 0)))))
+        corners = int(signal_data.get('corners', stats.get('corners_total', match_data.get('corners', stats.get('corners_home', 0) + stats.get('corners_away', 0)))))
+
+        # Rozróżnienie realnego 0 od braku danych (None / null w telemetrii OOS)
+        has_da = bool(signal_data.get('dangerous_attacks') is not None or stats.get('has_da') or ('dangerous_attacks_total' in stats and stats['dangerous_attacks_total'] is not None) or ('dangerous_attacks_home' in stats and 'dangerous_attacks_away' in stats))
+        if has_da:
+            raw_da = signal_data.get('dangerous_attacks')
+            if raw_da is None:
+                raw_da = stats.get('dangerous_attacks_total')
+            if raw_da is None and 'dangerous_attacks_home' in stats:
+                raw_da = stats.get('dangerous_attacks_home', 0) + stats.get('dangerous_attacks_away', 0)
+            dangerous_attacks = int(raw_da) if raw_da is not None else None
+        else:
+            dangerous_attacks = None
+
+        has_bc = bool(signal_data.get('big_chances') is not None or ('big_chances_total' in stats and stats['big_chances_total'] is not None) or ('big_chances_home' in stats and 'big_chances_away' in stats))
+        if has_bc:
+            raw_bc = signal_data.get('big_chances')
+            if raw_bc is None:
+                raw_bc = stats.get('big_chances_total')
+            if raw_bc is None and 'big_chances_home' in stats:
+                raw_bc = stats.get('big_chances_home', 0) + stats.get('big_chances_away', 0)
+            big_chances = int(raw_bc) if raw_bc is not None else None
+        else:
+            big_chances = None
+
+        sig_type = signal_data.get('signal_type') or signal_data.get('tier')
+        if not sig_type or sig_type in ('ALERT', 'OVER'):
+            if signal_data.get('is_golden') or 'GOLDEN' in str(signal_data.get('badge', '')).upper() or 'OVER_15_HT' in str(signal_data.get('type', '')):
+                sig_type = 'GOLDEN'
+            elif signal_data.get('is_silver') or 'SILVER' in str(signal_data.get('badge', '')).upper():
+                sig_type = 'SILVER'
+            else:
+                sig_type = signal_data.get('type', 'SILVER')
+
+        stats_provider = signal_data.get('stats_provider') or stats.get('source') or match_data.get('source', 'FLASHSCORE')
+        xg_is_estimated = bool(signal_data.get('xg_is_estimated', stats.get('xg_is_estimated', True)))
+        xg_source = "OFFICIAL" if (not xg_is_estimated and stats_provider == "FLASHSCORE") else "DERIVED"
+
+        decision_snapshot = {
+            "stats_provider": stats_provider,
+            "minute": minute,
+            "score": score,
+            "market": badge,
+            "odds": odds,
+            "di10": di10,
+            "di5": di5,
+            "sot10m": sot10m,
+            "apm": apm,
+            "xg": xg,
+            "xg_source": xg_source,
+            "shots": shots,
+            "dangerous_attacks": dangerous_attacks,
+            "corners": corners,
+            "big_chances": big_chances
+        }
+
+        data_quality = {
+            "parser_bug_detected": False,
+            "xg_source": xg_source,
+            "has_da": has_da,
+            "has_bc": has_bc,
+            "anomaly_note": None
+        }
+
         # Dedup: Sprawdź czy dla tego meczu istnieje już aktywny sygnał PENDING w ostatnich 4 godzinach
         h_norm = self._normalize_name(home)
         a_norm = self._normalize_name(away)
@@ -90,6 +162,20 @@ class StatsEngine:
                     item['unit_tag'] = unit_tag
                     item['units'] = units
                     item['stake_pln'] = stake_pln
+                    if 'score' not in item:
+                        item['score'] = item.get('score_initial', score)
+                    for k, val in [
+                        ('di10', di10), ('di5', di5), ('sot10m', sot10m),
+                        ('apm', apm), ('xg', xg), ('xg_source', xg_source),
+                        ('shots', shots), ('dangerous_attacks', dangerous_attacks),
+                        ('corners', corners), ('big_chances', big_chances),
+                        ('signal_type', sig_type), ('stats_provider', stats_provider),
+                        ('decision_snapshot', decision_snapshot),
+                        ('corrected_snapshot', None),
+                        ('data_quality', data_quality)
+                    ]:
+                        if k not in item:
+                            item[k] = val
                     self.save_history(history)
                     return item
 
@@ -106,17 +192,33 @@ class StatsEngine:
             "match_title": f"{home} vs {away}",
             "league": league,
             "minute": minute,
+            "score": score,
             "score_initial": score,
             "score_final": score,
             "market": badge,
             "odds": odds,
+            "di10": di10,
+            "di5": di5,
+            "sot10m": sot10m,
+            "apm": apm,
+            "xg": xg,
+            "xg_source": xg_source,
+            "shots": shots,
+            "dangerous_attacks": dangerous_attacks,
+            "corners": corners,
+            "big_chances": big_chances,
+            "signal_type": sig_type,
+            "stats_provider": stats_provider,
             "unit_tag": unit_tag,
             "units": units,
             "stake_pln": stake_pln,
             "status": "PENDING",
             "profit_units": 0.0,
             "profit_pln": 0.0,
-            "resolved_at": ""
+            "resolved_at": "",
+            "decision_snapshot": decision_snapshot,
+            "corrected_snapshot": None,
+            "data_quality": data_quality
         }
         
         history.append(entry)
@@ -208,13 +310,25 @@ class StatsEngine:
         
         # Filtrowanie czasowe
         cutoff_sec = None
+        end_sec = None
         period_label = "Wszystkie sygnały (Cały czas)"
         
         if period in ('1d', 'today', 'dzis', 'dzisiaj'):
-            # Od początku dzisiejszego dnia
+            # Od początku dzisiejszego dnia (od 00:00 dzisiaj)
             today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
             cutoff_sec = today_start
             period_label = f"Dzisiaj ({time.strftime('%d.%m.%Y')})"
+        elif period in ('yesterday', 'wczoraj', 'wcz'):
+            # Cały wczorajszy dzień (od 00:00 do 23:59 wczoraj)
+            today_dt = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            yesterday_dt = today_dt - datetime.timedelta(days=1)
+            cutoff_sec = yesterday_dt.timestamp()
+            end_sec = today_dt.timestamp()
+            period_label = f"Wczoraj ({yesterday_dt.strftime('%d.%m.%Y')})"
+        elif period in ('24h', '1day', '24'):
+            # Ostatnie 24 godziny płynnie
+            cutoff_sec = now - 86400
+            period_label = "Ostatnie 24 godziny"
         elif period in ('7d', 'week', 'tydzien'):
             cutoff_sec = now - (7 * 86400)
             period_label = "Ostatnie 7 dni"
@@ -231,8 +345,11 @@ class StatsEngine:
         filtered = []
         for item in history:
             ts = item.get('timestamp', 0)
-            if cutoff_sec is None or ts >= cutoff_sec:
-                filtered.append(item)
+            if cutoff_sec is not None and ts < cutoff_sec:
+                continue
+            if end_sec is not None and ts >= end_sec:
+                continue
+            filtered.append(item)
 
         total_count = len(filtered)
         won_count = sum(1 for i in filtered if i.get('status') == 'WON')
@@ -350,7 +467,11 @@ class StatsEngine:
     def get_inline_keyboard(self, current_period: str = '30d') -> dict:
         buttons = [
             [
-                {"text": ("▶ " if current_period in ('1d', 'today') else "") + "📊 Dzisiaj", "callback_data": "stats_1d"},
+                {"text": ("▶ " if current_period in ('1d', 'today', 'dzis', 'dzisiaj') else "") + "📊 Dzisiaj", "callback_data": "stats_1d"},
+                {"text": ("▶ " if current_period in ('yesterday', 'wczoraj', 'wcz') else "") + "📅 Wczoraj", "callback_data": "stats_yesterday"}
+            ],
+            [
+                {"text": ("▶ " if current_period in ('24h', '1day', '24') else "") + "⏱️ Ostatnie 24h", "callback_data": "stats_24h"},
                 {"text": ("▶ " if current_period in ('7d', 'week') else "") + "📅 7 Dni", "callback_data": "stats_7d"}
             ],
             [

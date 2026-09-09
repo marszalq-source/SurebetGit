@@ -63,11 +63,25 @@ try:
         draw.ellipse([26, 26, width - 27, height - 27], fill='#ffffff')
         return img
 
+    def is_server_already_running(port=5050):
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                return s.connect_ex(('127.0.0.1', port)) == 0
+        except Exception:
+            return False
+
     def start_inprocess_server():
         global api_instance, server_thread
         if server_thread and server_thread.is_alive():
             return
         
+        if is_server_already_running(5050):
+            print("Detected background scanner service already running on port 5050.")
+            print("Tray launcher operating in attached mode (connecting to background service).")
+            return
+
         def _server_worker():
             global api_instance
             try:
@@ -78,7 +92,7 @@ try:
             except Exception as e:
                 print(f"Error in server worker: {e}")
 
-        server_thread = threading.Thread(target=_server_worker, daemon=True, name="TrayServerThread")
+        server_thread = threading.Thread(target=_server_worker, daemon=False, name="TrayServerThread")
         server_thread.start()
         print("TrayServerThread launched.")
 
@@ -96,6 +110,12 @@ try:
                 api_instance.refresh_all()
             except Exception as ex:
                 print(f"Error refreshing: {ex}")
+        else:
+            try:
+                import urllib.request
+                urllib.request.urlopen("http://127.0.0.1:5050/api/scan", timeout=3)
+            except Exception as ex:
+                print(f"Error refreshing via HTTP: {ex}")
         try:
             icon.notify("Skaner STS Live został odświeżony!", "OverRadar Live")
         except Exception:
@@ -137,7 +157,15 @@ try:
             start_inprocess_server()
 
         print("Running pystray icon with setup callback...")
-        icon.run(setup=_setup_app)
+        try:
+            icon.run(setup=_setup_app)
+        except Exception as e:
+            print(f"Pystray icon exception: {e}")
+            start_inprocess_server()
+
+        if server_thread and server_thread.is_alive():
+            print("Pystray loop finished; keeping server thread alive...")
+            server_thread.join()
 
     if __name__ == "__main__":
         main()
