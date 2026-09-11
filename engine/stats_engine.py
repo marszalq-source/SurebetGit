@@ -3,7 +3,8 @@ import json
 import time
 import datetime
 from collections import defaultdict
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
+from sts_live_config import POLISH_TAX_MULTIPLIER
 
 SIGNALS_HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "telegram_signals_history.json")
 
@@ -51,6 +52,16 @@ class StatsEngine:
         n = re.sub(r'[^a-z0-9\s]', ' ', n)
         words = [w.strip() for w in n.split() if w.strip()]
         return " ".join(words)
+
+    @staticmethod
+    def _calculate_settlement_profit(status: str, odds: float, units: float, stake_pln: float) -> Tuple[float, float]:
+        """Zwraca wynik netto zgodny z EV_PL (12% podatku od stawki w STS)."""
+        if status == 'WON':
+            net_multiplier = (float(odds) * POLISH_TAX_MULTIPLIER) - 1.0
+            return round(float(units) * net_multiplier, 2), round(float(stake_pln) * net_multiplier, 2)
+        if status == 'LOST':
+            return round(-float(units), 2), round(-float(stake_pln), 2)
+        return 0.0, 0.0
 
     def record_signal(self, match_data: dict, signal_data: dict, unit_tag: str = "1J") -> dict:
         history = self.load_history()
@@ -124,6 +135,7 @@ class StatsEngine:
             "score": score,
             "market": badge,
             "odds": odds,
+            "entry_odds": odds,
             "di10": di10,
             "di5": di5,
             "sot10m": sot10m,
@@ -273,18 +285,16 @@ class StatsEngine:
                         item['odds'] = float(final_odds)
 
                     units = item.get('units', 1)
-                    odds = item.get('odds', 1.80)
+                    # Rozliczaj po kursie z pierwszego powiadomienia, nie po późniejszej edycji karty.
+                    odds = item.get('entry_odds', item.get('odds', 1.80))
                     stake_pln = item.get('stake_pln', units * 2.0)
                     
-                    if status == 'WON':
-                        p_units = round(units * (odds - 1.0), 2)
-                        p_pln = round(stake_pln * (odds - 1.0), 2)
-                    elif status == 'LOST':
-                        p_units = round(-1.0 * units, 2)
-                        p_pln = round(-1.0 * stake_pln, 2)
-                    else:  # VOID
-                        p_units = 0.0
-                        p_pln = 0.0
+                    p_units, p_pln = self._calculate_settlement_profit(
+                        status=status,
+                        odds=odds,
+                        units=units,
+                        stake_pln=stake_pln
+                    )
                         
                     item['profit_units'] = p_units
                     item['profit_pln'] = p_pln
@@ -360,11 +370,19 @@ class StatsEngine:
         resolved_count = won_count + lost_count
         win_rate = round((won_count / resolved_count) * 100, 1) if resolved_count > 0 else 0.0
 
-        total_staked_units = sum(i.get('units', 1) for i in filtered if i.get('status') in ('WON', 'LOST', 'VOID'))
-        total_staked_pln = sum(i.get('stake_pln', 2.0) for i in filtered if i.get('status') in ('WON', 'LOST', 'VOID'))
-        
-        profit_units = round(sum(i.get('profit_units', 0.0) for i in filtered), 2)
-        profit_pln = round(sum(i.get('profit_pln', 0.0) for i in filtered), 2)
+        settled_bets = [i for i in filtered if i.get('status') in ('WON', 'LOST')]
+        total_staked_units = sum(i.get('units', 1) for i in settled_bets)
+        total_staked_pln = sum(i.get('stake_pln', 2.0) for i in settled_bets)
+
+        # Wyliczaj od nowa z kursu wejścia, aby stare rekordy brutto nie zawyżały ROI.
+        profits = [self._calculate_settlement_profit(
+            status=i.get('status', ''),
+            odds=float(i.get('entry_odds', i.get('odds', 1.0))),
+            units=float(i.get('units', 1)),
+            stake_pln=float(i.get('stake_pln', 2.0))
+        ) for i in settled_bets]
+        profit_units = round(sum(p[0] for p in profits), 2)
+        profit_pln = round(sum(p[1] for p in profits), 2)
         
         yield_pct = round((profit_units / total_staked_units) * 100, 1) if total_staked_units > 0 else 0.0
         

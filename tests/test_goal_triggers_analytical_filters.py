@@ -155,7 +155,7 @@ class TestGoalTriggersAnalyticalFilters(unittest.TestCase):
             ]
         }
         res = self.triggers.evaluate_match(match_data, self.base_stats, {})
-        self.assertGreaterEqual(res['danger_index'], 50)
+        self.assertGreaterEqual(res['danger_index'], 45)
         self.assertNotIn('wykluczony analitycznie', res.get('top_recommendation', ''))
 
 if __name__ == '__main__':

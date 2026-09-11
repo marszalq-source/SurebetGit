@@ -15,7 +15,7 @@ import sys
 import json
 import math
 from collections import defaultdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -26,7 +26,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORY_FILE = os.path.join(BASE_DIR, "telegram_signals_history.json")
 
 
-def calculate_wilson_ci(k: int, n: int, confidence: float = 0.95) -> tuple[float, float]:
+def calculate_wilson_ci(k: int, n: int, confidence: float = 0.95) -> Tuple[float, float]:
     """Oblicza dwustronny przedział ufności Wilsona dla proporcji sukcesów (skuteczności)."""
     if n == 0:
         return (0.0, 0.0)

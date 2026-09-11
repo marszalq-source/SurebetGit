@@ -2,6 +2,7 @@ import os
 import json
 import pytest
 from engine.stats_engine import StatsEngine
+from sts_live_config import POLISH_TAX_MULTIPLIER
 
 def test_record_signal_emits_full_oos_telemetry(tmp_path):
     test_hist_file = tmp_path / "test_signals_history.json"
@@ -94,6 +95,9 @@ def test_record_signal_emits_full_oos_telemetry(tmp_path):
     assert settled["big_chances"] == 2
     assert settled["signal_type"] == "SILVER"
     assert settled["decision_snapshot"]["shots"] == 14
+    assert settled["profit_units"] == round(2 * (1.73 * POLISH_TAX_MULTIPLIER - 1.0), 2)
+    assert settled["profit_pln"] == round(4.0 * (1.73 * POLISH_TAX_MULTIPLIER - 1.0), 2)
+    assert engine.get_stats()["profit_pln"] == settled["profit_pln"]
 
 
 def test_record_signal_distinguishes_null_from_zero_for_unobserved_da(tmp_path):
@@ -183,4 +187,3 @@ def test_record_signal_official_xg_from_flashscore(tmp_path):
     assert entry["xg_source"] == "OFFICIAL"
     assert entry["decision_snapshot"]["xg_source"] == "OFFICIAL"
     assert entry["data_quality"]["xg_source"] == "OFFICIAL"
-

@@ -17,7 +17,9 @@ if ($task) {
         Write-Host ("  [Harmonogram] Kod ostatniego wyniku: " + $info.LastTaskResult) -ForegroundColor White
     }
 } else {
-    Write-Host "  [Harmonogram] Zadanie zarejestrowane: NIE (Uruchom ZAREJESTRUJ_HARMONOGRAM.bat)" -ForegroundColor Red
+    # Sprawdzenie czy zadanie istnieje jako systemowe (wymaga admina) lub czy usluga dziala bezposrednio
+    Write-Host "  [Harmonogram] Zadanie w Harmonogramie: Niezarejestrowane lub wymaga uprawnien Administratora" -ForegroundColor Yellow
+    Write-Host "                (Aby zarejestrowac w Harmonogramie Windows, uruchom: ZAREJESTRUJ_HARMONOGRAM.bat jako Administrator)" -ForegroundColor Gray
 }
 
 # 2. Sprawdzenie procesow Python
@@ -52,6 +54,8 @@ if (Test-Path $logPath) {
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 try {
-    Write-Host "Nacisnij dowolny klawisz, aby zakonczyc..." -ForegroundColor Yellow
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    if ([Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+        Write-Host "Nacisnij dowolny klawisz, aby zakonczyc..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
 } catch {}

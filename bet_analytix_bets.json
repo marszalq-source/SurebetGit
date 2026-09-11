@@ -3223,5 +3223,35 @@
     "status": "WON",
     "created_at": 1788898446.132237,
     "settled_at": 1788899617.0849688
+  },
+  "gwangju fc vs jeju united": {
+    "bet_id": 119534926,
+    "match": "Gwangju FC vs Jeju United",
+    "badge": "OVER 1.5 FT",
+    "odds": 2.02,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788953629.9530933,
+    "settled_at": 1788956788.6114924
+  },
+  "santa clara u23 vs sc farense u23": {
+    "bet_id": 119537535,
+    "match": "Santa Clara U23 vs SC Farense U23",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.49,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788956978.0150318,
+    "settled_at": 1788962871.4606674
+  },
+  "club fernando de la mora vs deportivo capiata": {
+    "bet_id": 119540494,
+    "match": "Club Fernando de la Mora vs Deportivo Capiata",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1788960119.2196736,
+    "settled_at": 1788965909.1186233
   }
 }

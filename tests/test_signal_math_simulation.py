@@ -417,6 +417,39 @@ class TestComprehensiveSignalSimulation(unittest.TestCase):
         self.assertFalse(res['has_signals'])
         self.assertLess(res['danger_index'], 50)
 
+    def test_directional_10m_deltas_preserve_team_side(self):
+        """Helper nie może mieszać naporu gospodarzy i gości w jedną sumę."""
+        current = {'xg_home': 1.10, 'xg_away': 0.25, 'sot_home': 5, 'sot_away': 1}
+        baseline = {'xg_home': 0.70, 'xg_away': 0.20, 'sot_home': 3, 'sot_away': 1}
+
+        deltas = self.triggers._calculate_directional_10m(current, baseline, normalizer=1.0)
+
+        self.assertEqual(deltas['delta_xg_home_10'], 0.40)
+        self.assertEqual(deltas['delta_xg_away_10'], 0.05)
+        self.assertEqual(deltas['delta_sot_home_10'], 2.0)
+        self.assertEqual(deltas['delta_sot_away_10'], 0.0)
+
+    def test_estimated_stats_and_unconfirmed_5m_window_cannot_signal(self):
+        """Dane syntetyczne i cold start nie mogą udawać potwierdzonego wejścia."""
+        match = {
+            'flashscore_id': 'quality_gate_fixture', 'minute': 30, 'half': '1H',
+            'home_team': 'Team A', 'away_team': 'Team B', 'home_score': 1, 'away_score': 0,
+            'league': 'Premier League', 'is_started': True,
+            'live_markets': [{'name': 'Over 1.5 FT', 'market': 'MECZ', 'odds': 1.80, 'source': 'STS_REAL'}]
+        }
+        stats = {
+            'xg_total': 1.2, 'shots_total': 10, 'shots_on_target_total': 4,
+            'dangerous_attacks_total': 30, 'corners_total': 4, 'big_chances_total': 1,
+        }
+
+        estimated = self.triggers.evaluate_match(match, {**stats, 'is_estimated': True}, {})
+        self.assertFalse(estimated['has_signals'])
+        self.assertIn('estymowane', estimated['top_recommendation'])
+
+        cold_start = self.triggers.evaluate_match(match, stats, {})
+        self.assertFalse(cold_start['has_signals'])
+        self.assertEqual(cold_start['trend_state'], 'UNCONFIRMED')
+
     # -------------------------------------------------------------
     # 6. TESTY CZYSZCZENIA PAMIĘCI RAM I OCHRONY PRZED WYCIEKAMI (24/7)
     # -------------------------------------------------------------

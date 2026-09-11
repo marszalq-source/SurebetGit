@@ -92,6 +92,45 @@ class GoalTriggersEngine:
             if hist and 'snapshots' in hist:
                 hist['snapshots'].clear()
 
+    @staticmethod
+    def _read_team_pair(stats: Dict[str, Any], metric: str) -> Tuple[Optional[float], Optional[float]]:
+        """Odczytuje parę home/away bez zamiany braku danych na sztuczne zero."""
+        aliases = {
+            'xg': (('xg_home', 'expected_goals_home'), ('xg_away', 'expected_goals_away')),
+            'sot': (('shots_on_target_home', 'shots_on_target_total_home'),
+                    ('shots_on_target_away', 'shots_on_target_total_away')),
+        }
+        home_keys, away_keys = aliases[metric]
+
+        def _first_numeric(keys: Tuple[str, ...]) -> Optional[float]:
+            for key in keys:
+                value = stats.get(key)
+                if value is not None:
+                    try:
+                        return max(0.0, float(value))
+                    except (TypeError, ValueError):
+                        return None
+            return None
+
+        return _first_numeric(home_keys), _first_numeric(away_keys)
+
+    @staticmethod
+    def _calculate_directional_10m(
+        current: Dict[str, Any], baseline: Dict[str, Any], normalizer: float
+    ) -> Dict[str, Optional[float]]:
+        """Zwraca znormalizowane delty 10m per drużyna; None oznacza brak wiarygodnej pary danych."""
+        result: Dict[str, Optional[float]] = {}
+        for metric in ('xg', 'sot'):
+            for side in ('home', 'away'):
+                key = f'{metric}_{side}'
+                current_value = current.get(key)
+                baseline_value = baseline.get(key)
+                result[f'delta_{metric}_{side}_10'] = (
+                    round(max(0.0, float(current_value) - float(baseline_value)) * normalizer, 2)
+                    if current_value is not None and baseline_value is not None else None
+                )
+        return result
+
     def _record_snapshot_and_get_deltas(self, match_key: str, snap: Dict[str, Any]) -> Dict[str, Any]:
         """
         Zapisuje stan meczu do bufora kroczącego i wylicza twarde delty z ostatnich 10 i 5 minut.
@@ -166,11 +205,14 @@ class GoalTriggersEngine:
             tracked_mins_5 = max(0.5, float(snap['minute'] - baseline_5['minute']) if snap['minute'] >= baseline_5['minute'] else (now - baseline_5['time']) / 60.0)
 
             is_full_window = (past_snap_10 is not None) or (tracked_mins_10 >= 7.0)
+            # Trend DI5 jest wiarygodny dopiero po rzeczywistym, niemal pełnym oknie 5 min.
+            is_full_window_5 = past_snap_5 is not None and tracked_mins_5 >= 4.5
+            has_da_10 = bool(snap.get('has_da') and baseline_10.get('has_da'))
 
             # Surowe różnice dla okna 10-minutowego
             raw_sot_10 = max(0, snap['sot'] - baseline_10['sot'])
             raw_shots_10 = max(0, snap['shots'] - baseline_10['shots'])
-            raw_da_10 = max(0, snap['dangerous_attacks'] - baseline_10['dangerous_attacks'])
+            raw_da_10 = max(0, snap['dangerous_attacks'] - baseline_10['dangerous_attacks']) if has_da_10 else 0
             raw_corners_10 = max(0, snap['corners'] - baseline_10['corners'])
             raw_xg_10 = max(0.0, snap['xg'] - baseline_10['xg'])
             raw_big_10 = max(0, snap['big_chances'] - baseline_10['big_chances'])
@@ -178,7 +220,8 @@ class GoalTriggersEngine:
             # Surowe różnice dla okna 5-minutowego
             raw_sot_5 = max(0, snap['sot'] - baseline_5['sot'])
             raw_shots_5 = max(0, snap['shots'] - baseline_5['shots'])
-            raw_da_5 = max(0, snap['dangerous_attacks'] - baseline_5['dangerous_attacks'])
+            has_da_5 = bool(snap.get('has_da') and baseline_5.get('has_da'))
+            raw_da_5 = max(0, snap['dangerous_attacks'] - baseline_5['dangerous_attacks']) if has_da_5 else 0
             raw_corners_5 = max(0, snap['corners'] - baseline_5['corners'])
             raw_xg_5 = max(0.0, snap['xg'] - baseline_5['xg'])
             raw_big_5 = max(0, snap['big_chances'] - baseline_5['big_chances'])
@@ -198,7 +241,7 @@ class GoalTriggersEngine:
                     norm_10 = min(2.0, 10.0 / eff_mins)
                     d_sot_10 = raw_sot_10 * norm_10 if raw_sot_10 > 0 else (snap['sot'] / max(1.0, snap['minute'] / 10.0))
                     d_shots_10 = raw_shots_10 * norm_10 if raw_shots_10 > 0 else (snap['shots'] / max(1.0, snap['minute'] / 10.0))
-                    d_da_10 = raw_da_10 * norm_10 if raw_da_10 > 0 else (snap['dangerous_attacks'] / max(1.0, snap['minute'] / 10.0))
+                    d_da_10 = raw_da_10 * norm_10 if has_da_10 else 0.0
                     d_corners_10 = raw_corners_10 * norm_10 if raw_corners_10 > 0 else (snap['corners'] / max(1.0, snap['minute'] / 10.0))
                     d_xg_10 = raw_xg_10 * norm_10 if raw_xg_10 > 0 else (snap['xg'] / max(1.0, snap['minute'] / 10.0))
                     d_big_10 = raw_big_10 * norm_10 if raw_big_10 > 0 else (snap['big_chances'] / max(1.0, snap['minute'] / 10.0))
@@ -207,13 +250,15 @@ class GoalTriggersEngine:
                     norm_10 = min(2.0, 10.0 / eff_mins)
                     d_sot_10 = raw_sot_10 * norm_10 if raw_sot_10 > 0 else (snap['sot'] * norm_10)
                     d_shots_10 = raw_shots_10 * norm_10 if raw_shots_10 > 0 else (snap['shots'] * norm_10)
-                    d_da_10 = raw_da_10 * norm_10 if raw_da_10 > 0 else (snap['dangerous_attacks'] * norm_10)
+                    d_da_10 = raw_da_10 * norm_10 if has_da_10 else 0.0
                     d_corners_10 = raw_corners_10 * norm_10 if raw_corners_10 > 0 else (snap['corners'] * norm_10)
                     d_xg_10 = raw_xg_10 * norm_10 if raw_xg_10 > 0 else (snap['xg'] * norm_10)
-                    d_big_10 = raw_big_10 * norm_10 if raw_big_10 > 0 else (snap['big_chances'] * norm_10)
+                d_big_10 = raw_big_10 * norm_10 if raw_big_10 > 0 else (snap['big_chances'] * norm_10)
+
+            directional_deltas = self._calculate_directional_10m(snap, baseline_10, norm_10)
 
             # Normalizacja okna 5m do skali 10m (dla bezpośredniej porównywalności DI5 z DI10)
-            if past_snap_5 is not None and tracked_mins_5 >= 3.0:
+            if is_full_window_5:
                 norm_5 = 10.0 / tracked_mins_5
                 d_sot_5 = raw_sot_5 * norm_5
                 d_shots_5 = raw_shots_5 * norm_5
@@ -222,7 +267,8 @@ class GoalTriggersEngine:
                 d_xg_5 = raw_xg_5 * norm_5
                 d_big_5 = raw_big_5 * norm_5
             else:
-                # Cold Start: dopóki nie ma min. 3 minut historii w RAM, tempo 5m odpowiada tempu 10m (Trend = STABLE)
+                # Cold start: zachowujemy DI5 do podglądu, lecz is_full_window_5=False
+                # bezwzględnie blokuje wykorzystanie go jako potwierdzenia trendu.
                 d_sot_5 = d_sot_10
                 d_shots_5 = d_shots_10
                 d_da_5 = d_da_10
@@ -239,6 +285,7 @@ class GoalTriggersEngine:
                 'delta_xg_10': round(d_xg_10, 2),
                 'delta_big_10': round(d_big_10, 2),
                 'raw_sot_10': raw_sot_10,
+                **directional_deltas,
 
                 'delta_sot_5': round(d_sot_5, 2),
                 'delta_shots_5': round(d_shots_5, 2),
@@ -248,10 +295,12 @@ class GoalTriggersEngine:
                 'delta_big_5': round(d_big_5, 2),
                 'raw_sot_5': raw_sot_5,
 
-                'has_da': bool(snap.get('dangerous_attacks', 0) > 0 or hist.get('has_da_seen', False)),
+                'has_da': has_da_10,
+                'has_da_5': has_da_5,
                 'last_goal_minute': hist.get('last_goal_minute'),
                 'last_goal_time': hist.get('last_goal_time', 0.0),
-                'is_full_window': is_full_window
+                'is_full_window': is_full_window,
+                'is_full_window_5': is_full_window_5
             }
 
     def evaluate_match(self, match_data: Dict[str, Any], stats: Dict[str, Any], sts_odds: Dict[str, Any]) -> Dict[str, Any]:
@@ -288,6 +337,18 @@ class GoalTriggersEngine:
         corners = max(0, int(stats.get('corners_total', 0)))
         red_cards = max(0, int(stats.get('red_cards_total', 0)))
         big_chances = max(0, int(stats.get('big_chances_total', 0)))
+        xg_home, xg_away = self._read_team_pair(stats, 'xg')
+        sot_home, sot_away = self._read_team_pair(stats, 'sot')
+
+        # Dane wyliczone z kursów lub pochodne xG mogą służyć wyłącznie do podglądu.
+        # Nie mogą tworzyć automatycznego sygnału value betting.
+        if stats.get('is_estimated') is True or stats.get('xg_is_estimated') is True:
+            return {
+                'apm': 0.0, 'danger_index': 0, 'danger_index_10': 0,
+                'danger_index_5': 0, 'trend': 0, 'danger_rating': 'BRAK DANYCH',
+                'signals': [], 'has_signals': False, 'primary_signal': None,
+                'top_recommendation': 'Brak sygnału: statystyki estymowane / syntetyczne'
+            }
 
         # Identyfikator meczu dla bufora serii czasowej
         m_home = str(match_data.get('home_team', '')).strip()
@@ -315,8 +376,16 @@ class GoalTriggersEngine:
             'shots': shots_total,
             'sot': sot,
             'dangerous_attacks': dangerous_attacks,
+            'has_da': bool(
+                stats.get('has_da') is True or
+                ('dangerous_attacks_total' in stats and stats.get('dangerous_attacks_total') is not None)
+            ),
             'corners': corners,
             'xg': xg_total,
+            'xg_home': xg_home,
+            'xg_away': xg_away,
+            'sot_home': sot_home,
+            'sot_away': sot_away,
             'big_chances': big_chances,
             'red_cards': red_cards,
             'is_finished': is_finished
@@ -331,7 +400,17 @@ class GoalTriggersEngine:
         danger_index_10, raw_di_10 = self._calculate_danger_index(deltas=deltas, suffix='_10', red_cards=red_cards)
         danger_index_5, raw_di_5 = self._calculate_danger_index(deltas=deltas, suffix='_5', red_cards=red_cards)
         trend = danger_index_5 - danger_index_10
-        trend_state = "RISING" if trend > 5 else ("FALLING" if trend < -15 else "STABLE")
+        trend_ready = bool(deltas.get('is_full_window_5'))
+        directional_10m = {
+            'home_xg': deltas.get('delta_xg_home_10'),
+            'away_xg': deltas.get('delta_xg_away_10'),
+            'home_sot': deltas.get('delta_sot_home_10'),
+            'away_sot': deltas.get('delta_sot_away_10'),
+        }
+        trend_state = (
+            "UNCONFIRMED" if not trend_ready else
+            ("RISING" if trend > 5 else ("FALLING" if trend < -15 else "STABLE"))
+        )
         danger_index = danger_index_10
         d_rat = "EKSTREMALNY" if danger_index >= 75 else ("WYSOKI" if danger_index >= 55 else ("ŚREDNI" if danger_index >= 35 else "NISKI"))
 
@@ -722,6 +801,9 @@ class GoalTriggersEngine:
 
             # 5. INTENSYWNOŚĆ (DI10 i DI5)
             # Próg bazowy 4⭐: min. 55% w oknie 10m oraz min. 60% w oknie 5m (potwierdzenie tempa)
+            if not trend_ready:
+                _log_eval(cand_type, badge_v, odds_v, "5_INTENSITY", "REJECTED", "UNCONFIRMED_5M_TREND", implied_p=1.0/odds_v if odds_v>0 else 1.0)
+                continue
             if danger_index_10 < 55 or danger_index_5 < 60:
                 _log_eval(cand_type, badge_v, odds_v, "5_INTENSITY", "REJECTED", f"LOW_INTENSITY (DI10={danger_index_10}%, DI5={danger_index_5}%)", implied_p=1.0/odds_v if odds_v>0 else 1.0)
                 continue
@@ -866,6 +948,8 @@ class GoalTriggersEngine:
             'danger_index_5': danger_index_5,
             'trend': trend,
             'trend_state': trend_state,
+            'trend_ready': trend_ready,
+            'directional_10m': directional_10m,
             'danger_rating': d_rat,
             'signals': signals,
             'has_signals': len(signals) > 0,
@@ -902,8 +986,8 @@ class GoalTriggersEngine:
 
     def _calculate_danger_index(self, deltas: Dict[str, Any], suffix: str = '_10', red_cards: int = 0) -> Tuple[int, int]:
         """
-        Zwraca krotkę: (final_danger_index, raw_danger_index) w skali (0-100, 0-71/100).
-        Eliminuje problem inercji w 2H oraz multikolinearność (brak dublowania tych samych strzałów).
+        Zwraca krotkę: (final_danger_index, raw_danger_index) w skali 0-100.
+        Brak DA jest karą jakości danych, nie powodem do podbijania indeksu.
         """
         d_sot = float(deltas.get(f'delta_sot{suffix}', 0.0))
         d_shots = float(deltas.get(f'delta_shots{suffix}', 0.0))
@@ -911,7 +995,7 @@ class GoalTriggersEngine:
         d_corners = float(deltas.get(f'delta_corners{suffix}', 0.0))
         d_xg = float(deltas.get(f'delta_xg{suffix}', 0.0))
         d_big = float(deltas.get(f'delta_big{suffix}', 0.0))
-        has_da = bool(deltas.get('has_da', False) or d_da > 0)
+        has_da = bool(deltas.get('has_da_5' if suffix == '_5' else 'has_da', False))
 
         raw_score = 0.0
         d_off_target = max(0.0, d_shots - d_sot)
@@ -925,14 +1009,13 @@ class GoalTriggersEngine:
         if red_cards > 0:
             raw_score += 4.0
 
-        if has_da and d_da > 0:
-            # 1. Pełny feed ze statystyką groźnych ataków
+        if has_da:
             raw_score += min(25.0, d_da * 1.65)
             final_score = raw_score
         else:
-            # 2. Dynamiczne proporcjonalne przeskalowanie bez DA: wskaźnik 96.0 / 71.0 ≈ 1.3521
-            scale = 96.0 / 71.0
-            final_score = raw_score * scale
+            # Feed bez DA ma mniej dowodów na presję terytorialną. Nie kompensujemy
+            # brakującej cechy mnożnikiem; obniżamy confidence o 15%.
+            final_score = raw_score * 0.85
 
         final_di = max(5, min(100, int(round(final_score))))
         raw_di = max(5, min(100, int(round(raw_score))))
