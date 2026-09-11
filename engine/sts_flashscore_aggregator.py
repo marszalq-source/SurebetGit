@@ -26,6 +26,8 @@ class STSFlashscoreAggregator:
         self.tracker = BetTracker()
         self.last_scan_time = 0
         self.cached_results = []
+        self._is_enriched = False
+        self._enrichment_status = "INITIALIZING"
         self._scan_lock = threading.Lock()
         self.start_background_scanner()
 
@@ -189,7 +191,10 @@ class STSFlashscoreAggregator:
             "timestamp": time.strftime('%H:%M:%S'),
             "matches": filtered,
             "total_live_matches": len(matches),
-            "signals_count": signals_cnt
+            "signals_count": signals_cnt,
+            "is_enriched": getattr(self, '_is_enriched', True),
+            "enrichment_status": getattr(self, '_enrichment_status', 'COMPLETE'),
+            "is_stale": elapsed_sec > 120
         }
 
 
@@ -212,6 +217,133 @@ class STSFlashscoreAggregator:
                     self.matcher.pre_normalize_matches(sts_matches)
             except Exception as e:
                 print(f"[Aggregator] STS fetch error: {e}")
+
+            # INSTANT FRESH SNAPSHOT (Warstwa prezentacyjna / cache dla UI):
+            # Zasilenie / odświeżenie RAM natychmiastowym bazowym snapshotem LIVE bez czekania na enrichment
+            if fs_matches or sts_matches:
+                existing_cache_map = {}
+                for item in self.cached_results:
+                    cid = item.get('id') or item.get('flashscore_id')
+                    if cid:
+                        existing_cache_map[cid] = item
+
+                fresh_baseline = []
+                seen_pairs = set()
+
+                for m in fs_matches:
+                    m_id = m.get('flashscore_id')
+                    pair_key = f"{m.get('home_team', '')}_{m.get('away_team', '')}".lower()
+                    seen_pairs.add(pair_key)
+                    existing_entry = existing_cache_map.get(m_id)
+
+                    sts_m = self.matcher.match_flashscore_with_sts(m, sts_matches) if sts_matches else None
+                    matched_with_sts = sts_m is not None
+                    sts_url = sts_m.get('url', 'https://www.sts.pl/live/pilka-nozna') if sts_m else 'https://www.sts.pl/live/pilka-nozna'
+                    live_mkts = sts_m.get('live_markets', []) if sts_m else (existing_entry.get('live_markets', []) if existing_entry else [])
+                    odds_dict = sts_m.get('goals_odds', {}) if sts_m else (existing_entry.get('odds', {}) if existing_entry else {})
+
+                    # Synchronizacja z STS
+                    m_min = m.get('minute', 0)
+                    m_half = m.get('half', '1H')
+                    m_stage = m.get('stage_text', '')
+                    m_score = m.get('score_str', '0:0')
+                    m_h_score = m.get('home_score', 0)
+                    m_a_score = m.get('away_score', 0)
+
+                    if sts_m:
+                        sts_min = sts_m.get('minute', 0)
+                        if sts_min > 0 and (sts_min >= m_min or m_min == 0):
+                            m_min = sts_min
+                            m_half = sts_m.get('half', m_half)
+                            m_stage = sts_m.get('stage_text', f"{sts_min}'")
+                        if sts_m.get('half') in ('2H', 'FT') and m_half == 'HT':
+                            m_half = sts_m.get('half')
+                            m_stage = sts_m.get('stage_text', m_stage)
+                        if sts_m.get('score_str') and sts_m.get('score_str') != '0:0':
+                            m_score = sts_m['score_str']
+                            m_h_score = sts_m.get('home_score', m_h_score)
+                            m_a_score = sts_m.get('away_score', m_a_score)
+
+                    fresh_baseline.append({
+                        'id': m_id,
+                        'league': (sts_m.get('league') if sts_m and not str(sts_m.get('league', '')).startswith('Piłka Nożna') else None) or m.get('league', 'Piłka Nożna'),
+                        'home_team': (sts_m.get('home_team') if sts_m else None) or m.get('home_team', ''),
+                        'away_team': (sts_m.get('away_team') if sts_m else None) or m.get('away_team', ''),
+                        'sts_home_team': sts_m.get('home_team') if sts_m else (existing_entry.get('sts_home_team') if existing_entry else None),
+                        'sts_away_team': sts_m.get('away_team') if sts_m else (existing_entry.get('sts_away_team') if existing_entry else None),
+                        'flashscore_home_team': m.get('home_team', ''),
+                        'flashscore_away_team': m.get('away_team', ''),
+                        'home_score': m_h_score,
+                        'away_score': m_a_score,
+                        'score_str': m_score,
+                        'minute': m_min,
+                        'half': m_half,
+                        'stage_text': m_stage,
+                        'stats': existing_entry.get('stats', {}) if existing_entry else {},
+                        'danger_index': existing_entry.get('danger_index', 50) if existing_entry else 50,
+                        'danger_index_10': existing_entry.get('danger_index_10', 50) if existing_entry else 50,
+                        'danger_index_5': existing_entry.get('danger_index_5', 50) if existing_entry else 50,
+                        'danger_rating': existing_entry.get('danger_rating', 'ŚREDNI') if existing_entry else 'ŚREDNI',
+                        'apm': existing_entry.get('apm', 0.8) if existing_entry else 0.8,
+                        'has_signals': existing_entry.get('has_signals', False) if existing_entry else False,
+                        'signals': existing_entry.get('signals', []) if existing_entry else [],
+                        'odds': odds_dict,
+                        'live_markets': live_mkts,
+                        'matched_with_sts': matched_with_sts or (existing_entry.get('matched_with_sts', False) if existing_entry else False),
+                        'sts_url': sts_url,
+                        'flashscore_url': m.get('url', f"https://www.flashscore.pl/mecz/{m_id}/"),
+                        'prematch_context': existing_entry.get('prematch_context', {}) if existing_entry else {},
+                        'is_worth_watching': existing_entry.get('is_worth_watching', False) if existing_entry else False,
+                        'worth_grade': existing_entry.get('worth_grade', 'STANDARD') if existing_entry else 'STANDARD',
+                        'worth_reasons': existing_entry.get('worth_reasons', ['⚪ Wczytywanie statystyk...']) if existing_entry else ['⚪ Wczytywanie statystyk...'],
+                        'enrichment_status': existing_entry.get('enrichment_status', 'PENDING') if existing_entry else 'PENDING'
+                    })
+
+                for sm in sts_matches:
+                    sm_pair = f"{sm.get('home_team', '')}_{sm.get('away_team', '')}".lower()
+                    if sm_pair not in seen_pairs:
+                        seen_pairs.add(sm_pair)
+                        sts_uid = f"sts_{abs(hash(sm['home_team'] + sm['away_team']))}"
+                        existing_entry = existing_cache_map.get(sts_uid)
+                        fresh_baseline.append({
+                            'id': sts_uid,
+                            'league': sm.get('league', 'Piłka Nożna – STS Live'),
+                            'home_team': sm.get('home_team', ''),
+                            'away_team': sm.get('away_team', ''),
+                            'sts_home_team': sm.get('home_team', ''),
+                            'sts_away_team': sm.get('away_team', ''),
+                            'flashscore_home_team': sm.get('home_team', ''),
+                            'flashscore_away_team': sm.get('away_team', ''),
+                            'home_score': sm.get('home_score', 0),
+                            'away_score': sm.get('away_score', 0),
+                            'score_str': sm.get('score_str', '0:0'),
+                            'minute': sm.get('minute', 0),
+                            'half': sm.get('half', '1H'),
+                            'stage_text': sm.get('stage_text', ''),
+                            'stats': existing_entry.get('stats', {}) if existing_entry else {},
+                            'danger_index': existing_entry.get('danger_index', 50) if existing_entry else 50,
+                            'danger_index_10': existing_entry.get('danger_index_10', 50) if existing_entry else 50,
+                            'danger_index_5': existing_entry.get('danger_index_5', 50) if existing_entry else 50,
+                            'danger_rating': existing_entry.get('danger_rating', 'ŚREDNI') if existing_entry else 'ŚREDNI',
+                            'apm': existing_entry.get('apm', 0.8) if existing_entry else 0.8,
+                            'has_signals': existing_entry.get('has_signals', False) if existing_entry else False,
+                            'signals': existing_entry.get('signals', []) if existing_entry else [],
+                            'odds': sm.get('goals_odds', {}),
+                            'live_markets': sm.get('live_markets', []),
+                            'matched_with_sts': True,
+                            'sts_url': sm.get('url', 'https://www.sts.pl/live/pilka-nozna'),
+                            'flashscore_url': 'https://www.flashscore.pl/',
+                            'prematch_context': existing_entry.get('prematch_context', {}) if existing_entry else {},
+                            'is_worth_watching': existing_entry.get('is_worth_watching', False) if existing_entry else False,
+                            'worth_grade': existing_entry.get('worth_grade', 'STANDARD') if existing_entry else 'STANDARD',
+                            'worth_reasons': existing_entry.get('worth_reasons', ['⚪ Wczytywanie statystyk...']) if existing_entry else ['⚪ Wczytywanie statystyk...'],
+                            'enrichment_status': existing_entry.get('enrichment_status', 'PENDING') if existing_entry else 'PENDING'
+                        })
+
+                self.cached_results = fresh_baseline
+                self.last_scan_time = time.time()
+                if not self._is_enriched:
+                    self._enrichment_status = "PENDING"
 
             # 3. Zabezpieczenie auto-rozliczania kart (szybki fallback gdy są aktywne karty)
             all_today_matches = fs_all_matches + sts_matches
@@ -267,32 +399,38 @@ class STSFlashscoreAggregator:
             used_sts_urls = set()
 
             for fs_m in target_matches:
-                # 1. PRIORYTET 1: BeeSports (100% realne statystyki live)
-                stats = self.beesports.get_live_stats(
-                    fs_m.get('home_team', ''),
-                    fs_m.get('away_team', ''),
-                    minute=fs_m.get('minute', 1)
-                )
+                # 0. WCZESNY FILTR CZARNEJ LISTY: Jeśli mecz w lidze amatorskiej/młodzieżowej, pomiń zewnętrzne odpytywania
+                is_bl = self.triggers.is_analytic_blacklisted(fs_m.get('league', ''), fs_m.get('home_team', ''), fs_m.get('away_team', ''))
 
-                # 2. PRIORYTET 2: BetsAPI (gdy brak na BeeSports)
-                if not stats or not stats.get('has_stats'):
-                    stats = self.betsapi.get_live_stats(
-                        fs_m.get('home_team', ''),
-                        fs_m.get('away_team', ''),
-                        minute=fs_m.get('minute', 1)
-                    )
-
-                # 3. PRIORYTET 3: Goaloo (gdy brak na BeeSports i BetsAPI)
-                if not stats or not stats.get('has_stats'):
-                    stats = self.goaloo.get_live_stats(
-                        fs_m.get('home_team', ''),
-                        fs_m.get('away_team', ''),
-                        minute=fs_m.get('minute', 1)
-                    )
-
-                # 4. PRIORYTET 4: Flashscore (gdy brak na BeeSports, BetsAPI i Goaloo)
-                if not stats or not stats.get('has_stats'):
+                if is_bl:
                     stats = stats_map.get(fs_m['flashscore_id'], {})
+                else:
+                    # 1. PRIORYTET 1: BeeSports (100% realne statystyki live)
+                    stats = self.beesports.get_live_stats(
+                        fs_m.get('home_team', ''),
+                        fs_m.get('away_team', ''),
+                        minute=fs_m.get('minute', 1)
+                    )
+
+                    # 2. PRIORYTET 2: BetsAPI (gdy brak na BeeSports)
+                    if not stats or not stats.get('has_stats'):
+                        stats = self.betsapi.get_live_stats(
+                            fs_m.get('home_team', ''),
+                            fs_m.get('away_team', ''),
+                            minute=fs_m.get('minute', 1)
+                        )
+
+                    # 3. PRIORYTET 3: Goaloo (gdy brak na BeeSports i BetsAPI)
+                    if not stats or not stats.get('has_stats'):
+                        stats = self.goaloo.get_live_stats(
+                            fs_m.get('home_team', ''),
+                            fs_m.get('away_team', ''),
+                            minute=fs_m.get('minute', 1)
+                        )
+
+                    # 4. PRIORYTET 4: Flashscore (gdy brak na BeeSports, BetsAPI i Goaloo)
+                    if not stats or not stats.get('has_stats'):
+                        stats = stats_map.get(fs_m['flashscore_id'], {})
 
                 s_tot = stats.get('shots_total') or 0
                 sot_tot = stats.get('shots_on_target_total') or 0
@@ -350,6 +488,9 @@ class STSFlashscoreAggregator:
                         fs_m['minute'] = sts_min
                         fs_m['half'] = sts_match.get('half', fs_m.get('half', '1H'))
                         fs_m['stage_text'] = sts_match.get('stage_text', f"{sts_min}'")
+                    if sts_match.get('half') in ('2H', 'FT') and fs_m.get('half') == 'HT':
+                        fs_m['half'] = sts_match.get('half')
+                        fs_m['stage_text'] = sts_match.get('stage_text', fs_m.get('stage_text'))
 
                     # Zsynchronizuj najświeższy wynik
                     if sts_match.get('score_str') and sts_match.get('score_str') != '0:0':
@@ -367,8 +508,17 @@ class STSFlashscoreAggregator:
                 # Wyznacz wskaźniki i triggery bramkowe
                 eval_res = self.triggers.evaluate_match(fs_m, stats, odds_dict)
 
-                # Jeśli mecz generuje sygnał lub ma wysoki indeks, pobierz 100% realne kursy z podstrony STS
-                if matched_with_sts and sts_url and '/live/' in sts_url and (eval_res.get('has_signals') or stats.get('danger_index', 0) >= 65):
+                # Kwalifikacja kandydata do pobrania dokładnych kursów STS_REAL przez Playwright:
+                # Nie otwieramy podstron dla DI >= 65 bez kandydata!
+                # Pobieramy realne rynki TYLKO gdy mecz nie jest na czarnej liście i kwalifikuje się jako kandydat do sygnału.
+                should_fetch_real = (
+                    matched_with_sts
+                    and sts_url
+                    and '/live/' in sts_url
+                    and not is_bl
+                    and (eval_res.get('has_signals') or self.triggers.is_candidate_eligible(fs_m, stats))
+                )
+                if should_fetch_real:
                     real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_url)
                     if real_sub_mkts:
                         fs_m['live_markets'] = real_sub_mkts
@@ -380,7 +530,7 @@ class STSFlashscoreAggregator:
 
                 # Analiza kontekstowa przedmeczowa (z fetch_h2h=False dla braku opóźnień sieciowych w pętli live)
                 prematch_ctx = self.prematch_analyzer.analyze_fixture(
-                    fs_m['flashscore_id'], fs_m['league'], fs_m['home_team'], fs_m['away_team'], fetch_h2h=False
+                    fs_m.get('flashscore_id', ''), fs_m.get('league', ''), fs_m.get('home_team', ''), fs_m.get('away_team', ''), fetch_h2h=False
                 )
 
                 is_worth, grade, reasons = self._evaluate_worth_watching(
@@ -391,20 +541,20 @@ class STSFlashscoreAggregator:
                 d_rat = "EKSTREMALNY" if d_idx >= 75 else ("WYSOKI" if d_idx >= 55 else ("ŚREDNI" if d_idx >= 35 else "NISKI"))
 
                 processed_matches.append({
-                    'id': fs_m['flashscore_id'],
-                    'league': fs_m['league'],
-                    'home_team': fs_m['home_team'],
-                    'away_team': fs_m['away_team'],
+                    'id': fs_m.get('flashscore_id', ''),
+                    'league': fs_m.get('league', ''),
+                    'home_team': fs_m.get('home_team', ''),
+                    'away_team': fs_m.get('away_team', ''),
                     'sts_home_team': sts_home,
                     'sts_away_team': sts_away,
                     'flashscore_home_team': orig_fs_home,
                     'flashscore_away_team': orig_fs_away,
-                    'home_score': fs_m['home_score'],
-                    'away_score': fs_m['away_score'],
-                    'score_str': fs_m['score_str'],
-                    'minute': fs_m['minute'],
-                    'half': fs_m['half'],
-                    'stage_text': fs_m['stage_text'],
+                    'home_score': fs_m.get('home_score', 0),
+                    'away_score': fs_m.get('away_score', 0),
+                    'score_str': fs_m.get('score_str', '0:0'),
+                    'minute': fs_m.get('minute', 0),
+                    'half': fs_m.get('half', '1H'),
+                    'stage_text': fs_m.get('stage_text', ''),
                     'stats': stats,
                     'danger_index': d_idx,
                     'danger_index_10': eval_res.get('danger_index_10', d_idx),
@@ -417,7 +567,7 @@ class STSFlashscoreAggregator:
                     'live_markets': fs_m.get('live_markets', []),
                     'matched_with_sts': matched_with_sts,
                     'sts_url': sts_url,
-                    'flashscore_url': fs_m.get('url', f"https://www.flashscore.pl/mecz/{fs_m['flashscore_id']}/"),
+                    'flashscore_url': fs_m.get('url', f"https://www.flashscore.pl/mecz/{fs_m.get('flashscore_id', '')}/"),
                     'prematch_context': prematch_ctx,
                     'is_worth_watching': is_worth,
                     'worth_grade': grade,
@@ -439,66 +589,92 @@ class STSFlashscoreAggregator:
                     continue
 
                 sts_id = f"sts_{abs(hash(sts_m['home_team'] + sts_m['away_team']))}"
+
+                # 0. WCZESNY FILTR CZARNEJ LISTY: Jeśli mecz w lidze amatorskiej/młodzieżowej, pomiń zewnętrzne odpytywania
+                is_bl_sts = self.triggers.is_analytic_blacklisted(
+                    sts_m.get('league', ''), sts_m.get('home_team', ''), sts_m.get('away_team', '')
+                )
+
                 prematch_ctx = self.prematch_analyzer.analyze_fixture(
-                    sts_id, sts_m['league'], sts_m['home_team'], sts_m['away_team'], fetch_h2h=False
+                    sts_id, sts_m.get('league', ''), sts_m.get('home_team', ''), sts_m.get('away_team', ''), fetch_h2h=False
                 )
 
-                # PRIORYTET 1: Sprawdź najpierw 100% realne statystyki z BeeSports
-                stats = self.beesports.get_live_stats(
-                    sts_m['home_team'],
-                    sts_m['away_team'],
-                    minute=sts_m['minute']
-                )
-
-                # PRIORYTET 2: Sprawdź BetsAPI
-                if not stats or not stats.get('has_stats'):
-                    stats = self.betsapi.get_live_stats(
-                        sts_m['home_team'],
-                        sts_m['away_team'],
-                        minute=sts_m['minute']
-                    )
-
-                # PRIORYTET 3: Sprawdź Goaloo
-                if not stats or not stats.get('has_stats'):
-                    stats = self.goaloo.get_live_stats(
-                        sts_m['home_team'],
-                        sts_m['away_team'],
-                        minute=sts_m['minute']
-                    )
-
-                # PRIORYTET 4 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
-                if not stats or not stats.get('has_stats'):
+                if is_bl_sts:
                     stats = self._estimate_live_stats(
-                        score_h=sts_m['home_score'],
-                        score_a=sts_m['away_score'],
-                        minute=sts_m['minute'],
+                        score_h=sts_m.get('home_score', 0),
+                        score_a=sts_m.get('away_score', 0),
+                        minute=sts_m.get('minute', 0),
                         o1=sts_m.get('odds_1', 2.20),
                         oX=sts_m.get('odds_X', 3.20),
                         o2=sts_m.get('odds_2', 3.10),
-                        league=sts_m['league']
+                        league=sts_m.get('league', '')
                     )
+                else:
+                    # PRIORYTET 1: Sprawdź najpierw 100% realne statystyki z BeeSports
+                    stats = self.beesports.get_live_stats(
+                        sts_m['home_team'],
+                        sts_m['away_team'],
+                        minute=sts_m['minute']
+                    )
+
+                    # PRIORYTET 2: Sprawdź BetsAPI
+                    if not stats or not stats.get('has_stats'):
+                        stats = self.betsapi.get_live_stats(
+                            sts_m['home_team'],
+                            sts_m['away_team'],
+                            minute=sts_m['minute']
+                        )
+
+                    # PRIORYTET 3: Sprawdź Goaloo
+                    if not stats or not stats.get('has_stats'):
+                        stats = self.goaloo.get_live_stats(
+                            sts_m['home_team'],
+                            sts_m['away_team'],
+                            minute=sts_m['minute']
+                        )
+
+                    # PRIORYTET 4 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
+                    if not stats or not stats.get('has_stats'):
+                        stats = self._estimate_live_stats(
+                            score_h=sts_m.get('home_score', 0),
+                            score_a=sts_m.get('away_score', 0),
+                            minute=sts_m.get('minute', 0),
+                            o1=sts_m.get('odds_1', 2.20),
+                            oX=sts_m.get('odds_X', 3.20),
+                            o2=sts_m.get('odds_2', 3.10),
+                            league=sts_m.get('league', '')
+                        )
 
                 fs_repr = {
                     'flashscore_id': sts_id,
-                    'home_team': sts_m['home_team'],
-                    'away_team': sts_m['away_team'],
-                    'home_score': sts_m['home_score'],
-                    'away_score': sts_m['away_score'],
-                    'minute': sts_m['minute'],
-                    'half': sts_m['half'],
+                    'home_team': sts_m.get('home_team', ''),
+                    'away_team': sts_m.get('away_team', ''),
+                    'home_score': sts_m.get('home_score', 0),
+                    'away_score': sts_m.get('away_score', 0),
+                    'minute': sts_m.get('minute', 0),
+                    'half': sts_m.get('half', '1H'),
+                    'league': sts_m.get('league', ''),
                     'is_started': sts_m.get('is_started', True),
                     'live_markets': sts_m.get('live_markets', [])
                 }
 
-                eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m['goals_odds'])
+                eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m.get('goals_odds', {}))
 
-                # Jeśli mecz generuje sygnał lub ma wysoki indeks, pobierz 100% realne kursy z podstrony STS
-                if sts_m.get('url') and '/live/' in sts_m['url'] and (eval_res.get('has_signals') or stats.get('danger_index', 0) >= 65):
-                    real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_m['url'])
+                # Kwalifikacja kandydata do pobrania dokładnych kursów STS_REAL przez Playwright:
+                # Nie otwieramy podstron dla DI >= 65 bez kandydata!
+                # Pobieramy realne rynki TYLKO gdy mecz nie jest na czarnej liście i kwalifikuje się jako kandydat do sygnału.
+                should_fetch_real_sts = (
+                    sts_m.get('url')
+                    and '/live/' in sts_m.get('url', '')
+                    and not is_bl_sts
+                    and (eval_res.get('has_signals') or self.triggers.is_candidate_eligible(fs_repr, stats))
+                )
+                if should_fetch_real_sts:
+                    real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_m.get('url', ''))
                     if real_sub_mkts:
                         sts_m['live_markets'] = real_sub_mkts
                         fs_repr['live_markets'] = real_sub_mkts
-                        eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m['goals_odds'])
+                        eval_res = self.triggers.evaluate_match(fs_repr, stats, sts_m.get('goals_odds', {}))
                 if eval_res.get('has_signals'):
                     signals_count += len(eval_res['signals'])
 
@@ -512,18 +688,18 @@ class STSFlashscoreAggregator:
 
                 processed_matches.append({
                     'id': sts_id,
-                    'league': sts_m['league'],
-                    'home_team': sts_m['home_team'],
-                    'away_team': sts_m['away_team'],
-                    'sts_home_team': sts_m['home_team'],
-                    'sts_away_team': sts_m['away_team'],
-                    'flashscore_home_team': sts_m['home_team'],
-                    'flashscore_away_team': sts_m['away_team'],
-                    'home_score': sts_m['home_score'],
-                    'away_score': sts_m['away_score'],
-                    'score_str': sts_m['score_str'],
-                    'minute': sts_m['minute'],
-                    'half': sts_m['half'],
+                    'league': sts_m.get('league', ''),
+                    'home_team': sts_m.get('home_team', ''),
+                    'away_team': sts_m.get('away_team', ''),
+                    'sts_home_team': sts_m.get('home_team', ''),
+                    'sts_away_team': sts_m.get('away_team', ''),
+                    'flashscore_home_team': sts_m.get('home_team', ''),
+                    'flashscore_away_team': sts_m.get('away_team', ''),
+                    'home_score': sts_m.get('home_score', 0),
+                    'away_score': sts_m.get('away_score', 0),
+                    'score_str': sts_m.get('score_str', '0:0'),
+                    'minute': sts_m.get('minute', 0),
+                    'half': sts_m.get('half', '1H'),
                     'is_started': sts_m.get('is_started', True),
                     'stage_text': sts_m.get('stage_text', 'LIVE STS'),
                     'stats': stats,
@@ -534,10 +710,10 @@ class STSFlashscoreAggregator:
                     'apm': eval_res.get('apm', 0.8),
                     'has_signals': eval_res.get('has_signals', False),
                     'signals': eval_res.get('signals', []),
-                    'odds': sts_m['goals_odds'],
+                    'odds': sts_m.get('goals_odds', {}),
                     'live_markets': live_mkts,
                     'matched_with_sts': True,
-                    'sts_url': sts_m['url'],
+                    'sts_url': sts_m.get('url', ''),
                     'flashscore_url': 'https://www.flashscore.pl/',
                     'prematch_context': prematch_ctx,
                     'is_worth_watching': is_worth,
@@ -552,6 +728,118 @@ class STSFlashscoreAggregator:
                 if eval_res.get('has_signals') and eval_res.get('signals'):
                     primary_sig = eval_res['signals'][0]
                     self.telegram.notify_goal_signal(processed_matches[-1], primary_sig)
+
+            # Jeśli było więcej meczów na Flashscore niż w pierwszej partii target_matches,
+            # dołącz pozostałe jako w pełni zsynchronizowane z STS, aby panel /api/scan widział pełną listę live
+            for fs_rem in fs_matches[40:]:
+                if any(p['id'] == fs_rem.get('flashscore_id') for p in processed_matches):
+                    continue
+                sts_match = self.matcher.match_flashscore_with_sts(fs_rem, sts_matches) if sts_matches else None
+                odds_dict = sts_match.get('goals_odds', {}) if sts_match else {}
+                sts_url = sts_match.get('url', 'https://www.sts.pl/live/pilka-nozna') if sts_match else 'https://www.sts.pl/live/pilka-nozna'
+                matched_with_sts = sts_match is not None
+                if sts_match:
+                    used_sts_urls.add(sts_match.get('url'))
+
+                orig_fs_home = fs_rem.get('home_team', '')
+                orig_fs_away = fs_rem.get('away_team', '')
+                orig_fs_league = fs_rem.get('league', '')
+
+                if sts_match:
+                    sts_home = sts_match.get('home_team') or orig_fs_home
+                    sts_away = sts_match.get('away_team') or orig_fs_away
+                    sts_league = sts_match.get('league', '')
+                    if sts_league and not sts_league.startswith('Piłka Nożna'):
+                        fs_rem['league'] = sts_league
+                    else:
+                        fs_rem['league'] = orig_fs_league or sts_league or "Piłka Nożna"
+                    fs_rem['home_team'] = sts_home
+                    fs_rem['away_team'] = sts_away
+
+                    sts_min = sts_match.get('minute', 0)
+                    if sts_min > 0 and (sts_min >= fs_rem.get('minute', 0) or fs_rem.get('minute', 0) == 0):
+                        fs_rem['minute'] = sts_min
+                        fs_rem['half'] = sts_match.get('half', fs_rem.get('half', '1H'))
+                        fs_rem['stage_text'] = sts_match.get('stage_text', f"{sts_min}'")
+                    if sts_match.get('half') in ('2H', 'FT') and fs_rem.get('half') == 'HT':
+                        fs_rem['half'] = sts_match.get('half')
+                        fs_rem['stage_text'] = sts_match.get('stage_text', fs_rem.get('stage_text'))
+
+                    if sts_match.get('score_str') and sts_match.get('score_str') != '0:0':
+                        fs_rem['score_str'] = sts_match['score_str']
+                        fs_rem['home_score'] = sts_match.get('home_score', fs_rem.get('home_score', 0))
+                        fs_rem['away_score'] = sts_match.get('away_score', fs_rem.get('away_score', 0))
+
+                    fs_rem['live_markets'] = sts_match.get('live_markets', [])
+                else:
+                    fs_rem['live_markets'] = []
+
+                # Pobranie statystyk dla meczu poza TOP 40:
+                # 1. Sprawdź szybkie źródła live (BeeSports / Goaloo / BetsAPI)
+                stats = self.beesports.get_live_stats(fs_rem.get('home_team', ''), fs_rem.get('away_team', ''), minute=fs_rem.get('minute', 1))
+                if not stats or not stats.get('has_stats'):
+                    stats = self.goaloo.get_live_stats(fs_rem.get('home_team', ''), fs_rem.get('away_team', ''), minute=fs_rem.get('minute', 1))
+                if not stats or not stats.get('has_stats'):
+                    stats = self.betsapi.get_live_stats(fs_rem.get('home_team', ''), fs_rem.get('away_team', ''), minute=fs_rem.get('minute', 1))
+
+                # 2. Fallback: Jeśli brak statystyk zewnętrznych, ale mecz ma STS -> model radarowy STS
+                if (not stats or not stats.get('has_stats')) and sts_match:
+                    stats = self._estimate_live_stats(
+                        score_h=fs_rem.get('home_score', 0),
+                        score_a=fs_rem.get('away_score', 0),
+                        minute=fs_rem.get('minute', 0),
+                        o1=sts_match.get('odds_1', 2.20),
+                        oX=sts_match.get('odds_X', 3.20),
+                        o2=sts_match.get('odds_2', 3.10),
+                        league=sts_match.get('league', fs_rem.get('league', ''))
+                    )
+                elif not stats:
+                    stats = {}
+
+                eval_res = self.triggers.evaluate_match(fs_rem, stats, odds_dict)
+                d_idx = eval_res.get('danger_index', stats.get('danger_index', 50) if stats else 50)
+                d_rat = "EKSTREMALNY" if d_idx >= 75 else ("WYSOKI" if d_idx >= 55 else ("ŚREDNI" if d_idx >= 35 else "NISKI"))
+                prematch_ctx = self.prematch_analyzer.analyze_fixture(
+                    fs_rem.get('flashscore_id'), fs_rem.get('league', ''), fs_rem.get('home_team', ''), fs_rem.get('away_team', ''), fetch_h2h=False
+                )
+                is_worth, grade, reasons = self._evaluate_worth_watching(
+                    eval_res.get('has_signals', False), d_idx, eval_res.get('apm', 0.8), prematch_ctx, 'FLASHSCORE'
+                )
+
+                processed_matches.append({
+                    'id': fs_rem.get('flashscore_id'),
+                    'league': fs_rem.get('league', ''),
+                    'home_team': fs_rem.get('home_team', ''),
+                    'away_team': fs_rem.get('away_team', ''),
+                    'sts_home_team': sts_match.get('home_team') if sts_match else None,
+                    'sts_away_team': sts_match.get('away_team') if sts_match else None,
+                    'flashscore_home_team': orig_fs_home,
+                    'flashscore_away_team': orig_fs_away,
+                    'home_score': fs_rem.get('home_score', 0),
+                    'away_score': fs_rem.get('away_score', 0),
+                    'score_str': fs_rem.get('score_str', '0:0'),
+                    'minute': fs_rem.get('minute', 0),
+                    'half': fs_rem.get('half', '1H'),
+                    'stage_text': fs_rem.get('stage_text', ''),
+                    'stats': stats,
+                    'danger_index': d_idx,
+                    'danger_index_10': eval_res.get('danger_index_10', d_idx),
+                    'danger_index_5': eval_res.get('danger_index_5', d_idx),
+                    'danger_rating': d_rat,
+                    'apm': eval_res.get('apm', stats.get('apm', 0.8) if stats else 0.8),
+                    'has_signals': eval_res.get('has_signals', False),
+                    'signals': eval_res.get('signals', []),
+                    'odds': odds_dict,
+                    'live_markets': sts_match.get('live_markets', []) if sts_match else [],
+                    'matched_with_sts': matched_with_sts,
+                    'sts_url': sts_url,
+                    'flashscore_url': fs_rem.get('url', f"https://www.flashscore.pl/mecz/{fs_rem.get('flashscore_id')}/"),
+                    'prematch_context': prematch_ctx,
+                    'is_worth_watching': is_worth,
+                    'worth_grade': grade,
+                    'worth_reasons': reasons,
+                    'enrichment_status': 'COMPLETE' if stats else 'BASIC'
+                })
 
             # Sortuj mecze: najpierw te z aktywnymi sygnałami, potem wg Danger Index
             processed_matches.sort(
@@ -578,6 +866,8 @@ class STSFlashscoreAggregator:
             scan_duration = round(time.time() - start_time, 2)
             self.cached_results = processed_matches
             self.last_scan_time = time.time()
+            self._is_enriched = True
+            self._enrichment_status = "COMPLETE"
 
             return {
                 'timestamp': time.strftime('%H:%M:%S'),
@@ -585,6 +875,8 @@ class STSFlashscoreAggregator:
                 'displayed_matches_count': len(processed_matches),
                 'signals_count': signals_count,
                 'scan_duration_sec': scan_duration,
+                'is_enriched': True,
+                'enrichment_status': 'COMPLETE',
                 'matches': processed_matches
             }
 

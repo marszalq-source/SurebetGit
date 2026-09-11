@@ -14,7 +14,7 @@
   "free_picks_start_hour": 14,
   "free_picks_end_hour": 20,
   "free_picks_min_interval_minutes": 60,
-  "_free_picks_last_sent_ts": 1788956977.558433,
+  "_free_picks_last_sent_ts": 1789153163.6043718,
   "_free_picks_tracker": {
     "2026-09-02": [
       "baia de pemba_vs_ferroviario lichinga",
@@ -46,6 +46,9 @@
     ],
     "2026-09-09": [
       "santa clara u23_vs_farense u23"
+    ],
+    "2026-09-11": [
+      "mock_vs_test city"
     ]
   }
 }
