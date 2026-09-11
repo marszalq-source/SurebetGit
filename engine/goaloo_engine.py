@@ -171,11 +171,15 @@ class GoalooEngine:
 
             sections = f_txt.split('^')
             # Indeksy flashdata Goaloo:
-            # sections[8] = Home (Attacks, Dangerous, Poss) -> "10,0,34"
-            # sections[9] = Away (Attacks, Dangerous, Poss) -> "21,0,66"
-            # sections[10] = Home (On Target, Off Target) -> "1,0"
-            # sections[11] = Away (On Target, Off Target) -> "0,0"
-            # sections[14] = Corners Home -> "1"
+            # sections[8] = Home (Attacks, Total Shots, Poss) -> np. "57,5,52"
+            # sections[9] = Away (Attacks, Total Shots, Poss) -> np. "48,5,48"
+            # sections[10] = Home (Dangerous Attacks, On Target) -> np. "37,2"
+            # sections[11] = Away (Dangerous Attacks, On Target) -> np. "26,3"
+            # sections[12] = Yellow cards Home -> "4"
+            # sections[13] = Red cards Home -> "0"
+            # sections[14] = Corners Home -> "2"
+            # sections[15] = Yellow cards Away -> "2"
+            # sections[16] = Red cards Away -> "0"
             # sections[17] = Corners Away -> "4"
 
             att_h, dang_h, poss_h = 0, 0, 50
@@ -183,21 +187,22 @@ class GoalooEngine:
             s_on_h, s_off_h = 0, 0
             s_on_a, s_off_a = 0, 0
             corn_h, corn_a = 0, 0
-
             shots_tot_h, shots_tot_a = 0, 0
+            yc_h, rc_h = 0, 0
+            yc_a, rc_a = 0, 0
 
             if len(sections) > 8 and ',' in sections[8]:
                 p = sections[8].split(',')
                 if len(p) >= 3:
                     att_h = int(p[0]) if p[0].isdigit() else 0
-                    s_off_h = int(p[1]) if p[1].isdigit() else 0
+                    shots_tot_h = int(p[1]) if p[1].isdigit() else 0
                     poss_h = int(p[2]) if p[2].isdigit() else 50
 
             if len(sections) > 9 and ',' in sections[9]:
                 p = sections[9].split(',')
                 if len(p) >= 3:
                     att_a = int(p[0]) if p[0].isdigit() else 0
-                    s_off_a = int(p[1]) if p[1].isdigit() else 0
+                    shots_tot_a = int(p[1]) if p[1].isdigit() else 0
                     poss_a = int(p[2]) if p[2].isdigit() else 50
 
             if len(sections) > 10 and ',' in sections[10]:
@@ -212,12 +217,33 @@ class GoalooEngine:
                     dang_a = int(p[0]) if p[0].isdigit() else 0
                     s_on_a = int(p[1]) if p[1].isdigit() else 0
 
-            shots_tot_h = s_on_h + s_off_h
-            shots_tot_a = s_on_a + s_off_a
+            # Bezpieczne wyznaczenie strzałów ogółem i niecelnych
+            if shots_tot_h < s_on_h:
+                shots_tot_h = s_on_h
+            s_off_h = max(0, shots_tot_h - s_on_h)
 
+            if shots_tot_a < s_on_a:
+                shots_tot_a = s_on_a
+            s_off_a = max(0, shots_tot_a - s_on_a)
+
+            # Kartki i rzuty rożne:
+            # sections[12] = Żółte kartki gospodarzy
+            # sections[13] = Czerwone kartki gospodarzy
+            # sections[14] = Rzuty rożne gospodarzy
+            # sections[15] = Żółte kartki gości
+            # sections[16] = Czerwone kartki gości
+            # sections[17] = Rzuty rożne gości
+            if len(sections) > 12 and sections[12].isdigit():
+                yc_h = int(sections[12])
+            if len(sections) > 13 and sections[13].isdigit():
+                rc_h = int(sections[13])
             if len(sections) > 14 and sections[14].isdigit():
                 corn_h = int(sections[14])
 
+            if len(sections) > 15 and sections[15].isdigit():
+                yc_a = int(sections[15])
+            if len(sections) > 16 and sections[16].isdigit():
+                rc_a = int(sections[16])
             if len(sections) > 17 and sections[17].isdigit():
                 corn_a = int(sections[17])
 
@@ -254,10 +280,10 @@ class GoalooEngine:
                 'corners_home': corn_h,
                 'corners_away': corn_a,
                 'corners_total': corn_total,
-                'yellow_cards_home': 0,
-                'yellow_cards_away': 0,
-                'red_cards_home': 0,
-                'red_cards_away': 0,
+                'yellow_cards_home': yc_h,
+                'yellow_cards_away': yc_a,
+                'red_cards_home': rc_h,
+                'red_cards_away': rc_a,
                 'apm': apm,
                 'danger_index': danger_idx,
                 'xg_home': xg_h,
