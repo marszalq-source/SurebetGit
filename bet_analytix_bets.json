@@ -3253,5 +3253,15 @@
     "status": "LOST",
     "created_at": 1788960119.2196736,
     "settled_at": 1788965909.1186233
+  },
+  "sportivo ameliano vs sportivo san lorenzo": {
+    "bet_id": 119725632,
+    "match": "Sportivo Ameliano vs Sportivo San Lorenzo",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789158383.754941,
+    "settled_at": 1789159374.8316588
   }
 }

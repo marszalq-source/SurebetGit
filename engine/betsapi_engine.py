@@ -40,7 +40,9 @@ _TEAM_TRANSLATIONS = {
 }
 
 class BetsAPIEngine:
-    def __init__(self):
+    def __init__(self, enabled: bool = False, api_token: Optional[str] = None):
+        self.enabled = enabled
+        self.api_token = api_token
         self._matches_cache = []
         self._matches_cache_time = 0.0
         self._stats_cache = {}
@@ -65,6 +67,9 @@ class BetsAPIEngine:
 
     def update_live_matches_list(self) -> List[Dict[str, Any]]:
         """Pobiera aktualną listę meczów na żywo z BetsAPI In-Play przez lekki HTTP."""
+        if not self.enabled:
+            return []
+
         now = time.time()
         if (now - self._matches_cache_time) < self._cache_ttl:
             return self._matches_cache
@@ -140,6 +145,9 @@ class BetsAPIEngine:
         """
         Pobiera 100% realne statystyki live z BetsAPI przez szybki request HTTP.
         """
+        if not self.enabled:
+            return None
+
         cache_key = f"{home_team}_{away_team}".lower()
         now = time.time()
         if cache_key in self._stats_cache:
