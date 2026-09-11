@@ -232,12 +232,30 @@ class CustomHTTPHandler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         # Usuń parametry query
         path = path.split('?', 1)[0].split('#', 1)[0]
-        if path == "/" or path == "":
+        if path in ("/", ""):
             return os.path.join(self.web_dir, "index.html")
         
         rel_path = path.lstrip('/')
-        full_path = os.path.join(self.web_dir, rel_path)
+        full_path = os.path.normpath(os.path.join(self.web_dir, rel_path))
         return full_path
+
+    def guess_type(self, path):
+        p_lower = str(path).lower()
+        if p_lower.endswith('.css'):
+            return 'text/css; charset=utf-8'
+        if p_lower.endswith('.js'):
+            return 'application/javascript; charset=utf-8'
+        if p_lower.endswith('.json'):
+            return 'application/json; charset=utf-8'
+        if p_lower.endswith('.html') or p_lower.endswith('.htm'):
+            return 'text/html; charset=utf-8'
+        if p_lower.endswith('.png'):
+            return 'image/png'
+        if p_lower.endswith('.jpg') or p_lower.endswith('.jpeg'):
+            return 'image/jpeg'
+        if p_lower.endswith('.svg'):
+            return 'image/svg+xml'
+        return super().guess_type(path)
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)

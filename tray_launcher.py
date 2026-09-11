@@ -181,7 +181,20 @@ try:
                 icon.notify("OverRadar Live działa w tle i monitoruje mecze na żywo!", "OverRadar Live – STS Scanner")
             except Exception:
                 pass
-            start_inprocess_server()
+        def _watchdog_loop():
+            import time
+            while True:
+                time.sleep(15)
+                try:
+                    if not is_server_already_running(5050):
+                        print("[Watchdog] Port 5050 is down! Starting in-process server worker...")
+                        start_inprocess_server()
+                except Exception as ex:
+                    print(f"[Watchdog Error] {ex}")
+
+        watchdog_thread = threading.Thread(target=_watchdog_loop, daemon=True, name="TrayWatchdogThread")
+        watchdog_thread.start()
+        start_inprocess_server()
 
         print("Running pystray icon with setup callback...")
         try:
