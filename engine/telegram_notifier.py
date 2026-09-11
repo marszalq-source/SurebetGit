@@ -607,37 +607,38 @@ class TelegramNotifier:
                         self.answer_callback_query(cb_id, text=toast_txt)
                         continue
 
-                        if cb_data in ("sniper_on", "sniper_off"):
-                            is_on = (cb_data == "sniper_on")
-                            self.config["min_stars"] = 4 if is_on else 2
-                            self.config["sniper_mode"] = is_on
-                            if is_on:
-                                self.config["max_active_cards"] = 3
-                            self.save_config(self.config)
-                            
-                            status_txt = "<b>WŁĄCZONY 🟢</b>" if is_on else "<b>WYŁĄCZONY ⚪ (Tryb Pełny)</b>"
-                            kb = {
-                                "inline_keyboard": [
-                                    [
-                                        {"text": f"{'✅ ' if is_on else ''}🟢 Włącz Snajper (VIP)", "callback_data": "sniper_on"},
-                                        {"text": f"{'✅ ' if not is_on else ''}⚪ Wyłącz (Tryb Pełny)", "callback_data": "sniper_off"}
-                                    ]
+                    elif cb_data in ("sniper_on", "sniper_off"):
+                        is_on = (cb_data == "sniper_on")
+                        self.config["min_stars"] = 4 if is_on else 2
+                        self.config["sniper_mode"] = is_on
+                        if is_on:
+                            self.config["max_active_cards"] = 3
+                        self.save_config(self.config)
+                        
+                        status_txt = "<b>WŁĄCZONY 🟢</b>" if is_on else "<b>WYŁĄCZONY ⚪ (Tryb Pełny)</b>"
+                        kb = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": f"{'✅ ' if is_on else ''}🟢 Włącz Snajper (VIP)", "callback_data": "sniper_on"},
+                                    {"text": f"{'✅ ' if not is_on else ''}⚪ Wyłącz (Tryb Pełny)", "callback_data": "sniper_off"}
                                 ]
-                            }
-                            new_text = (
-                                f"🎯 <b>TRYB SNAJPER (VIP)</b>\n\n"
-                                f"Aktualny status: {status_txt}\n\n"
-                                f"• <b>Minimalna ocena:</b> {'4⭐ - 5⭐ (Stawki 2J i 3J)' if is_on else 'Wszystkie sygnały (od 2⭐)'}\n"
-                                f"• <b>Maksymalnie otwartych:</b> {'3 aktywne mecze naraz' if is_on else 'Bez limitu'}\n"
-                                f"• <b>Okno godzinowe:</b> 16:00 – 06:00\n\n"
-                                f"<i>Wybierz tryb przyciskami poniżej:</i>"
-                            )
-                            if cb_mid and cb_cid:
-                                self.edit_message(cb_mid, new_text, chat_id=cb_cid, reply_markup=kb)
-                            toast_mode = "🟢 Włączono Snajper VIP (od 4⭐)" if is_on else "⚪ Wyłączono Snajper (wszystkie sygnały)"
-                            self.answer_callback_query(cb_id, text=toast_mode)
-                            continue
+                            ]
+                        }
+                        new_text = (
+                            f"🎯 <b>TRYB SNAJPER (VIP)</b>\n\n"
+                            f"Aktualny status: {status_txt}\n\n"
+                            f"• <b>Minimalna ocena:</b> {'4⭐ - 5⭐ (Stawki 2J i 3J)' if is_on else 'Wszystkie sygnały (od 2⭐)'}\n"
+                            f"• <b>Maksymalnie otwartych:</b> {'3 aktywne mecze naraz' if is_on else 'Bez limitu'}\n"
+                            f"• <b>Okno godzinowe:</b> 16:00 – 06:00\n\n"
+                            f"<i>Wybierz tryb przyciskami poniżej:</i>"
+                        )
+                        if cb_mid and cb_cid:
+                            self.edit_message(cb_mid, new_text, chat_id=cb_cid, reply_markup=kb)
+                        toast_mode = "🟢 Włączono Snajper VIP (od 4⭐)" if is_on else "⚪ Wyłączono Snajper (wszystkie sygnały)"
+                        self.answer_callback_query(cb_id, text=toast_mode)
+                        continue
 
+                    else:
                         # Domyślne potwierdzenie dla każdego innego callbacka
                         self.answer_callback_query(cb_id)
                         continue
