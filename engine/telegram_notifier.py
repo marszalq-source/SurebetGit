@@ -611,8 +611,7 @@ class TelegramNotifier:
                         is_on = (cb_data == "sniper_on")
                         self.config["min_stars"] = 4 if is_on else 2
                         self.config["sniper_mode"] = is_on
-                        if is_on:
-                            self.config["max_active_cards"] = 3
+                        self.config["max_active_cards"] = 3 if is_on else 99
                         self.save_config(self.config)
                         
                         status_txt = "<b>WŁĄCZONY 🟢</b>" if is_on else "<b>WYŁĄCZONY ⚪ (Tryb Pełny)</b>"
@@ -747,6 +746,7 @@ class TelegramNotifier:
                     if len(parts) >= 2 and parts[1].lower() in ("off", "wylacz", "standard", "all", "wszystkie"):
                         self.config["min_stars"] = 2
                         self.config["sniper_mode"] = False
+                        self.config["max_active_cards"] = 99
                         self.save_config(self.config)
                         is_on = False
                     elif len(parts) >= 2 and parts[1].lower() in ("on", "wlacz", "vip", "start"):
@@ -1504,11 +1504,12 @@ class TelegramNotifier:
             return False
 
         # Weryfikacja limitu jednocześnie aktywnych kart w czacie (Tryb Snajper UX: max 3 mecze)
-        max_active = self.config.get("max_active_cards", 3)
-        existing_key = self._find_existing_card_key(home, away)
-        if not existing_key and len(self.active_match_cards) >= max_active:
-            # Osiągnięto limit 3 otwartych pozycji - wstrzymujemy nowe sygnały do rozstrzygnięcia
-            return False
+        if self.config.get("sniper_mode", True):
+            max_active = self.config.get("max_active_cards", 3)
+            existing_key = self._find_existing_card_key(home, away)
+            if not existing_key and len(self.active_match_cards) >= max_active:
+                # Osiągnięto limit 3 otwartych pozycji - wstrzymujemy nowe sygnały do rozstrzygnięcia
+                return False
 
         # Mapowanie jednostek i sugerowanych stawek:
         # 5 gwiazdek (Super-Lock / Top EV) -> 3J (6.00 zł)
