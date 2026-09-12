@@ -6,7 +6,7 @@ from .sts_live_engine import STSLiveEngine
 from .beesports_engine import BeeSportsEngine
 from .betsapi_engine import BetsAPIEngine
 from .goaloo_engine import GoalooEngine
-from .live_matcher import LiveMatcher
+from .live_matcher import LiveMatcher, get_canonical_match_key
 from .goal_triggers import GoalTriggersEngine
 from .prematch_analyzer import PrematchAnalyzer
 from .telegram_notifier import TelegramNotifier
@@ -748,7 +748,7 @@ class STSFlashscoreAggregator:
 
                 if eval_res.get('has_signals'):
                     for sig in eval_res.get('signals', []):
-                        self.telegram.notify_goal_signal(processed_matches[-1], sig)
+                        self.telegram.notify_goal_signal(target_record, sig)
 
             # Dołącz mecze obecne na żywo w STS, które nie zostały jeszcze sparsowane przez Flashscore
             for sts_m in sts_matches:
@@ -909,8 +909,8 @@ class STSFlashscoreAggregator:
 
                 # Telegram: Jeśli jest aktywny sygnał, wyślij lub zaktualizuj w locie kartę meczu
                 if eval_res.get('has_signals') and eval_res.get('signals'):
-                    primary_sig = eval_res['signals'][0]
-                    self.telegram.notify_goal_signal(processed_matches[-1], primary_sig)
+                    for sig in eval_res.get('signals', []):
+                        self.telegram.notify_goal_signal(sts_record, sig)
 
             # Jeśli było więcej meczów na Flashscore niż w pierwszej partii target_matches,
             # dołącz pozostałe jako w pełni zsynchronizowane z STS, aby panel /api/scan widział pełną listę live
@@ -927,6 +927,10 @@ class STSFlashscoreAggregator:
                 orig_fs_home = fs_rem.get('home_team', '')
                 orig_fs_away = fs_rem.get('away_team', '')
                 orig_fs_league = fs_rem.get('league', '')
+
+                is_bl_rem = self.triggers.is_analytic_blacklisted(
+                    orig_fs_league, orig_fs_home, orig_fs_away
+                )
 
                 if sts_match:
                     sts_home = sts_match.get('home_team') or orig_fs_home
@@ -992,6 +996,28 @@ class STSFlashscoreAggregator:
                     stats = {}
 
                 eval_res = self.triggers.evaluate_match(fs_rem, stats, odds_dict)
+
+                # JIT TARGETED ENRICHMENT DLA MECZÓW POZA TOP 40:
+                # Jeśli mecz poza TOP 40 kwalifikuje się jako kandydat (is_candidate_eligible),
+                # pobierz autentyczne kursy STS_REAL wyłącznie dla tego konkretnego meczu,
+                # nie obciążając całego cyklu skanera masowymi zapytaniami Playwright.
+                should_fetch_jit = (
+                    matched_with_sts
+                    and sts_url
+                    and '/live/' in sts_url
+                    and not is_bl_rem
+                    and (
+                        eval_res.get('has_signals')
+                        or (self.triggers.is_candidate_eligible(fs_rem, stats) and not any(m.get('source') == 'STS_REAL' for m in fs_rem.get('live_markets', [])))
+                    )
+                )
+                if should_fetch_jit:
+                    real_sub_mkts = self.sts_engine.get_match_real_live_markets(sts_url)
+                    if real_sub_mkts:
+                        fs_rem['live_markets'] = real_sub_mkts
+                        odds_dict['live_markets'] = real_sub_mkts
+                        eval_res = self.triggers.evaluate_match(fs_rem, stats, odds_dict)
+
                 d_idx = eval_res.get('danger_index', stats.get('danger_index', 50) if stats else 50)
                 d_rat = "EKSTREMALNY" if d_idx >= 75 else ("WYSOKI" if d_idx >= 55 else ("ŚREDNI" if d_idx >= 35 else "NISKI"))
                 prematch_ctx = self.prematch_analyzer.analyze_fixture(
@@ -1002,6 +1028,8 @@ class STSFlashscoreAggregator:
                 )
 
                 enrich_status = 'COMPLETE' if (stats and stats.get('has_stats')) else ('ESTIMATED' if (stats and stats.get('is_estimated')) else 'BASIC')
+
+                live_mkts_to_store = fs_rem.get('live_markets') or (sts_match.get('live_markets', []) if sts_match else [])
 
                 rem_record = {
                     'id': fs_rem.get('flashscore_id'),
@@ -1027,7 +1055,7 @@ class STSFlashscoreAggregator:
                     'has_signals': eval_res.get('has_signals', False),
                     'signals': eval_res.get('signals', []),
                     'odds': odds_dict,
-                    'live_markets': sts_match.get('live_markets', []) if sts_match else [],
+                    'live_markets': live_mkts_to_store,
                     'matched_with_sts': matched_with_sts,
                     'sts_url': sts_url,
                     'flashscore_url': fs_rem.get('url', f"https://www.flashscore.pl/mecz/{fs_rem.get('flashscore_id')}/"),
@@ -1039,6 +1067,13 @@ class STSFlashscoreAggregator:
                 }
                 processed_matches.append(rem_record)
                 self._update_cache_entry(rem_record['id'], rem_record)
+
+                # EMISJA PRODUKCYJNA ALERTÓW DLA MECZÓW POZA TOP 40:
+                # TOP 40 jest wyłącznie priorytetem enrichmentu UI, a nie barierą blokującą alerty.
+                if eval_res.get('has_signals') and eval_res.get('signals'):
+                    signals_count += len(eval_res.get('signals', []))
+                    for sig in eval_res.get('signals', []):
+                        self.telegram.notify_goal_signal(rem_record, sig)
 
             # Sortuj mecze: najpierw te z aktywnymi sygnałami, potem wg Danger Index
             processed_matches.sort(
@@ -1054,10 +1089,17 @@ class STSFlashscoreAggregator:
 
             # Czyszczenie pamięci RAM z meczów nieobecnych w feedzie live (ochrona 24/7)
             try:
-                active_keys = {
-                    str(m.get('flashscore_id') or m.get('id') or f"{m.get('home_team')}_{m.get('away_team')}").strip().lower()
-                    for m in processed_matches
-                }
+                active_keys = set()
+                for m in processed_matches:
+                    fid = str(m.get('flashscore_id') or m.get('id') or '').strip().lower()
+                    if fid:
+                        active_keys.add(fid)
+                    pair = f"{m.get('home_team', '')}_{m.get('away_team', '')}".strip().lower()
+                    if pair and pair != '_':
+                        active_keys.add(pair)
+                    ck = get_canonical_match_key(m.get('home_team', ''), m.get('away_team', ''))
+                    if ck and ck != 'unknown_match':
+                        active_keys.add(ck)
                 self.triggers.cleanup_unseen_matches(active_keys)
             except Exception as ex:
                 pass

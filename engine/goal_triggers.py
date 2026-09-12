@@ -20,6 +20,7 @@ from sts_live_config import (
     ACTIVE_HOURS_ENABLED, ACTIVE_HOURS_START, ACTIVE_HOURS_END
 )
 from engine.shadow_logger import ShadowLogger
+from engine.live_matcher import get_canonical_match_key
 
 
 class GoalTriggersEngine:
@@ -138,8 +139,8 @@ class GoalTriggersEngine:
             # Dla goli >= 2 (linia 2.5+ FT) dozwolone max do 60. minuty (po 61' zakaz wysokich linii)
             if total_goals >= 2 and 20 <= minute <= 60:
                 return True
-            # Dla 1 gola (linia 1.5 FT) dozwolone do 68. minuty
-            if total_goals == 1 and 20 <= minute <= 68:
+            # Dla 1 gola (linia 1.5 FT) dozwolone do 78. minuty (zgodnie ze Scenariuszem 3: 20'-78')
+            if total_goals == 1 and 20 <= minute <= 78:
                 return True
 
         return False
@@ -471,12 +472,11 @@ class GoalTriggersEngine:
                 'top_recommendation': 'Brak sygnału: statystyki estymowane / syntetyczne'
             }
 
-        # Identyfikator meczu dla bufora serii czasowej
+        # Kanoniczny identyfikator meczu dla bufora serii czasowej (wspólny dla FS, STS, Goaloo)
         m_home = str(match_data.get('home_team', '')).strip()
         m_away = str(match_data.get('away_team', '')).strip()
-        match_key = str(match_data.get('flashscore_id') or match_data.get('id') or f"{m_home}_{m_away}").strip().lower()
-        if not match_key or match_key == '_':
-            match_key = f"match_obj_{id(match_data)}"
+        canonical_key = str(match_data.get('canonical_match_key') or get_canonical_match_key(m_home, m_away)).strip().lower()
+        match_key = canonical_key if canonical_key and canonical_key not in ('_', 'unknown_match') else str(match_data.get('flashscore_id') or match_data.get('id') or f"match_obj_{id(match_data)}").strip().lower()
 
         # Rejestracja snapshotu w buforze kroczącym i obliczenie delt z ostatnich 10 minut
         now_ts = float(match_data.get('timestamp') or time.time())
@@ -513,6 +513,17 @@ class GoalTriggersEngine:
         }
 
         deltas = self._record_snapshot_and_get_deltas(match_key, current_snapshot)
+
+        # Aliasowanie identyfikatorów źródłowych (flashscore_id, id) do tego samego bufora historii
+        fid = str(match_data.get('flashscore_id') or '').strip().lower()
+        mid = str(match_data.get('id') or '').strip().lower()
+        with self._history_lock:
+            hist_ref = self._match_history.get(match_key)
+            if hist_ref:
+                if fid and fid not in ('_', 'none', match_key):
+                    self._match_history[fid] = hist_ref
+                if mid and mid not in ('_', 'none', match_key):
+                    self._match_history[mid] = hist_ref
 
         # 1. Dynamiczne obliczenie APM w oknie kroczącym
         apm = self._calculate_dynamic_apm(minute, dangerous_attacks, shots_total, sot, corners, deltas)
