@@ -291,7 +291,8 @@ class GoalooEngine:
                 'xg_total': xg_total,
                 'is_estimated': False,
                 'source': 'GOALOO',
-                'has_stats': True
+                'has_stats': True,
+                'timestamp': now
             }
 
             self._stats_cache[cache_key] = {'time': now, 'stats': stats}

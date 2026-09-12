@@ -12,6 +12,41 @@ from .prematch_analyzer import PrematchAnalyzer
 from .telegram_notifier import TelegramNotifier
 from .bet_tracker import BetTracker
 
+def get_stats_tier(stats: Any) -> int:
+    """
+    Zwraca rangę jakości statystyk meczowych:
+    3: REAL_STATS (Goaloo, BeeSports, BetsAPI, Flashscore szczegółowy)
+    2: ESTIMATED_STATS (Model radarowy STS / estymowane xG)
+    1: EMPTY / ZERO / BRAK DANYCH
+    """
+    if not stats or not isinstance(stats, dict):
+        return 1
+    if stats.get('is_estimated') is True or stats.get('source') == 'STS_RADAR':
+        return 2
+    if stats.get('has_stats') is True and stats.get('is_estimated') is not True:
+        return 3
+    if stats.get('has_detailed_stats') is True and ((stats.get('shots_total') or 0) > 0 or (stats.get('corners_total') or 0) > 0):
+        return 3
+    return 1
+
+
+def is_newer_or_equal_stats(new_stats: Dict[str, Any], old_stats: Dict[str, Any], new_min: int = 0, old_min: int = 0) -> bool:
+    """
+    Sprawdza, czy nowe REAL_STATS są co najmniej tak świeże jak stare REAL_STATS.
+    Zabezpiecza przed nadpisaniem świeższych danych starszym out-of-order snapshotem.
+    """
+    new_ts = float(new_stats.get('timestamp') or 0.0)
+    old_ts = float(old_stats.get('timestamp') or 0.0)
+    if new_ts > 0 and old_ts > 0:
+        return new_ts >= old_ts
+    # Jeśli brak jawnych timestampów, sprawdź czy nowe statystyki nie cofają liczby zdarzeń (strzały + rożne)
+    new_act = int(new_stats.get('shots_total', 0) or 0) + int(new_stats.get('corners_total', 0) or 0)
+    old_act = int(old_stats.get('shots_total', 0) or 0) + int(old_stats.get('corners_total', 0) or 0)
+    if old_act > 0 and new_act > 0 and new_act < old_act:
+        return False
+    return True
+
+
 class STSFlashscoreAggregator:
     def __init__(self):
         self.fs_engine = FlashscoreEngine()
@@ -163,7 +198,9 @@ class STSFlashscoreAggregator:
         with self._cache_lock:
             for idx, entry in enumerate(self.cached_results):
                 cid = entry.get('id') or entry.get('flashscore_id')
-                if cid and cid == match_id:
+                entry_pair = f"{entry.get('home_team', '')}_{entry.get('away_team', '')}".lower().strip()
+                target_pair = f"{enriched_data.get('home_team', '')}_{enriched_data.get('away_team', '')}".lower().strip()
+                if (cid and cid == match_id) or (entry_pair != '_' and entry_pair == target_pair):
                     # Monotoniczność minuty: nie cofaj minuty
                     old_min = entry.get('minute', 0)
                     new_min = enriched_data.get('minute', 0)
@@ -183,6 +220,40 @@ class STSFlashscoreAggregator:
                     # Monotoniczność rynków STS
                     if entry.get('live_markets') and not enriched_data.get('live_markets'):
                         enriched_data['live_markets'] = entry['live_markets']
+
+                    # 4. HIERARCHIA JAKOŚCI DANYCH STATYSTYK (Data Quality Hierarchy):
+                    #    REAL_STATS (nowsze) > REAL_STATS (starsze) > ESTIMATED_STATS > EMPTY / ZERO
+                    old_stats = entry.get('stats', {})
+                    new_stats = enriched_data.get('stats', {})
+                    old_tier = get_stats_tier(old_stats)
+                    new_tier = get_stats_tier(new_stats)
+
+                    should_keep_old_stats = False
+
+                    if old_tier > new_tier:
+                        # Próba degradacji jakości danych (np. REAL -> ESTIMATED lub REAL -> EMPTY)
+                        should_keep_old_stats = True
+                    elif old_tier == new_tier == 3:
+                        # Oba to REAL_STATS: nadpisz tylko jeśli nowe są nowsze/co najmniej równe
+                        if not is_newer_or_equal_stats(new_stats, old_stats, new_min, old_min):
+                            should_keep_old_stats = True
+                    elif old_tier == new_tier == 2:
+                        # Oba to ESTIMATED_STATS: nie cofaj estymacji jeśli minuta jest cofana
+                        if new_min < old_min and new_min > 0:
+                            should_keep_old_stats = True
+
+                    if should_keep_old_stats:
+                        enriched_data['stats'] = old_stats
+                        enriched_data['danger_index'] = entry.get('danger_index', enriched_data.get('danger_index'))
+                        enriched_data['danger_index_10'] = entry.get('danger_index_10', enriched_data.get('danger_index_10'))
+                        enriched_data['danger_index_5'] = entry.get('danger_index_5', enriched_data.get('danger_index_5'))
+                        enriched_data['danger_rating'] = entry.get('danger_rating', enriched_data.get('danger_rating'))
+                        enriched_data['apm'] = entry.get('apm', enriched_data.get('apm'))
+                        if entry.get('signals'):
+                            enriched_data['signals'] = entry['signals']
+                            enriched_data['has_signals'] = True
+                        if entry.get('enrichment_status') == 'COMPLETE':
+                            enriched_data['enrichment_status'] = 'COMPLETE'
 
                     self.cached_results[idx] = enriched_data
                     return
@@ -263,15 +334,18 @@ class STSFlashscoreAggregator:
                     cid = item.get('id') or item.get('flashscore_id')
                     if cid:
                         existing_cache_map[cid] = item
+                    c_pair = f"{item.get('home_team', '')}_{item.get('away_team', '')}".lower().strip()
+                    if c_pair and c_pair != '_':
+                        existing_cache_map[c_pair] = item
 
                 fresh_baseline = []
                 seen_pairs = set()
 
                 for m in fs_matches:
                     m_id = m.get('flashscore_id')
-                    pair_key = f"{m.get('home_team', '')}_{m.get('away_team', '')}".lower()
+                    pair_key = f"{m.get('home_team', '')}_{m.get('away_team', '')}".lower().strip()
                     seen_pairs.add(pair_key)
-                    existing_entry = existing_cache_map.get(m_id)
+                    existing_entry = existing_cache_map.get(m_id) or existing_cache_map.get(pair_key)
 
                     sts_m = self.matcher.match_flashscore_with_sts(m, sts_matches) if sts_matches else None
                     matched_with_sts = sts_m is not None
@@ -337,11 +411,11 @@ class STSFlashscoreAggregator:
                     })
 
                 for sm in sts_matches:
-                    sm_pair = f"{sm.get('home_team', '')}_{sm.get('away_team', '')}".lower()
+                    sm_pair = f"{sm.get('home_team', '')}_{sm.get('away_team', '')}".lower().strip()
                     if sm_pair not in seen_pairs:
                         seen_pairs.add(sm_pair)
                         sts_uid = f"sts_{abs(hash(sm['home_team'] + sm['away_team']))}"
-                        existing_entry = existing_cache_map.get(sts_uid)
+                        existing_entry = existing_cache_map.get(sts_uid) or existing_cache_map.get(sm_pair)
                         fresh_baseline.append({
                             'id': sts_uid,
                             'league': sm.get('league', 'Piłka Nożna – STS Live'),
@@ -494,7 +568,14 @@ class STSFlashscoreAggregator:
                             minute=fs_m.get('minute', 1)
                         )
 
-                    # 4. PRIORYTET 4: Flashscore (gdy brak na Goaloo i BeeSports)
+                    # 4. PRIORYTET 4: Zachowaj poprzednie REAL_STATS z cache jeśli źródła chwilowo nie odpowiadają
+                    if not stats or not stats.get('has_stats'):
+                        m_pair = f"{fs_m.get('home_team', '')}_{fs_m.get('away_team', '')}".lower().strip()
+                        existing_entry = existing_cache_map.get(fs_m.get('flashscore_id')) or existing_cache_map.get(m_pair)
+                        if existing_entry and get_stats_tier(existing_entry.get('stats')) == 3:
+                            stats = existing_entry['stats']
+
+                    # 5. PRIORYTET 5: Flashscore (gdy brak na Goaloo, BeeSports i w cache)
                     if not stats or not stats.get('has_stats'):
                         stats = stats_map.get(fs_m['flashscore_id'], {})
 
@@ -721,7 +802,14 @@ class STSFlashscoreAggregator:
                             minute=sts_m['minute']
                         )
 
-                    # PRIORYTET 4 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
+                    # PRIORYTET 4: Zachowaj poprzednie REAL_STATS z cache jeśli źródła chwilowo nie odpowiadają
+                    if not stats or not stats.get('has_stats'):
+                        sm_pair = f"{sts_m.get('home_team', '')}_{sts_m.get('away_team', '')}".lower().strip()
+                        existing_entry = existing_cache_map.get(sts_id) or existing_cache_map.get(sm_pair)
+                        if existing_entry and get_stats_tier(existing_entry.get('stats')) == 3:
+                            stats = existing_entry['stats']
+
+                    # PRIORYTET 5 / FALLBACK: Wylicz dynamiczne statystyki na żywo z modelu radarowego STS
                     if not stats or not stats.get('has_stats'):
                         stats = self._estimate_live_stats(
                             score_h=sts_m.get('home_score', 0),
@@ -882,7 +970,14 @@ class STSFlashscoreAggregator:
                 if getattr(self.betsapi, 'enabled', False) and (not stats or not stats.get('has_stats')):
                     stats = self.betsapi.get_live_stats(fs_rem.get('home_team', ''), fs_rem.get('away_team', ''), minute=fs_rem.get('minute', 1))
 
-                # 2. Fallback: Jeśli brak statystyk zewnętrznych, ale mecz ma STS -> model radarowy STS
+                # 2. Fallback: Zachowaj poprzednie REAL_STATS z cache jeśli źródła chwilowo nie odpowiadają
+                if not stats or not stats.get('has_stats'):
+                    rem_pair = f"{fs_rem.get('home_team', '')}_{fs_rem.get('away_team', '')}".lower().strip()
+                    existing_entry = existing_cache_map.get(fs_rem.get('flashscore_id')) or existing_cache_map.get(rem_pair)
+                    if existing_entry and get_stats_tier(existing_entry.get('stats')) == 3:
+                        stats = existing_entry['stats']
+
+                # 3. Fallback: Jeśli brak statystyk zewnętrznych, ale mecz ma STS -> model radarowy STS
                 if (not stats or not stats.get('has_stats')) and sts_match:
                     stats = self._estimate_live_stats(
                         score_h=fs_rem.get('home_score', 0),
