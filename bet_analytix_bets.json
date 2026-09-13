@@ -3313,5 +3313,35 @@
     "status": "WON",
     "created_at": 1789248324.827821,
     "settled_at": 1789294642.0774221
+  },
+  "scu torreense [k] vs rio ave [k]": {
+    "bet_id": 119895304,
+    "match": "SCU Torreense [K] vs Rio Ave [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.57,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789323616.6953373,
+    "settled_at": 1789324963.7856228
+  },
+  "crixas ec go vs mineiros go": {
+    "bet_id": 119901813,
+    "match": "Crixas EC GO vs Mineiros GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789329324.394611,
+    "settled_at": 1789330916.7908378
+  },
+  "goianesia go vs gremio anapolis go": {
+    "bet_id": 119903909,
+    "match": "Goianesia GO vs Gremio Anapolis GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789331046.6262813,
+    "settled_at": 1789332156.9786172
   }
 }
