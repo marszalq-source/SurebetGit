@@ -82,13 +82,15 @@
     "is_silver": true,
     "signal_type": "OVER_1H_TO_FT",
     "status": "PENDING",
-    "settled": false
+    "settled": false,
+    "_logged_watchdog_age": true,
+    "_logged_watchdog_3h": true
   },
   "__settled_matches__": {
-    "sportivo carapegua_vs_club dr. benjamin aceval": 1789123135.4798846,
-    "ca cerro_vs_cs cerrito": 1789123135.4798846,
-    "banfield ii_vs_gimnasia mendoza ii": 1789123135.4798846,
-    "ferroviario ce u20_vs_patos pb u20": 1789123135.4798846,
-    "sportivo ameliano_vs_sportivo san lorenzo": 1789159372.9514694
+    "san sebastian reyes_vs_real valladolid 2": 1789235994.7269917,
+    "figueirense_vs_nacao": 1789243002.695046,
+    "us pianese_vs_us grosseto": 1789244713.323189,
+    "club ciudad de bolivar_vs_central norte salta": 1789246824.5143814,
+    "estudiantes merida_vs_deportivo tachira": 1789294638.7737668
   }
 }

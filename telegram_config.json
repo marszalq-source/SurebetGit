@@ -14,7 +14,7 @@
   "free_picks_start_hour": 14,
   "free_picks_end_hour": 20,
   "free_picks_min_interval_minutes": 60,
-  "_free_picks_last_sent_ts": 1789153163.6043718,
+  "_free_picks_last_sent_ts": 1789237736.996885,
   "_free_picks_tracker": {
     "2026-09-02": [
       "baia de pemba_vs_ferroviario lichinga",
@@ -49,6 +49,10 @@
     ],
     "2026-09-11": [
       "mock_vs_test city"
+    ],
+    "2026-09-12": [
+      "san sebastian reyes_vs_real valladolid 2",
+      "figueirense_vs_nacao"
     ]
   }
 }

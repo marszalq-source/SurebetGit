@@ -217,8 +217,12 @@ class STSFlashscoreAggregator:
                         enriched_data['home_score'] = entry.get('home_score', enriched_data.get('home_score'))
                         enriched_data['away_score'] = entry.get('away_score', enriched_data.get('away_score'))
 
-                    # Monotoniczność rynków STS
-                    if entry.get('live_markets') and not enriched_data.get('live_markets'):
+                    # Monotoniczność rynków STS: ochrona STS_REAL przed degradacją do STS_LIVE
+                    old_has_real = any(m.get('source') == 'STS_REAL' for m in entry.get('live_markets', []))
+                    new_has_real = any(m.get('source') == 'STS_REAL' for m in enriched_data.get('live_markets', []))
+                    if old_has_real and not new_has_real:
+                        enriched_data['live_markets'] = entry['live_markets']
+                    elif entry.get('live_markets') and not enriched_data.get('live_markets'):
                         enriched_data['live_markets'] = entry['live_markets']
 
                     # 4. HIERARCHIA JAKOŚCI DANYCH STATYSTYK (Data Quality Hierarchy):
@@ -350,7 +354,10 @@ class STSFlashscoreAggregator:
                     sts_m = self.matcher.match_flashscore_with_sts(m, sts_matches) if sts_matches else None
                     matched_with_sts = sts_m is not None
                     sts_url = sts_m.get('url', 'https://www.sts.pl/live/pilka-nozna') if sts_m else 'https://www.sts.pl/live/pilka-nozna'
-                    live_mkts = sts_m.get('live_markets', []) if sts_m else (existing_entry.get('live_markets', []) if existing_entry else [])
+                    if existing_entry and any(mk.get('source') == 'STS_REAL' for mk in existing_entry.get('live_markets', [])):
+                        live_mkts = existing_entry['live_markets']
+                    else:
+                        live_mkts = sts_m.get('live_markets', []) if sts_m else (existing_entry.get('live_markets', []) if existing_entry else [])
                     odds_dict = sts_m.get('goals_odds', {}) if sts_m else (existing_entry.get('odds', {}) if existing_entry else {})
 
                     # Synchronizacja z STS
@@ -615,7 +622,13 @@ class STSFlashscoreAggregator:
                     odds_dict = sts_match.get('goals_odds', {})
                     sts_url = sts_match.get('url', 'https://www.sts.pl/live/pilka-nozna')
                     matched_with_sts = True
-                    fs_m['live_markets'] = sts_match.get('live_markets', [])
+                    m_pair = f"{fs_m.get('home_team', '')}_{fs_m.get('away_team', '')}".lower().strip()
+                    existing_m_entry = existing_cache_map.get(fs_m.get('flashscore_id')) or existing_cache_map.get(m_pair)
+                    if existing_m_entry and any(mk.get('source') == 'STS_REAL' for mk in existing_m_entry.get('live_markets', [])):
+                        fs_m['live_markets'] = existing_m_entry['live_markets']
+                        odds_dict['live_markets'] = existing_m_entry['live_markets']
+                    else:
+                        fs_m['live_markets'] = sts_match.get('live_markets', [])
 
                     # GWARANCJA: Nazwa i liga z STS zawsze na pierwszym miejscu
                     sts_home = sts_match.get('home_team') or orig_fs_home
@@ -672,6 +685,10 @@ class STSFlashscoreAggregator:
 
                 # Kwalifikacja kandydata do pobrania dokładnych kursów STS_REAL przez Playwright:
                 # Nie otwieramy podstron dla meczów mających już rynki z feedu bez sygnału!
+                cand_eligible = self.triggers.is_candidate_eligible(fs_m, stats)
+                srcs_before = [mk.get('source') for mk in fs_m.get('live_markets', [])]
+                has_sig_before = eval_res.get('has_signals', False)
+
                 should_fetch_real = (
                     matched_with_sts
                     and sts_url
@@ -679,7 +696,7 @@ class STSFlashscoreAggregator:
                     and not is_bl
                     and (
                         eval_res.get('has_signals')
-                        or (self.triggers.is_candidate_eligible(fs_m, stats) and not fs_m.get('live_markets'))
+                        or (cand_eligible and not any(mk.get('source') == 'STS_REAL' for mk in fs_m.get('live_markets', [])))
                     )
                 )
                 if should_fetch_real:
@@ -688,6 +705,8 @@ class STSFlashscoreAggregator:
                         fs_m['live_markets'] = real_sub_mkts
                         odds_dict['live_markets'] = real_sub_mkts
                         eval_res = self.triggers.evaluate_match(fs_m, stats, odds_dict)
+
+                srcs_after = [mk.get('source') for mk in fs_m.get('live_markets', [])]
 
                 if eval_res.get('has_signals'):
                     signals_count += len(eval_res.get('signals', []))
@@ -746,9 +765,23 @@ class STSFlashscoreAggregator:
                 # Telegram: Sprawdź czy padł gol i zaktualizuj wiadomość o trafieniu
                 self.telegram.check_and_notify_goal_event(processed_matches[-1])
 
+                notify_called = False
                 if eval_res.get('has_signals'):
                     for sig in eval_res.get('signals', []):
                         self.telegram.notify_goal_signal(target_record, sig)
+                        notify_called = True
+
+                if cand_eligible:
+                    print(f"[TOP40 Diagnostic] match_id={target_record['id']} "
+                          f"pos={len(processed_matches)} "
+                          f"candidate_eligible={cand_eligible} "
+                          f"src_before={srcs_before} "
+                          f"should_fetch_real={should_fetch_real} "
+                          f"src_after={srcs_after} "
+                          f"signals_before={has_sig_before} "
+                          f"signals_after={eval_res.get('has_signals', False)} "
+                          f"final_decision={'ALERT' if eval_res.get('has_signals') else 'REJECTED'} "
+                          f"notify_called={notify_called}")
 
             # Dołącz mecze obecne na żywo w STS, które nie zostały jeszcze sparsowane przez Flashscore
             for sts_m in sts_matches:
@@ -844,7 +877,7 @@ class STSFlashscoreAggregator:
                     and not is_bl_sts
                     and (
                         eval_res.get('has_signals')
-                        or (self.triggers.is_candidate_eligible(fs_repr, stats) and not sts_m.get('live_markets'))
+                        or (self.triggers.is_candidate_eligible(fs_repr, stats) and not any(m.get('source') == 'STS_REAL' for m in sts_m.get('live_markets', [])))
                     )
                 )
                 if should_fetch_real_sts:
@@ -957,7 +990,13 @@ class STSFlashscoreAggregator:
                         fs_rem['home_score'] = sts_match.get('home_score', fs_rem.get('home_score', 0))
                         fs_rem['away_score'] = sts_match.get('away_score', fs_rem.get('away_score', 0))
 
-                    fs_rem['live_markets'] = sts_match.get('live_markets', [])
+                    rem_pair = f"{fs_rem.get('home_team', '')}_{fs_rem.get('away_team', '')}".lower().strip()
+                    existing_rem_entry = existing_cache_map.get(fs_rem.get('flashscore_id')) or existing_cache_map.get(rem_pair)
+                    if existing_rem_entry and any(mk.get('source') == 'STS_REAL' for mk in existing_rem_entry.get('live_markets', [])):
+                        fs_rem['live_markets'] = existing_rem_entry['live_markets']
+                        odds_dict['live_markets'] = existing_rem_entry['live_markets']
+                    else:
+                        fs_rem['live_markets'] = sts_match.get('live_markets', [])
                 else:
                     fs_rem['live_markets'] = []
 
