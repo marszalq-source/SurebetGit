@@ -112,6 +112,20 @@ def normalize_team_name(name: str) -> str:
 
     return name
 
+@functools.lru_cache(maxsize=4096)
+def get_canonical_match_key(home: str, away: str) -> str:
+    """
+    Tworzy zunifikowany, kanoniczny klucz meczu dla buforów czasowych i serii (GoalTriggers, cache itp.).
+    Usuwa różnice w wielkości liter, spacjach, prefiksach klubowych (FC, FK itp.) i znakach specjalnych.
+    Przykład: 'Wisła Kraków' vs 'Jagiellonia Białystok' -> 'wisla_krakow_jagiellonia_bialystok'.
+    """
+    if not home and not away:
+        return "unknown_match"
+    norm_h = normalize_team_name(home).replace(" ", "_")
+    norm_a = normalize_team_name(away).replace(" ", "_")
+    key = f"{norm_h}_{norm_a}".strip("_")
+    return key if key else "unknown_match"
+
 @functools.lru_cache(maxsize=8192)
 def match_teams_similarity(norm1: str, norm2: str) -> float:
     """Zwraca stopień podobieństwa dwóch znormalizowanych nazw drużyn (0.0 do 1.0)."""

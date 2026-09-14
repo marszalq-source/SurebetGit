@@ -2667,13 +2667,49 @@ class TelegramNotifier:
                     card['_logged_watchdog_age'] = True
                     self._log_watchdog_alert(card, c_age, "MATCH_AGE_OVER_2H")
 
-                # Check 4: Ostrzeżenie WARNING jeśli mecz wisi w active_cards > 3h (10800s) od kickoffu / utworzenia karty
-                kickoff_ts = card.get('kickoff_ts') or card.get('created_at', now)
-                effective_age = max(c_age, now - kickoff_ts)
-                if effective_age >= 10800.0 and not card.get('_logged_watchdog_3h'):
-                    print(f"⚠️ [WARNING] POTENCJALNIE ZABLOKOWANE ZDARZENIE: match={c_home} vs {c_away} wisi w telegram_active_cards.json ponad 3h (age={effective_age:.0f}s, state={card_status})!")
-                    card['_logged_watchdog_3h'] = True
-                    self._log_watchdog_alert(card, effective_age, "MATCH_AGE_OVER_3H_WARNING")
+                # Check 4: Precyzyjna fizyka czasu meczu piłkarskiego (Kickoff Timeout Guard)
+                # Struktura meczu:
+                # - 1H: 45 min + ok. 15 min doliczone = 60 min (3600s) od rozpoczęcia meczu
+                # - FT: 45 min (1H) + 15 min (przerwa) + 45 min (2H) + ok. 15 min (doliczone łącznie) = 120 min (7200s, równe 2h) od kickoffu
+                init_m = int(card.get('initial_minute', 0) or 0)
+                is_2h_entry = (card.get('target_period') == '2H' or init_m > 45 or '2H' in str(card.get('last_seen_half', '')).upper())
+                extra_break_sec = 900.0 if is_2h_entry else 0.0  # 15 min przerwy
+                inferred_kickoff = card.get('kickoff_ts') or (c_created - (init_m * 60.0) - extra_break_sec if init_m > 0 else c_created)
+
+                time_since_kickoff = now - inferred_kickoff
+                time_since_creation = now - c_created
+                is_ht_card = (card.get('target_period') == '1H' or 'HT' in str(card.get('badge', '')).upper())
+
+                # Zabezpieczenie: auto-uwalnianie działa WYŁĄCZNIE gdy mecz definitywnie zniknął z feedu live (not is_active_live)
+                is_timeout_settlement = False
+                if not is_active_live:
+                    if is_ht_card and (time_since_kickoff >= 3600.0 or time_since_creation >= 2700.0):
+                        is_timeout_settlement = True
+                    elif not is_ht_card and (time_since_kickoff >= 7200.0 or time_since_creation >= 4500.0):
+                        is_timeout_settlement = True
+
+                if is_timeout_settlement:
+                    print(f"[Telegram Watchdog] 🧹 Automatyczne uwalnianie karty meczu zakończonego: {c_home} vs {c_away} (od kickoffu: {time_since_kickoff/60:.0f}m, od typu: {time_since_creation/60:.0f}m)")
+                    target_half = '1H' if is_ht_card else 'FT'
+                    target_min = 45 if is_ht_card else 90
+                    synthetic_fin = {
+                        'home_team': c_home,
+                        'away_team': c_away,
+                        'score_str': card.get('last_seen_score', card.get('initial_score', '0:0')),
+                        'minute': target_min,
+                        'half': target_half,
+                        'stage_text': 'Przerwa' if is_ht_card else 'Koniec',
+                        'is_live': False,
+                        'status_code': '3'
+                    }
+                    if self.check_and_update_match_status(synthetic_fin, card_key=key):
+                        settled_count += 1
+                    else:
+                        # Awaryjne usunięcie jeśli edycja telegrama nie powiodła się (np. sztuczny/usunięty chat_id)
+                        self.active_match_cards.pop(key, None)
+                        self.settled_matches[key] = now
+                        self._save_cards()
+                        settled_count += 1
 
             return settled_count
         finally:

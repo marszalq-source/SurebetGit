@@ -3253,5 +3253,95 @@
     "status": "LOST",
     "created_at": 1788960119.2196736,
     "settled_at": 1788965909.1186233
+  },
+  "sportivo ameliano vs sportivo san lorenzo": {
+    "bet_id": 119725632,
+    "match": "Sportivo Ameliano vs Sportivo San Lorenzo",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789158383.754941,
+    "settled_at": 1789159374.8316588
+  },
+  "san sebastian reyes vs real valladolid ii": {
+    "bet_id": 119799957,
+    "match": "San Sebastian Reyes vs Real Valladolid II",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789230418.8206754,
+    "settled_at": 1789235998.062191
+  },
+  "figueirense sc vs nacao sc": {
+    "bet_id": 119809057,
+    "match": "Figueirense SC vs Nacao SC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.75,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789237738.4864447,
+    "settled_at": 1789243006.1009266
+  },
+  "us pianese vs us grosseto": {
+    "bet_id": 119816863,
+    "match": "US Pianese vs US Grosseto",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789244498.2020192,
+    "settled_at": 1789244716.5023477
+  },
+  "club ciudad de bolivar vs ca central norte salta": {
+    "bet_id": 119817104,
+    "match": "Club Ciudad de Bolivar vs CA Central Norte Salta",
+    "badge": "OVER 0.5 FT",
+    "odds": 2.07,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789244775.865576,
+    "settled_at": 1789246827.2766695
+  },
+  "estudiantes merida vs deportivo tachira": {
+    "bet_id": 119821888,
+    "match": "Estudiantes Merida vs Deportivo Tachira",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789248324.827821,
+    "settled_at": 1789294642.0774221
+  },
+  "scu torreense [k] vs rio ave [k]": {
+    "bet_id": 119895304,
+    "match": "SCU Torreense [K] vs Rio Ave [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.57,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789323616.6953373,
+    "settled_at": 1789324963.7856228
+  },
+  "crixas ec go vs mineiros go": {
+    "bet_id": 119901813,
+    "match": "Crixas EC GO vs Mineiros GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789329324.394611,
+    "settled_at": 1789330916.7908378
+  },
+  "goianesia go vs gremio anapolis go": {
+    "bet_id": 119903909,
+    "match": "Goianesia GO vs Gremio Anapolis GO",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789331046.6262813,
+    "settled_at": 1789332156.9786172
   }
 }

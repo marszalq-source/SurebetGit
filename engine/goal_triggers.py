@@ -20,9 +20,131 @@ from sts_live_config import (
     ACTIVE_HOURS_ENABLED, ACTIVE_HOURS_START, ACTIVE_HOURS_END
 )
 from engine.shadow_logger import ShadowLogger
+from engine.live_matcher import get_canonical_match_key
 
 
 class GoalTriggersEngine:
+    _ANALYTIC_BL_KEYWORDS = [
+        'U21', 'U-21',
+        'U20', 'U-20',
+        'U19', 'U-19',
+        'U18', 'U-18',
+        'U17', 'U-17',
+        'AMATEUR', 'AMATORZY', 'DEVELOPMENT', 'RESERVE', 'REZERWY'
+    ]
+    _ANALYTIC_BL_EXACT = ['RUMUNIA, PUCHAR', 'CHINY, PUCHAR', 'ARABIA SAUDYJSKA, DIVISION 1']
+
+    @classmethod
+    def is_analytic_blacklisted(cls, league: str, home_team: str = '', away_team: str = '') -> bool:
+        """Szybki test czarnej listy analitycznej bez żadnych kosztownych obliczeń."""
+        league_upper = str(league or '').upper()
+        match_text = f"{league_upper} {str(home_team or '').upper()} {str(away_team or '').upper()}"
+        if 'REVELACAO' in match_text:
+            return False
+        if any(kw in match_text for kw in cls._ANALYTIC_BL_KEYWORDS):
+            return True
+        if any(ex in league_upper for ex in cls._ANALYTIC_BL_EXACT):
+            return True
+        if 'RUMUNIA' in league_upper and 'PUCHAR' in league_upper:
+            return True
+        if 'CHINY' in league_upper and 'PUCHAR' in league_upper:
+            return True
+        if 'ARABIA' in league_upper and ('DIVISION 1' in league_upper or 'PUCHAR' in league_upper):
+            return True
+        return False
+
+    @classmethod
+    def is_candidate_eligible(cls, match_data: Dict[str, Any], stats: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Szybki test kwalifikacji wstępnej kandydata przed pobraniem podstrony STS (Playwright).
+        Odrzuca mecze, które ze względów czasowych, statusowych, statystycznych lub analitycznych
+        nie mają szansy na wygenerowanie sygnału w obecnej chwili.
+        """
+        league = str(match_data.get('league', ''))
+        home = str(match_data.get('home_team', ''))
+        away = str(match_data.get('away_team', ''))
+        if cls.is_analytic_blacklisted(league, home, away):
+            return False
+
+        minute = int(match_data.get('minute', 0))
+        half = str(match_data.get('half', '1H')).upper()
+        stage_text = str(match_data.get('stage_text', '')).lower()
+
+        # Blokada przerw (HT), głębokiej końcówki meczu (82'+) lub meczu zakończonego (FT/AET/PEN)
+        if half in ('HT', 'FT', 'AET', 'PEN') or minute >= 82 or 'przerwa' in stage_text or 'koniec' in stage_text:
+            return False
+
+        if minute < 14 and half == '1H':
+            return False
+
+        # Wymóg obecności realnych danych statystycznych (brak stats lub estymacje wykluczają Playwright)
+        if not stats:
+            return False
+        if stats.get('is_estimated') is True or stats.get('xg_is_estimated') is True:
+            return False
+        has_real_stats = bool(
+            stats.get('has_stats') or 
+            stats.get('has_detailed_stats') or 
+            stats.get('source') in ('BEESPORTS', 'BETSAPI', 'GOALOO', 'FLASHSCORE')
+        )
+        if not has_real_stats:
+            return False
+
+        danger_index = int(stats.get('danger_index', 0))
+        apm = float(stats.get('apm', 0.0))
+        has_sot = 'shots_on_target_total' in stats and stats['shots_on_target_total'] is not None
+        sot = int(stats['shots_on_target_total']) if has_sot else None
+
+        # Twarde bramki minimalnej intensywności (Bramka 5 i 6 z evaluate_match)
+        # Żaden sygnał nie powstanie przy DI < 55, SoT < 2 (jeśli dostępne w statystykach) lub APM < 0.75
+        if danger_index < 55 or apm < 0.75:
+            return False
+        if sot is not None and sot < 2:
+            return False
+
+        home_score = int(match_data.get('home_score', 0))
+        away_score = int(match_data.get('away_score', 0))
+        total_goals = home_score + away_score
+        score_diff = abs(home_score - away_score)
+
+        # Filtry anomalii (Bramka 2): jałowe posiadanie lub blowout
+        dang_att = int(stats.get('dangerous_attacks_total', 0))
+        if minute >= 25 and sot is not None and sot == 0 and dang_att >= 20:
+            return False
+        if half == '2H' and score_diff >= 3 and minute >= 60:
+            return False
+
+        # Weryfikacja zgodności z istniejącymi scenariuszami bramkowymi (TRIGGERS_CONFIG):
+        # 1. Scenariusz 1 (OVER_1H_TO_FT): 1H, 14'-32', 0:0
+        if half == '1H' and 14 <= minute <= 32 and total_goals == 0:
+            return True
+
+        # 2. Scenariusz 2 (OVER_15_HT): 1H, 14'-34', dokładnie 1 gol
+        if half == '1H' and 14 <= minute <= 34 and total_goals == 1:
+            return True
+
+        # 3. Scenariusz 4 (OVER_15_FT): 2H, 46'-68', suma goli <= 1 (przy 0:0 max do 60')
+        if half == '2H' and 46 <= minute <= 68 and total_goals <= 1:
+            if total_goals == 0 and minute > 60:
+                return False  # Filtr B: 0:0 po 60' zablokowany dla 1.5 FT
+            return True
+
+        # 4. Scenariusz 5 (Late Goal 2H): 2H, 63'-75', różnica goli <= 2, max 2 gole (linia 0.5 lub 1.5/2.5 FT)
+        if half == '2H' and 63 <= minute <= 75 and score_diff <= 2 and total_goals <= 2:
+            return True
+
+        # 5. Scenariusz 3 (POST_GOAL_FT): reakcja po bramce na najbliższą linię (total_goals + 0.5 FT)
+        # Wymaga potwierdzonego naporu (DI >= 60, APM >= 0.85, oraz SoT >= 2 jeśli dostępne w statystykach)
+        if total_goals >= 1 and danger_index >= 60 and apm >= 0.85 and (sot is None or sot >= 2):
+            # Dla goli >= 2 (linia 2.5+ FT) dozwolone max do 60. minuty (po 61' zakaz wysokich linii)
+            if total_goals >= 2 and 20 <= minute <= 60:
+                return True
+            # Dla 1 gola (linia 1.5 FT) dozwolone do 78. minuty (zgodnie ze Scenariuszem 3: 20'-78')
+            if total_goals == 1 and 20 <= minute <= 78:
+                return True
+
+        return False
+
     def __init__(self, config=None):
         self.config = config or TRIGGERS_CONFIG
         # Bufor serii czasowej (Sliding Time-Series Buffer w RAM)
@@ -350,12 +472,11 @@ class GoalTriggersEngine:
                 'top_recommendation': 'Brak sygnału: statystyki estymowane / syntetyczne'
             }
 
-        # Identyfikator meczu dla bufora serii czasowej
+        # Kanoniczny identyfikator meczu dla bufora serii czasowej (wspólny dla FS, STS, Goaloo)
         m_home = str(match_data.get('home_team', '')).strip()
         m_away = str(match_data.get('away_team', '')).strip()
-        match_key = str(match_data.get('flashscore_id') or match_data.get('id') or f"{m_home}_{m_away}").strip().lower()
-        if not match_key or match_key == '_':
-            match_key = f"match_obj_{id(match_data)}"
+        canonical_key = str(match_data.get('canonical_match_key') or get_canonical_match_key(m_home, m_away)).strip().lower()
+        match_key = canonical_key if canonical_key and canonical_key not in ('_', 'unknown_match') else str(match_data.get('flashscore_id') or match_data.get('id') or f"match_obj_{id(match_data)}").strip().lower()
 
         # Rejestracja snapshotu w buforze kroczącym i obliczenie delt z ostatnich 10 minut
         now_ts = float(match_data.get('timestamp') or time.time())
@@ -392,6 +513,17 @@ class GoalTriggersEngine:
         }
 
         deltas = self._record_snapshot_and_get_deltas(match_key, current_snapshot)
+
+        # Aliasowanie identyfikatorów źródłowych (flashscore_id, id) do tego samego bufora historii
+        fid = str(match_data.get('flashscore_id') or '').strip().lower()
+        mid = str(match_data.get('id') or '').strip().lower()
+        with self._history_lock:
+            hist_ref = self._match_history.get(match_key)
+            if hist_ref:
+                if fid and fid not in ('_', 'none', match_key):
+                    self._match_history[fid] = hist_ref
+                if mid and mid not in ('_', 'none', match_key):
+                    self._match_history[mid] = hist_ref
 
         # 1. Dynamiczne obliczenie APM w oknie kroczącym
         apm = self._calculate_dynamic_apm(minute, dangerous_attacks, shots_total, sot, corners, deltas)
@@ -441,33 +573,13 @@ class GoalTriggersEngine:
         # BRAMKA 1b: ANALITYCZNA CZARNA LISTA — Ligi juniorskie / amatorskie / pucharowe (niska wartość)
         # Oparcie na danych historycznych: WR<50% na n>=3 sygnałach (post-mortem 2026-09-01/08)
         # WYJĄTEK BEZWZGLĘDNY: Liga Revelacao U23 (Portugalia) — WR 85.7%, +15.08J na 7 syg -> ZAWSZE PRZEPUSZCZA
-        _ANALYTIC_BL_KEYWORDS = [
-            'U21', 'U-21',
-            'U20', 'U-20',
-            'U19', 'U-19',
-            'U18', 'U-18',
-            'U17', 'U-17',
-            'AMATEUR', 'AMATORZY', 'DEVELOPMENT', 'RESERVE', 'REZERWY'
-        ]
-        _ANALYTIC_BL_EXACT = ['RUMUNIA, PUCHAR', 'CHINY, PUCHAR', 'ARABIA SAUDYJSKA, DIVISION 1']
         _league_upper = str(match_data.get('league', '')).upper()
         _match_text_upper = f"{_league_upper} {str(match_data.get('home_team', '')).upper()} {str(match_data.get('away_team', '')).upper()}"
-        _is_revelacao = 'REVELACAO' in _match_text_upper  # wyjątek: Portugalia Liga Revelacao U23
-
-        _analytic_blocked = (
-            not _is_revelacao
-            and (
-                any(kw in _match_text_upper for kw in _ANALYTIC_BL_KEYWORDS)
-                or any(ex in _league_upper for ex in _ANALYTIC_BL_EXACT)
-                or ('RUMUNIA' in _league_upper and 'PUCHAR' in _league_upper)
-                or ('CHINY' in _league_upper and 'PUCHAR' in _league_upper)
-                or ('ARABIA' in _league_upper and ('DIVISION 1' in _league_upper or 'PUCHAR' in _league_upper))
-            )
-        )
+        _analytic_blocked = self.is_analytic_blacklisted(_league_upper, match_data.get('home_team', ''), match_data.get('away_team', ''))
         if _analytic_blocked:
             _bl_match = next(
-                (kw for kw in _ANALYTIC_BL_KEYWORDS if kw in _match_text_upper),
-                next((ex for ex in _ANALYTIC_BL_EXACT if ex in _league_upper), 'BL')
+                (kw for kw in self._ANALYTIC_BL_KEYWORDS if kw in _match_text_upper),
+                next((ex for ex in self._ANALYTIC_BL_EXACT if ex in _league_upper), 'BL')
             )
             print(f"[GoalTriggers] [ANALYTIC_BL] Liga/mecz wykluczony analitycznie: '{_league_upper}' (pasuje: '{_bl_match}')")
             self.shadow_logger.log_evaluation(

@@ -84,7 +84,7 @@ try:
             return
 
         def _server_worker():
-            global api_instance
+            global api_instance, server_thread
             try:
                 print("Initializing LiveApi in background worker...")
                 api_instance = LiveApi()
@@ -203,9 +203,14 @@ try:
             print(f"Pystray icon exception: {e}")
             start_inprocess_server()
 
-        if server_thread and server_thread.is_alive():
-            print("Pystray loop finished; keeping server thread alive...")
-            server_thread.join()
+        print("Pystray loop finished; keeping server thread alive indefinitely...")
+        while True:
+            if server_thread and server_thread.is_alive():
+                server_thread.join(timeout=2.0)
+            else:
+                start_inprocess_server()
+                import time
+                time.sleep(2.0)
 
     if __name__ == "__main__":
         main()
