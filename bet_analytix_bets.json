@@ -3254,94 +3254,212 @@
     "created_at": 1788960119.2196736,
     "settled_at": 1788965909.1186233
   },
-  "sportivo ameliano vs sportivo san lorenzo": {
-    "bet_id": 119725632,
-    "match": "Sportivo Ameliano vs Sportivo San Lorenzo",
-    "badge": "OVER 0.5 FT",
-    "odds": 1.65,
-    "stake": 20.0,
-    "status": "WON",
-    "created_at": 1789158383.754941,
-    "settled_at": 1789159374.8316588
-  },
-  "san sebastian reyes vs real valladolid ii": {
-    "bet_id": 119799957,
-    "match": "San Sebastian Reyes vs Real Valladolid II",
-    "badge": "OVER 1.5 FT",
-    "odds": 1.55,
-    "stake": 20.0,
-    "status": "LOST",
-    "created_at": 1789230418.8206754,
-    "settled_at": 1789235998.062191
-  },
-  "figueirense sc vs nacao sc": {
-    "bet_id": 119809057,
-    "match": "Figueirense SC vs Nacao SC",
-    "badge": "OVER 1.5 FT",
-    "odds": 1.75,
-    "stake": 20.0,
-    "status": "LOST",
-    "created_at": 1789237738.4864447,
-    "settled_at": 1789243006.1009266
-  },
-  "us pianese vs us grosseto": {
-    "bet_id": 119816863,
-    "match": "US Pianese vs US Grosseto",
-    "badge": "OVER 0.5 FT",
-    "odds": 1.6,
-    "stake": 20.0,
-    "status": "WON",
-    "created_at": 1789244498.2020192,
-    "settled_at": 1789244716.5023477
-  },
-  "club ciudad de bolivar vs ca central norte salta": {
-    "bet_id": 119817104,
-    "match": "Club Ciudad de Bolivar vs CA Central Norte Salta",
-    "badge": "OVER 0.5 FT",
-    "odds": 2.07,
-    "stake": 20.0,
-    "status": "LOST",
-    "created_at": 1789244775.865576,
-    "settled_at": 1789246827.2766695
-  },
-  "estudiantes merida vs deportivo tachira": {
-    "bet_id": 119821888,
-    "match": "Estudiantes Merida vs Deportivo Tachira",
-    "badge": "OVER 1.5 FT",
-    "odds": 1.55,
-    "stake": 20.0,
-    "status": "WON",
-    "created_at": 1789248324.827821,
-    "settled_at": 1789294642.0774221
-  },
-  "scu torreense [k] vs rio ave [k]": {
-    "bet_id": 119895304,
-    "match": "SCU Torreense [K] vs Rio Ave [K]",
-    "badge": "OVER 1.5 FT",
-    "odds": 1.57,
-    "stake": 20.0,
-    "status": "WON",
-    "created_at": 1789323616.6953373,
-    "settled_at": 1789324963.7856228
-  },
-  "crixas ec go vs mineiros go": {
-    "bet_id": 119901813,
-    "match": "Crixas EC GO vs Mineiros GO",
-    "badge": "OVER 1.5 FT",
-    "odds": 1.65,
-    "stake": 20.0,
-    "status": "WON",
-    "created_at": 1789329324.394611,
-    "settled_at": 1789330916.7908378
-  },
-  "goianesia go vs gremio anapolis go": {
-    "bet_id": 119903909,
-    "match": "Goianesia GO vs Gremio Anapolis GO",
+  "neptunas klaipeda vs fk jonava": {
+    "bet_id": 119702659,
+    "match": "Neptunas Klaipeda vs FK Jonava",
     "badge": "OVER 1.5 FT",
     "odds": 1.5,
     "stake": 20.0,
     "status": "WON",
-    "created_at": 1789331046.6262813,
-    "settled_at": 1789332156.9786172
+    "created_at": 1789137121.301522,
+    "settled_at": 1789139497.9128346
+  },
+  "panama city fc vs tauro fc ii": {
+    "bet_id": 119741378,
+    "match": "Panama City FC vs Tauro FC II",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789179773.3542244,
+    "settled_at": 1789388729.749272
+  },
+  "dimas escazu [k] vs adff pococi [k]": {
+    "bet_id": 119742981,
+    "match": "Dimas Escazu [K] vs ADFF Pococi [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.52,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789182728.6741886,
+    "settled_at": 1789388730.0597239
+  },
+  "north lakes united [k] vs caboolture sports fc [k]": {
+    "bet_id": 119744322,
+    "match": "North Lakes United [K] vs Caboolture Sports FC [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789185227.817417,
+    "settled_at": 1789388731.4808965
+  },
+  "quilmes ac vs san martin san juan": {
+    "bet_id": 119822413,
+    "match": "Quilmes AC vs San Martin San Juan",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.93,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789248772.9073267,
+    "settled_at": 1789250816.5985248
+  },
+  "envigado fc vs itagui leones fc": {
+    "bet_id": 119823528,
+    "match": "Envigado FC vs Itagui Leones FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789249782.1421738,
+    "settled_at": 1789251138.0377314
+  },
+  "maringa fc vs santa cruz pe": {
+    "bet_id": 119833794,
+    "match": "Maringa FC vs Santa Cruz PE",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789253740.7357788,
+    "settled_at": 1789259845.7632594
+  },
+  "internacional de bogota [k] vs millonarios fc [k]": {
+    "bet_id": 119837996,
+    "match": "Internacional de Bogota [K] vs Millonarios FC [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.9,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789259539.5597355,
+    "settled_at": 1789264331.616396
+  },
+  "richmond kickers vs chattanooga red wolves": {
+    "bet_id": 119838255,
+    "match": "Richmond Kickers vs Chattanooga Red Wolves",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789259988.8091605,
+    "settled_at": 1789260969.7476635
+  },
+  "orca kamogawa [k] vs shizuoka ssu bonita [k]": {
+    "bet_id": 119848901,
+    "match": "Orca Kamogawa [K] vs Shizuoka SSU Bonita [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.65,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789280914.8751748,
+    "settled_at": 1789283270.7675164
+  },
+  "yuen long fc vs kui tan sc": {
+    "bet_id": 119849174,
+    "match": "Yuen Long FC vs Kui Tan SC",
+    "badge": "OVER 1.5 FT",
+    "odds": 2.15,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789281598.896169,
+    "settled_at": 1789282602.0394228
+  },
+  "criacao shinjuku vs maruyasu okazaki": {
+    "bet_id": 119850355,
+    "match": "Criacao Shinjuku vs Maruyasu Okazaki",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.51,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1789283757.9978526
+  },
+  "canberra croatia fc vs cooma tigers": {
+    "bet_id": 119860275,
+    "match": "Canberra Croatia FC vs Cooma Tigers",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789297829.0698414,
+    "settled_at": 1789298733.8322494
+  },
+  "atletico goianiense vs criciuma sc": {
+    "bet_id": 119900122,
+    "match": "Atletico Goianiense vs Criciuma SC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.7,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789327671.6263342,
+    "settled_at": 1789329296.9472845
+  },
+  "montego bay united vs chapelton maroons": {
+    "bet_id": 119912983,
+    "match": "Montego Bay United vs Chapelton Maroons",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789336727.3461344,
+    "settled_at": 1789337949.9318013
+  },
+  "fuerte san francisco vs municipal limeno": {
+    "bet_id": 119914315,
+    "match": "Fuerte San Francisco vs Municipal Limeno",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789338026.8226483,
+    "settled_at": 1789338947.075421
+  },
+  "cd godoy cruz vs colon santa fe": {
+    "bet_id": 119914348,
+    "match": "CD Godoy Cruz vs Colon Santa Fe",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.61,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789338090.0161636,
+    "settled_at": 1789339707.5475557
+  },
+  "moca fc vs cibao cf": {
+    "bet_id": 119917137,
+    "match": "Moca FC vs Cibao CF",
+    "badge": "OVER 0.5 FT",
+    "odds": 1.55,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789341607.727806,
+    "settled_at": 1789341906.7899904
+  },
+  "santos laguna vs fc juarez": {
+    "bet_id": 119925290,
+    "match": "Santos Laguna vs FC Juarez",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "WON",
+    "created_at": 1789349397.2507265,
+    "settled_at": 1789352947.8748727
+  },
+  "cucuta deportivo fc vs millonarios fc": {
+    "bet_id": 119927159,
+    "match": "Cucuta Deportivo FC vs Millonarios FC",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.6,
+    "stake": 20.0,
+    "status": "PENDING",
+    "created_at": 1789353608.5129745
+  },
+  "seoul city [k] vs hwacheon kspo [k]": {
+    "bet_id": 119938039,
+    "match": "Seoul City [K] vs Hwacheon KSPO [K]",
+    "badge": "OVER 1.5 FT",
+    "odds": 1.5,
+    "stake": 20.0,
+    "status": "LOST",
+    "created_at": 1789381359.3164163,
+    "settled_at": 1789387199.5899835
   }
 }

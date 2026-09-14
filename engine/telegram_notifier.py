@@ -2689,7 +2689,7 @@ class TelegramNotifier:
                         is_timeout_settlement = True
 
                 if is_timeout_settlement:
-                    print(f"[Telegram Watchdog] 🧹 Automatyczne uwalnianie karty meczu zakończonego: {c_home} vs {c_away} (od kickoffu: {time_since_kickoff/60:.0f}m, od typu: {time_since_creation/60:.0f}m)")
+                    print(f"[Telegram Watchdog] [CLEANUP] Automatyczne uwalnianie karty meczu zakonczonego: {c_home} vs {c_away} (od kickoffu: {time_since_kickoff/60:.0f}m, od typu: {time_since_creation/60:.0f}m)")
                     target_half = '1H' if is_ht_card else 'FT'
                     target_min = 45 if is_ht_card else 90
                     synthetic_fin = {
