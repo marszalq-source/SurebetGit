@@ -2,10 +2,12 @@ import sys
 import os
 import unittest
 import math
+import time
 sys.path.insert(0, os.path.abspath('.'))
 
 from engine.goal_triggers import GoalTriggersEngine
 from sts_live_config import POLISH_TAX_MULTIPLIER, MIN_EV_PL_4_STAR, MIN_ODDS
+from engine.live_matcher import get_canonical_match_key
 
 
 class TestLinePriorityAndPoissonEV(unittest.TestCase):
@@ -19,6 +21,72 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
             'corners_total': 5,
             'big_chances_total': 1,
             'red_cards_total': 0
+        }
+
+    def _setup_stream_history(self, match_data, stats_cur, stars_target=4):
+        if 'canonical_match_key' not in match_data:
+            match_data['canonical_match_key'] = f"test_stream_{id(match_data)}"
+        match_key = match_data['canonical_match_key'].strip().lower()
+
+        now = time.time()
+        cur_min = int(match_data.get('minute', 30))
+        h_score = match_data.get('home_score', 0)
+        a_score = match_data.get('away_score', 0)
+        tot_goals = h_score + a_score
+
+        if stars_target == 5:
+            snap_10 = {
+                'time': now - 600.0, 'minute': cur_min - 10, 'half': match_data.get('half', '1H'),
+                'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+                'shots': max(0, int(stats_cur.get('shots_total', 0)) - 7),
+                'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 3),
+                'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 25),
+                'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 3),
+                'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.7),
+                'xg_home': 0.4, 'xg_away': 0.2, 'sot_home': 2, 'sot_away': 0,
+                'big_chances': 0, 'red_cards': 0, 'is_finished': False
+            }
+            snap_5 = {
+                'time': now - 300.0, 'minute': cur_min - 5, 'half': match_data.get('half', '1H'),
+                'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+                'shots': max(0, int(stats_cur.get('shots_total', 0)) - 4),
+                'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 2),
+                'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 14),
+                'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 2),
+                'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.4),
+                'xg_home': 0.6, 'xg_away': 0.25, 'sot_home': 3, 'sot_away': 0,
+                'big_chances': 0, 'red_cards': 0, 'is_finished': False
+            }
+        else:
+            snap_10 = {
+                'time': now - 600.0, 'minute': cur_min - 10, 'half': match_data.get('half', '1H'),
+                'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+                'shots': max(0, int(stats_cur.get('shots_total', 0)) - 3),
+                'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 1),
+                'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 11),
+                'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 1),
+                'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.30),
+                'xg_home': 0.4, 'xg_away': 0.2, 'sot_home': 2, 'sot_away': 0,
+                'big_chances': 0, 'red_cards': 0, 'is_finished': False
+            }
+            snap_5 = {
+                'time': now - 300.0, 'minute': cur_min - 5, 'half': match_data.get('half', '1H'),
+                'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+                'shots': max(0, int(stats_cur.get('shots_total', 0)) - 2),
+                'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 1),
+                'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 6),
+                'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 1),
+                'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.17),
+                'xg_home': 0.5, 'xg_away': 0.23, 'sot_home': 2, 'sot_away': 0,
+                'big_chances': 0, 'red_cards': 0, 'is_finished': False
+            }
+
+        self.triggers._match_history[match_key] = {
+            'last_seen': now - 300.0,
+            'last_score': (h_score, a_score),
+            'last_goal_minute': None,
+            'last_goal_time': None,
+            'snapshots': [snap_10, snap_5]
         }
 
     # -------------------------------------------------------------
@@ -97,6 +165,7 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
                 {'name': 'Over 2.5 FT', 'market': 'Over 2.5 FT', 'odds': 2.45, 'source': 'STS_REAL'},
             ]
         }
+        self._setup_stream_history(match_data, self.base_stats, 4)
         res = self.triggers.evaluate_match(match_data, self.base_stats, {})
         self.assertTrue(res['has_signals'], "Over 1.5 FT przy 1:0 i kursie 1.75 musi wygenerować sygnał")
         self.assertEqual(res['primary_signal']['badge'], 'OVER 1.5 FT')
@@ -120,6 +189,7 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
                 {'name': 'Over 2.5 FT', 'market': 'Over 2.5 FT', 'odds': 1.75, 'source': 'STS_REAL'}
             ]
         }
+        self._setup_stream_history(match_data, self.base_stats, 4)
         res = self.triggers.evaluate_match(match_data, self.base_stats, {})
         self.assertTrue(res['has_signals'], "Over 2.5 FT przy 1:1 (k=1) musi być dozwolony")
         self.assertEqual(res['primary_signal']['badge'], 'OVER 2.5 FT')
@@ -157,6 +227,7 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
                 {'name': 'Over 1.5 FT', 'market': 'Over 1.5 FT', 'odds': 1.95, 'source': 'STS_REAL'}
             ]
         }
+        self._setup_stream_history(match_data, self.base_stats, 4)
         res = self.triggers.evaluate_match(match_data, self.base_stats, {})
         self.assertTrue(res['has_signals'], "Kurs 1.95 na Over 1.5 FT przy 1:0 musi być dozwolony")
         sig = res['primary_signal']
@@ -177,8 +248,9 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
 
         stats_high_apm = dict(self.base_stats)
         stats_high_apm['dangerous_attacks_total'] = 55
-        stats_high_apm['shots_total'] = 12
-        stats_high_apm['shots_on_target_total'] = 5
+        stats_high_apm['shots_total'] = 14
+        stats_high_apm['shots_on_target_total'] = 6
+        stats_high_apm['xg_total'] = 1.45
 
         match_data = {
             'minute': 30,
@@ -191,6 +263,7 @@ class TestLinePriorityAndPoissonEV(unittest.TestCase):
                 {'name': 'Over 1.5 FT', 'market': 'Over 1.5 FT', 'odds': 1.75, 'source': 'STS_REAL'}
             ]
         }
+        self._setup_stream_history(match_data, stats_high_apm, 5)
         res = self.triggers.evaluate_match(match_data, stats_high_apm, {})
         self.assertTrue(len(logged) > 0)
         eval_item = logged[-1]

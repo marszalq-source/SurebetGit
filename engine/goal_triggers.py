@@ -23,6 +23,24 @@ from engine.shadow_logger import ShadowLogger
 from engine.live_matcher import get_canonical_match_key
 
 
+def _safe_int_val(val: Any) -> Optional[int]:
+    """Bezpieczne rzutowanie na int z rozróżnieniem poprawnej liczby od braku danych / błędu."""
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        try:
+            return int(val)
+        except (ValueError, OverflowError):
+            return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return None
+
+
 class GoalTriggersEngine:
     # Ligi juniorskie, rezerwowe i amatorskie (U19/U20/U21, Development, PL2, Primavera) odblokowane
     # po audycie: pod nowym zaostrzonym silnikiem jakościowym generują WR 78.9% i dodatni yield netto.
@@ -55,13 +73,22 @@ class GoalTriggersEngine:
         Odrzuca mecze, które ze względów czasowych, statusowych, statystycznych lub analitycznych
         nie mają szansy na wygenerowanie sygnału w obecnej chwili.
         """
-        league = str(match_data.get('league', ''))
-        home = str(match_data.get('home_team', ''))
-        away = str(match_data.get('away_team', ''))
+        league = str(match_data.get('league', '')).strip()
+        home = str(match_data.get('home_team', '')).strip()
+        away = str(match_data.get('away_team', '')).strip()
+        match_full_text = f"{league.lower()} {home.lower()} {away.lower()}"
+
+        # Blokada wirtualnych i esportu przed Playwright (spójność z Bramką 1 evaluate_match)
+        if any(kw in match_full_text for kw in LEAGUE_BLACKLIST_KEYWORDS):
+            return False
+
         if cls.is_analytic_blacklisted(league, home, away):
             return False
 
-        minute = int(match_data.get('minute', 0))
+        minute = _safe_int_val(match_data.get('minute'))
+        if minute is None:
+            return False
+
         half = str(match_data.get('half', '1H')).upper()
         stage_text = str(match_data.get('stage_text', '')).lower()
 
@@ -102,9 +129,9 @@ class GoalTriggersEngine:
         total_goals = home_score + away_score
         score_diff = abs(home_score - away_score)
 
-        # Filtry anomalii (Bramka 2): jałowe posiadanie lub blowout
-        dang_att = int(stats.get('dangerous_attacks_total') or 0)
-        if minute >= 25 and sot is not None and sot == 0 and dang_att >= 20:
+        # Filtry anomalii (Bramka 2): jałowe posiadanie lub blowout (odporne na brak danych)
+        dang_att = _safe_int_val(stats.get('dangerous_attacks_total'))
+        if minute >= 25 and sot is not None and sot == 0 and dang_att is not None and dang_att >= 20:
             return False
         if half == '2H' and score_diff >= 3 and minute >= 60:
             return False
@@ -120,8 +147,8 @@ class GoalTriggersEngine:
 
         # 3. Scenariusz 4 (OVER_15_FT): 2H, 46'-68', suma goli <= 1 (przy 0:0 max do 60')
         if half == '2H' and 46 <= minute <= 68 and total_goals <= 1:
-            if total_goals == 0 and minute > 60:
-                return False  # Filtr B: 0:0 po 60' zablokowany dla 1.5 FT
+            if total_goals == 0 and minute >= 60:
+                return False  # Filtr B: 0:0 po 60' zablokowany dla 1.5 FT (ujednolicone z evaluate_match)
             return True
 
         # 4. Scenariusz 5 (Late Goal 2H): 2H, 63'-75', różnica goli <= 2, max 2 gole (linia 0.5 lub 1.5/2.5 FT)
@@ -425,12 +452,13 @@ class GoalTriggersEngine:
         Ocenia mecz i wyznacza wskaźniki intensywności oraz aktywne sygnały bramkowe.
         Zwraca tylko sygnały o potwierdzonej wartości (Value Bet / Sweet Spot).
         """
-        minute = max(0, min(120, int(match_data.get('minute', 0))))
+        minute_raw = match_data.get('minute')
+        minute_val = _safe_int_val(minute_raw)
         is_started = match_data.get('is_started', True)
         half = str(match_data.get('half', '1H')).upper()
 
-        # Jeśli mecz jeszcze się nie rozpoczął lub minuta wynosi 0
-        if not is_started or half == 'PRE' or minute == 0:
+        # Jeśli mecz jeszcze się nie rozpoczął, brak minuty lub minuta wynosi 0
+        if not is_started or half == 'PRE' or minute_val is None or minute_val <= 0:
             return {
                 'danger_index': 0,
                 'danger_rating': 'OCZEKUJE',
@@ -441,6 +469,9 @@ class GoalTriggersEngine:
                 'top_recommendation': 'Mecz przed rozpoczęciem'
             }
 
+        minute = max(0, min(120, minute_val))
+        match_data['minute'] = minute
+
         home_score = max(0, int(match_data.get('home_score') or 0))
         away_score = max(0, int(match_data.get('away_score') or 0))
         total_goals = home_score + away_score
@@ -450,7 +481,8 @@ class GoalTriggersEngine:
         xg_total = max(0.0, float(stats.get('xg_total') or 0.0))
         shots_total = max(0, int(stats.get('shots_total') or 0))
         sot = max(0, int(stats.get('shots_on_target_total') or 0))
-        dangerous_attacks = max(0, int(stats.get('dangerous_attacks_total') or 0))
+        da_val = _safe_int_val(stats.get('dangerous_attacks_total'))
+        dangerous_attacks = max(0, da_val) if da_val is not None else 0
         corners = max(0, int(stats.get('corners_total') or 0))
         red_cards = max(0, int(stats.get('red_cards_total') or 0))
         big_chances = max(0, int(stats.get('big_chances_total') or 0))
@@ -494,7 +526,7 @@ class GoalTriggersEngine:
             'dangerous_attacks': dangerous_attacks,
             'has_da': bool(
                 stats.get('has_da') is True or
-                ('dangerous_attacks_total' in stats and stats.get('dangerous_attacks_total') is not None)
+                (da_val is not None)
             ),
             'corners': corners,
             'xg': xg_total,
@@ -818,7 +850,7 @@ class GoalTriggersEngine:
                 trend=trend, trend_state=trend_state,
                 sot_total=sot, sot_10m=d_sot_10, shots_total=shots_total,
                 corners_total=corners, big_chances=big_chances,
-                dangerous_attacks=dang_att if dang_att is not None else (int(stats['dangerous_attacks_total']) if stats.get('dangerous_attacks_total') is not None else None),
+                dangerous_attacks=dang_att if dang_att is not None else _safe_int_val(stats.get('dangerous_attacks_total')),
                 apm=apm, xg_total=xg_total, xg_10m=d_xg_10,
                 model_probability=model_p, implied_probability=implied_p,
                 edge=edge_val, ev=ev_val,

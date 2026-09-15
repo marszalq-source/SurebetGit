@@ -110,20 +110,13 @@ class TestGoalTriggersAnalyticalFilters(unittest.TestCase):
     # 3. CZARNA LISTA LIG ORAZ WYJATEK REVELACAO
     # -----------------------------------------------------------------
     def test_blacklist_leagues_rejected(self):
-        """Ligi U21, U20, U19, U18, U17, AMATEUR, DEVELOPMENT, RESERVE oraz puchary Rumunia/Chiny/Arabia odrzucane."""
-        blacklisted_examples = [
-            ('Anglia Amatorzy, Professional Development League', 'Team A', 'Team B'),
-            ('Szkocja, Reserve League', 'Team A', 'Team B'),
-            ('Wlochy, Campionato Primavera 1 U21', 'Team A', 'Team B'),
-            ('Hiszpania, Division de Honor Juvenil', 'CA Osasuna U19', 'UD Valle de Aranguren'),
-            ('Brazylia, Paulista U20', 'Palmeiras U20', 'Corinthians U20'),
-            ('Niemcy, U17 Bundesliga', 'Bayern U17', 'Dortmund U17'),
-            ('Polska, Centralna Liga Juniorow U18', 'Legia U18', 'Lech U18'),
+        """Puchary Rumunia/Chiny/Arabia odrzucane przez czarna liste, a odblokowane U17-U21/rezerwy dopuszczone."""
+        blacklisted_cups = [
             ('Rumunia, Puchar', 'Team A', 'Team B'),
             ('Chiny, Puchar', 'Team A', 'Team B'),
             ('Arabia Saudyjska, Division 1', 'Team A', 'Team B')
         ]
-        for lg, h_team, a_team in blacklisted_examples:
+        for lg, h_team, a_team in blacklisted_cups:
             match_data = {
                 'minute': 22,
                 'half': '1H',
@@ -138,8 +131,35 @@ class TestGoalTriggersAnalyticalFilters(unittest.TestCase):
                 ]
             }
             res = self.triggers.evaluate_match(match_data, self.base_stats, {})
-            self.assertFalse(res['has_signals'], f"Mecz/liga '{lg}' ({h_team} vs {a_team}) powinna byc odrzucona przez czarna liste!")
+            self.assertFalse(res['has_signals'], f"Puchar/liga '{lg}' ({h_team} vs {a_team}) powinna byc odrzucona przez czarna liste!")
             self.assertIn('wykluczony analitycznie', str(res.get('top_recommendation', '')))
+
+        unblocked_youth_reserve = [
+            ('Anglia Amatorzy, Professional Development League', 'Team A', 'Team B'),
+            ('Szkocja, Reserve League', 'Team A', 'Team B'),
+            ('Wlochy, Campionato Primavera 1 U21', 'Team A', 'Team B'),
+            ('Hiszpania, Division de Honor Juvenil', 'CA Osasuna U19', 'UD Valle de Aranguren'),
+            ('Brazylia, Paulista U20', 'Palmeiras U20', 'Corinthians U20'),
+            ('Niemcy, U17 Bundesliga', 'Bayern U17', 'Dortmund U17'),
+            ('Polska, Centralna Liga Juniorow U18', 'Legia U18', 'Lech U18'),
+        ]
+        for lg, h_team, a_team in unblocked_youth_reserve:
+            match_data = {
+                'minute': 22,
+                'half': '1H',
+                'home_score': 1,
+                'away_score': 0,
+                'league': lg,
+                'home_team': h_team,
+                'away_team': a_team,
+                'is_started': True,
+                'live_markets': [
+                    {'name': 'Over 1.5 FT', 'market': 'MECZ', 'odds': 1.75, 'source': 'STS_REAL'}
+                ]
+            }
+            res = self.triggers.evaluate_match(match_data, self.base_stats, {})
+            self.assertNotIn('wykluczony analitycznie', str(res.get('top_recommendation', '')),
+                             f"Odblokowana liga juniorska/rezerwowa '{lg}' nie powinna byc oznaczona jako wykluczona analitycznie!")
 
     def test_revelacao_exception_allowed(self):
         """Portugalia Liga Revelacao U23 NIE MOZE byc odrzucona (wyjatek)."""

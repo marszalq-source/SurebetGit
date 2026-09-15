@@ -4,13 +4,57 @@ sys.path.insert(0, os.path.abspath('.'))
 
 import unittest
 import math
+import time
 from engine.goal_triggers import GoalTriggersEngine
 from engine.sts_live_engine import STSLiveEngine
+from engine.live_matcher import get_canonical_match_key
 
 class TestComprehensiveSignalSimulation(unittest.TestCase):
     def setUp(self):
         self.triggers = GoalTriggersEngine()
         self.sts_engine = STSLiveEngine()
+
+    def _setup_stream_history(self, match_data, stats_cur, stars_target=4):
+        if 'canonical_match_key' not in match_data:
+            match_data['canonical_match_key'] = f"test_stream_{id(match_data)}"
+        match_key = match_data['canonical_match_key'].strip().lower()
+
+        now = time.time()
+        cur_min = int(match_data.get('minute', 30))
+        h_score = match_data.get('home_score', 0)
+        a_score = match_data.get('away_score', 0)
+        tot_goals = h_score + a_score
+
+        snap_10 = {
+            'time': now - 600.0, 'minute': cur_min - 10, 'half': match_data.get('half', '1H'),
+            'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+            'shots': max(0, int(stats_cur.get('shots_total', 0)) - 3),
+            'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 1),
+            'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 11),
+            'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 1),
+            'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.25),
+            'xg_home': 0.4, 'xg_away': 0.2, 'sot_home': 1, 'sot_away': 0,
+            'big_chances': 0, 'red_cards': 0, 'is_finished': False
+        }
+        snap_5 = {
+            'time': now - 300.0, 'minute': cur_min - 5, 'half': match_data.get('half', '1H'),
+            'home_score': h_score, 'away_score': a_score, 'total_goals': tot_goals,
+            'shots': max(0, int(stats_cur.get('shots_total', 0)) - 2),
+            'sot': max(0, int(stats_cur.get('shots_on_target_total', 0)) - 1),
+            'dangerous_attacks': max(0, int(stats_cur.get('dangerous_attacks_total', 0)) - 6),
+            'has_da': True, 'corners': max(0, int(stats_cur.get('corners_total', 0)) - 1),
+            'xg': max(0.0, float(stats_cur.get('xg_total', 0.0)) - 0.15),
+            'xg_home': 0.5, 'xg_away': 0.23, 'sot_home': 1, 'sot_away': 0,
+            'big_chances': 0, 'red_cards': 0, 'is_finished': False
+        }
+
+        self.triggers._match_history[match_key] = {
+            'last_seen': now - 300.0,
+            'last_score': (h_score, a_score),
+            'last_goal_minute': None,
+            'last_goal_time': None,
+            'snapshots': [snap_10, snap_5]
+        }
 
     # -------------------------------------------------------------
     # 1. STRATEGIE BRAMKOWE (5 STRATEGII)
@@ -137,6 +181,7 @@ class TestComprehensiveSignalSimulation(unittest.TestCase):
             'big_chances_total': 2,
             'red_cards_total': 0
         }
+        self._setup_stream_history(match_data, stats)
         res = self.triggers.evaluate_match(match_data, stats, {})
         self.assertGreaterEqual(res['danger_index'], 50)
         if res['has_signals']:
@@ -171,6 +216,7 @@ class TestComprehensiveSignalSimulation(unittest.TestCase):
             'big_chances_total': 2,
             'red_cards_total': 0
         }
+        self._setup_stream_history(match_data, stats)
         res = self.triggers.evaluate_match(match_data, stats, {})
         self.assertGreaterEqual(res['danger_index'], 50)
         # Niski rynek Over 1.5 FT nie jest zablokowany przez filtr wysokich linii 61+
@@ -203,6 +249,7 @@ class TestComprehensiveSignalSimulation(unittest.TestCase):
         # Kurs idealny w Sweet Spocie (1.80 >= 1.60) -> 4⭐ akceptacja
         mkt_ideal = {'minute': 20, 'half': '1H', 'home_score': 0, 'away_score': 0, 'league': 'Ekstraklasa', 'is_started': True,
                      'live_markets': [{'name': 'Over 0.5 FT', 'market': 'MECZ', 'odds': 1.80, 'source': 'STS_REAL'}]}
+        self._setup_stream_history(mkt_ideal, stats_4star)
         res_ideal = self.triggers.evaluate_match(mkt_ideal, stats_4star, {})
         self.assertTrue(res_ideal['has_signals'])
         self.assertGreaterEqual(res_ideal['primary_signal']['stars'], 4)
