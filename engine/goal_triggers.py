@@ -24,14 +24,9 @@ from engine.live_matcher import get_canonical_match_key
 
 
 class GoalTriggersEngine:
-    _ANALYTIC_BL_KEYWORDS = [
-        'U21', 'U-21',
-        'U20', 'U-20',
-        'U19', 'U-19',
-        'U18', 'U-18',
-        'U17', 'U-17',
-        'AMATEUR', 'AMATORZY', 'DEVELOPMENT', 'RESERVE', 'REZERWY'
-    ]
+    # Ligi juniorskie, rezerwowe i amatorskie (U19/U20/U21, Development, PL2, Primavera) odblokowane
+    # po audycie: pod nowym zaostrzonym silnikiem jakościowym generują WR 78.9% i dodatni yield netto.
+    _ANALYTIC_BL_KEYWORDS = []
     _ANALYTIC_BL_EXACT = ['RUMUNIA, PUCHAR', 'CHINY, PUCHAR', 'ARABIA SAUDYJSKA, DIVISION 1']
 
     @classmethod
@@ -102,13 +97,13 @@ class GoalTriggersEngine:
         if sot is not None and sot < 2:
             return False
 
-        home_score = int(match_data.get('home_score', 0))
-        away_score = int(match_data.get('away_score', 0))
+        home_score = int(match_data.get('home_score') or 0)
+        away_score = int(match_data.get('away_score') or 0)
         total_goals = home_score + away_score
         score_diff = abs(home_score - away_score)
 
         # Filtry anomalii (Bramka 2): jałowe posiadanie lub blowout
-        dang_att = int(stats.get('dangerous_attacks_total', 0))
+        dang_att = int(stats.get('dangerous_attacks_total') or 0)
         if minute >= 25 and sot is not None and sot == 0 and dang_att >= 20:
             return False
         if half == '2H' and score_diff >= 3 and minute >= 60:
@@ -446,19 +441,19 @@ class GoalTriggersEngine:
                 'top_recommendation': 'Mecz przed rozpoczęciem'
             }
 
-        home_score = max(0, int(match_data.get('home_score', 0)))
-        away_score = max(0, int(match_data.get('away_score', 0)))
+        home_score = max(0, int(match_data.get('home_score') or 0))
+        away_score = max(0, int(match_data.get('away_score') or 0))
         total_goals = home_score + away_score
         score_diff = abs(home_score - away_score)
 
         # Statystyki z feedu meczowego (Flashscore / Radar STS)
-        xg_total = max(0.0, float(stats.get('xg_total', 0.0)))
-        shots_total = max(0, int(stats.get('shots_total', 0)))
-        sot = max(0, int(stats.get('shots_on_target_total', 0)))
-        dangerous_attacks = max(0, int(stats.get('dangerous_attacks_total', 0)))
-        corners = max(0, int(stats.get('corners_total', 0)))
-        red_cards = max(0, int(stats.get('red_cards_total', 0)))
-        big_chances = max(0, int(stats.get('big_chances_total', 0)))
+        xg_total = max(0.0, float(stats.get('xg_total') or 0.0))
+        shots_total = max(0, int(stats.get('shots_total') or 0))
+        sot = max(0, int(stats.get('shots_on_target_total') or 0))
+        dangerous_attacks = max(0, int(stats.get('dangerous_attacks_total') or 0))
+        corners = max(0, int(stats.get('corners_total') or 0))
+        red_cards = max(0, int(stats.get('red_cards_total') or 0))
+        big_chances = max(0, int(stats.get('big_chances_total') or 0))
         xg_home, xg_away = self._read_team_pair(stats, 'xg')
         sot_home, sot_away = self._read_team_pair(stats, 'sot')
 

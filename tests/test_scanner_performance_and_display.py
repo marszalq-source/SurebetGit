@@ -99,13 +99,11 @@ class TestScannerPerformanceAndDisplay(unittest.TestCase):
 
     def test_early_analytic_blacklist_blocks_playwright_and_external_apis(self):
         """
-        2. Mecze na ANALYTIC_BL (U19/U20/U21, rezerwy, amatorzy, puchary niszowe)
+        2. Mecze na ANALYTIC_BL (puchary niszowe o ujemnym ROI)
         muszą być odrzucone wcześnie i NIGDY nie mogą wywoływać get_match_real_live_markets (Playwright).
+        Ligi młodzieżowe są odblokowane pod kontrolą silnika jakościowego.
         """
         bl_leagues = [
-            ("U21 Premier League Cup", "Chelsea U21", "Arsenal U21"),
-            ("Czech U19 League", "Sparta Prague U19", "Slavia Prague U19"),
-            ("Poland Amateur League", "Klub A", "Klub B"),
             ("Rumunia, Puchar", "Steaua", "Dinamo"),
             ("Chiny, Puchar", "Beijing", "Shanghai"),
             ("Arabia Saudyjska, Division 1", "Al-Hazem", "Al-Batin")
@@ -117,9 +115,15 @@ class TestScannerPerformanceAndDisplay(unittest.TestCase):
                 f"Powinno być na czarnej liście: {league}, {home} vs {away}"
             )
 
-        # Wyjątek REVELACAO nie może być na czarnej liście
+        # Ligi młodzieżowe i rezerwowe oraz Liga Revelacao U23 nie mogą być na czarnej liście
         self.assertFalse(
             GoalTriggersEngine.is_analytic_blacklisted("Liga Revelacao U23", "Estoril U23", "Benfica U23")
+        )
+        self.assertFalse(
+            GoalTriggersEngine.is_analytic_blacklisted("Anglia, Premier League 2", "West Ham U21", "Liverpool U21")
+        )
+        self.assertFalse(
+            GoalTriggersEngine.is_analytic_blacklisted("Włochy, Campionato Primavera 1", "AS Roma U20", "Como U20")
         )
 
     def test_di_65_non_candidate_does_not_call_playwright(self):
